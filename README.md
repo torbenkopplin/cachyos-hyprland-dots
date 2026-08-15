@@ -105,6 +105,7 @@ window along.
 | `M + X` | Clipboard history |
 | `M + O` | Shell settings |
 | `M + B` | Pin / unpin the bar |
+| `M + SHIFT + G` | Cycle frosted glass level |
 | `M + CTRL + Escape` | Lock |
 | `M + SHIFT + Escape` | Session menu |
 
@@ -242,6 +243,38 @@ nothing needs per-tool configuration.
 Drop the `terminal_live` entry from `40-templates.toml` if you would rather
 terminals only changed on restart.
 
+### Frosted glass
+
+On by default, and tied to the scheme. `bin/noct-glass` runs from Noctalia's
+`colors_changed` hook, so the level follows whatever you pick in `/theme` —
+levels live in `config/noctalia/glass.conf`, keyed by scheme. **`SUPER+SHIFT+G`**
+cycles opaque → light → default → heavy as a temporary override.
+
+The effect is not "make windows transparent". Compositor opacity fades a
+window's *text* along with its background, which is unreadable for work. Real
+frosted glass is the app drawing a translucent background while the compositor
+blurs what is behind it:
+
+| Surface | Frosted? | How |
+|---|---|---|
+| kitty | yes | `background_opacity` + Hyprland blur behind it |
+| Noctalia bar and panels | yes | `background_opacity` + the layer blur rule |
+| GTK / Qt apps | **no** | they paint an opaque background and offer no way not to |
+
+That last row is why "every app possible" is a genuinely short list. If you
+want it anyway for a specific app, add its class to `GLASS_WINDOWS` in
+`conf/rules.lua` — it is left empty rather than populated, because the trade is
+translucent body text.
+
+Two consequences worth knowing:
+
+- **Colour changes apply live; glass changes need a new terminal.** kitty reads
+  `background_opacity` at startup, whereas colours arrive over OSC sequences.
+- **Neovim will look opaque inside a transparent kitty.** Your `noirblaze.lua`
+  paints `Normal` with `bg = #121212`. Making it `bg = "none"` fixes that — but
+  it is a change in *your nvim repo*, not this one, so it has not been made.
+  `config/kitty/README.md` has the snippet and the trade-off.
+
 Useful commands:
 
 ```sh
@@ -249,6 +282,7 @@ noctalia theme --list-templates      # every template id available to you
 noctalia msg templates-apply         # re-render without changing the theme
 noctalia msg theme-mode-toggle       # dark <-> light
 noctalia msg color-scheme-set builtin Gruvbox
+noct-glass show                      # level currently in effect
 ```
 
 ---
@@ -296,6 +330,7 @@ ignored, look there first.
 | noctalia, satty | the shell and its screenshot editor |
 | libpulse, networkmanager, bluez, power-profiles-daemon | the backends `/aout` `/ain` `/bt` `/net` `/power` shell out to — without these those providers just say "not installed" |
 | neovim, git, base-devel, nodejs, npm | editor, and what mason needs to build its servers |
+| fish, fisher | the login shell, and the plugin manager used to get a fish-native nvm |
 | ripgrep, fd, fzf, bat | what the neovim config calls out to (fzf-lua and its previewer) |
 | yazi, ffmpeg, p7zip, jq, poppler, imagemagick, chafa | file manager and its preview pipeline |
 | brave-bin, zen-browser-bin, chromium, firefox | browsers |
@@ -355,6 +390,14 @@ config/noctalia/
   templates/
     hyprland-colors.lua   window borders -> hypr/generated/colors.lua
     terminal-colors.sh    OSC repaint of already-open terminals
+config/kitty/
+  kitty.conf          carried over; theme + glass come from generated includes
+  search.py           third-party kitten (GPLv3), scroll_mark.py
+  README.md           what is not tracked here, and why
+config/fish/
+  config.fish         NEW -- there was no fish config to migrate
+  conf.d/environment.fish
+  README.md           the nvm-does-not-work-in-fish explanation
 config/yazi/
   yazi.toml           carried over from the Ubuntu setup
 browsers/
@@ -368,6 +411,7 @@ bin/
   noct-network        NetworkManager
   noct-power          power profiles, night light, caffeine
   noct-theme          colour scheme picker
+  noct-glass          frosted glass level, per scheme
 install.sh
 TESTING.md            post-install checklist — start here on first boot
 ```

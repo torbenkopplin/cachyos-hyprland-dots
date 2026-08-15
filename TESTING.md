@@ -192,6 +192,44 @@ Then through the launcher:
 > `light`, not a bug. Add a `"light"` object to `palettes/noirblaze.json` if
 > you want a real one.
 
+## 8c. Frosted glass — `bin/noct-glass`
+
+- [ ] `noct-glass show` prints a number with a **decimal point**, not a comma.
+      (awk formats per locale; the script pins `LC_ALL=C` to prevent `0,90`,
+      which Hyprland would refuse to parse. Worth re-checking if you ever edit
+      the script.)
+- [ ] `~/.config/hypr/generated/glass.lua` and
+      `~/.config/kitty/generated-glass.conf` both exist after the first scheme
+      change, and contain real numbers.
+- [ ] A new kitty window is translucent, with the wallpaper blurred behind it.
+- [ ] **Text stays fully opaque** — only the background is see-through.
+- [ ] Switching to noirblaze via `/theme` changes the glass level to 0.80
+      (`noct-glass show` confirms it) without you doing anything else.
+- [ ] `SUPER+SHIFT+G` cycles the level; a new terminal shows the change.
+- [ ] At level `1.00`, `glass.lua` has `enabled = false` for blur.
+- [ ] Changing scheme afterwards clears the manual override.
+- [ ] Hyprland does not error on `generated/glass.lua` after a `hyprctl reload`.
+
+> Neovim will look opaque inside a transparent kitty until `Normal`/`NormalNC`
+> use `bg = "none"` — that change belongs in your nvim repo, not this one.
+> See `config/kitty/README.md`.
+
+## 8d. kitty and fish
+
+- [ ] kitty starts with no config errors (`kitty --debug-config` if unsure).
+- [ ] `ctrl+f` still opens the search kitten.
+- [ ] Colours match the active scheme, and change when you switch scheme.
+- [ ] On a **fresh** machine, before Noctalia has rendered a palette, kitty
+      still starts — the two `include`s point at files that do not exist yet
+      and kitty should warn rather than fail.
+- [ ] `echo $SHELL` reports fish **after a fresh login** (chsh does not affect
+      the shell you ran the installer from).
+- [ ] Vi keys work at the prompt, and the cursor changes shape between modes.
+- [ ] `y` opens yazi and leaves the shell in the directory you quit from.
+- [ ] `nvm --version` works **in fish** (this is nvm.fish, not the bash one).
+- [ ] `node --version` works in a shell where no nvm version is selected —
+      this is the system package mason depends on.
+
 ## 9. Installer — `install.sh`
 
 - [ ] `./install.sh --all --dry-run` completes with no errors before you run
@@ -257,3 +295,7 @@ something misbehaves:
 | yazi's `%s` opener placeholder is still current | Carried over verbatim from your working config rather than modernised | `config/yazi/yazi.toml` |
 | Brave policy names (`BraveRewardsDisabled`, `BraveAIChatEnabled`, …) | Brave-specific policies are less stable than Chromium's; `brave://policy` is the check | `browsers/brave/policies.json` |
 | Zen reads `user.js` from profiles under `~/.zen` | Zen is a Firefox fork so this should hold, but its profile root is not documented as firmly | `install.sh` |
+| Noctalia's `kitty` template writes `current-theme.conf` | Inferred from CachyOS's shipped kitty.conf, which includes exactly that filename under a `BEGIN_KITTY_THEME` marker | `config/kitty/kitty.conf` |
+| `fisher` exists as a package | If not, install it by its documented one-liner and rerun; the installer warns rather than failing | `install.sh` |
+| `colors_changed` fires on a scheme change, not only a wallpaper change | Documented as "after the theme palette is resolved"; if it only fires for wallpapers, call `noct-glass apply` from `noct-theme act` instead | `50-glass.toml` |
+| `blur.xray` samples the wallpaper rather than windows behind | Documented behaviour; turn it off in `noct-glass` if windows behind show through oddly | `bin/noct-glass` |
