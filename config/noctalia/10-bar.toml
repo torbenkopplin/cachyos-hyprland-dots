@@ -31,7 +31,12 @@ reserve_space            = false   # no exclusive zone: full-height windows
 layer                    = "overlay"  # visible even over a fullscreen window
 
 thickness          = 34
-background_opacity = 0.92
+
+## Frosted: the layer rule in conf/rules.lua blurs Noctalia's surfaces, and
+## this is what lets that blur show through. Held constant rather than managed
+## by bin/noct-glass -- that runs from the colors_changed hook, and having it
+## write a Noctalia .toml would risk a config-reload loop.
+background_opacity = 0.85
 padding            = 14
 widget_spacing     = 8
 margin_edge        = 0

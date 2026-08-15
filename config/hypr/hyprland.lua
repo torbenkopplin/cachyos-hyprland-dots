@@ -25,3 +25,8 @@ require("conf.binds")
 -- The file legitimately does not exist until Noctalia has rendered a palette
 -- once, i.e. on a fresh install.
 pcall(require, "generated.colors")
+
+-- Frosted glass level for the active scheme, written by bin/noct-glass from
+-- Noctalia's colors_changed hook. Same pcall reasoning: absent until the first
+-- render, and a bare require() of a missing module would kill this file.
+pcall(require, "generated.glass")

@@ -32,6 +32,15 @@ hl.config({
         rounding       = ROUNDING,
         rounding_power = 2,
 
+        -- Opacity and blur are fallbacks only. bin/noct-glass overwrites both
+        -- from generated/glass.lua, which hyprland.lua loads last, using the
+        -- frosted-glass level configured per colour scheme in
+        -- ~/.config/noctalia/glass.conf.
+        --
+        -- Windows are rendered fully opaque on purpose. The frosted look comes
+        -- from the *app* drawing a translucent background (kitty's
+        -- background_opacity) with the compositor blurring behind it. Lowering
+        -- opacity here instead would fade the text along with the background.
         active_opacity   = 1.0,
         inactive_opacity = INACTIVE_OPACITY,
 
@@ -41,10 +50,10 @@ hl.config({
 
         blur = {
             enabled  = true,
-            size     = 4,
+            size     = 6,
             passes   = 2,
+            xray     = true,
             vibrancy = 0.1696,
-            -- Blur is here for Noctalia's panels, not for your terminals.
             popups   = true,
         },
     },

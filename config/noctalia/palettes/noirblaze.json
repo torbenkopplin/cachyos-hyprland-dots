@@ -1,21 +1,28 @@
 {
   "_comment": [
-    "noirblaze -- ported from ~/.config/nvim/colors/noirblaze.lua so the desktop",
-    "matches the editor. Monochrome greys with a single hot-pink accent.",
+    "noirblaze -- your colourscheme, as a Noctalia palette, so the whole",
+    "desktop can use it and not just the editor.",
     "",
-    "Source colours, using the names from the neovim theme:",
+    "The UI roles come from ~/.config/nvim/colors/noirblaze.lua:",
     "  bg #121212  bg2 #212121  bg3 #323232",
     "  dim1 #535353  dim2 #737373  dim3 #787878  dim4 #7a7a7a  mid #949494",
     "  fg4 #a7a7a7  fg3 #b0b0b0  fg2 #b4b4b4  fg1 #d5d5d5  fg0 #f5f5f5",
     "  white #ffffff  pink #ff0088",
     "",
-    "Dark only, deliberately: the neovim theme has no light variant, and",
-    "inventing one here would mean shipping colours you never chose. Noctalia",
-    "falls back to the dark variant when mode = light, so nothing breaks -- it",
-    "just stays dark. Add a \"light\" object alongside \"dark\" if you ever want one.",
+    "The terminal block is copied verbatim from the upstream noirblaze kitty",
+    "theme (Dimitar Dimitrov, github.com/n1ghtmare) that you already run, NOT",
+    "derived from the neovim highlight groups. That distinction matters: the",
+    "kitty theme keeps a real green (#00ff77) for ANSI 2, which is what makes",
+    "git diffs and ls readable. Deriving the ANSI slots from the editor's",
+    "highlights instead produces a grey green and quietly breaks both.",
     "",
-    "Selected with:  noctalia msg color-scheme-set custom noirblaze",
-    "or from the launcher:  /theme"
+    "Dark only, matching the source: the neovim theme has no light variant and",
+    "inventing one would mean shipping colours you never chose. Noctalia falls",
+    "back to the dark variant when mode = light, so nothing breaks -- it just",
+    "stays dark. Add a \"light\" object alongside \"dark\" if you ever want one.",
+    "",
+    "Selected from the launcher with /theme, or:",
+    "  noctalia msg color-scheme-set custom noirblaze"
   ],
 
   "dark": {
@@ -32,7 +39,7 @@
     "mOnError": "#121212",
 
     "mSurface": "#121212",
-    "mOnSurface": "#b4b4b4",
+    "mOnSurface": "#d5d5d5",
 
     "mSurfaceVariant": "#323232",
     "mOnSurfaceVariant": "#b0b0b0",
@@ -45,32 +52,32 @@
 
     "terminal": {
       "background": "#121212",
-      "foreground": "#b4b4b4",
+      "foreground": "#d5d5d5",
       "cursor": "#ff0088",
       "cursorText": "#121212",
-      "selectionBg": "#323232",
-      "selectionFg": "#f5f5f5",
+      "selectionBg": "#b0b0b0",
+      "selectionFg": "#121212",
 
       "normal": {
-        "black": "#212121",
+        "black": "#121212",
         "red": "#ff0088",
-        "green": "#787878",
-        "yellow": "#949494",
-        "blue": "#7a7a7a",
-        "magenta": "#ff0088",
-        "cyan": "#737373",
-        "white": "#b4b4b4"
+        "green": "#00ff77",
+        "yellow": "#ffffff",
+        "blue": "#b0b0b0",
+        "magenta": "#7a7a7a",
+        "cyan": "#787878",
+        "white": "#d5d5d5"
       },
 
       "bright": {
-        "black": "#535353",
-        "red": "#ff3ba3",
-        "green": "#b0b0b0",
-        "yellow": "#a7a7a7",
-        "blue": "#949494",
-        "magenta": "#ff3ba3",
-        "cyan": "#a7a7a7",
-        "white": "#ffffff"
+        "black": "#737373",
+        "red": "#fd319e",
+        "green": "#fd319e",
+        "yellow": "#fdfdfd",
+        "blue": "#bebebe",
+        "magenta": "#939393",
+        "cyan": "#919191",
+        "white": "#f5f5f5"
       }
     }
   }

@@ -194,6 +194,12 @@ hl.bind(mod .. " + N", hl.dsp.exec_cmd(NOCT .. "panel-toggle control-center noti
 hl.bind(mod .. " + X", hl.dsp.exec_cmd(NOCT .. "panel-toggle clipboard"), { description = "Clipboard history" })
 hl.bind(mod .. " + O", hl.dsp.exec_cmd(NOCT .. "settings-toggle"), { description = "Shell settings" })
 
+-- Step the frosted-glass level: opaque -> light -> default -> heavy. Overrides
+-- the per-scheme level until you next change scheme. Applies to new terminal
+-- windows; see bin/noct-glass.
+hl.bind(mod .. " + SHIFT + G", hl.dsp.exec_cmd("noct-glass cycle"),
+    { description = "Cycle frosted glass" })
+
 -- Pin the bar on screen instead of letting it follow panels. See lib/bar.lua.
 -- With BAR_FOLLOWS_PANELS off, lib/bar.lua is never set up, so fall back to a
 -- plain toggle rather than leaving the key dead.

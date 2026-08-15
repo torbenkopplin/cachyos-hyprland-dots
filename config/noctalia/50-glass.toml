@@ -1,0 +1,15 @@
+## Noctalia -- hooks.
+##
+## colors_changed fires after the palette has been resolved and the templates
+## have run, whichever way the scheme was changed: the /theme launcher entry,
+## the settings GUI, an IPC call, or a new wallpaper. Hooking noct-glass here
+## rather than into the /theme script means the glass level follows the scheme
+## no matter how you switched it.
+##
+## noct-glass writes kitty's background_opacity and Hyprland's blur settings.
+## It deliberately does NOT write any Noctalia config: this hook fires on
+## config-driven palette changes, so generating a .toml from it would risk a
+## reload loop. The bar's own opacity stays fixed in 10-bar.toml.
+
+[hooks]
+colors_changed = "noct-glass apply"

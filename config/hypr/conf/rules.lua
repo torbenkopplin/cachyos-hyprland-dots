@@ -80,6 +80,36 @@ hl.window_rule({
 })
 
 ------------------------------------------------------------------------------
+-- Frosted glass for apps that cannot do it themselves
+--
+-- kitty draws its own translucent background, so the compositor blurs behind
+-- it and the text stays fully opaque. That is the good version of this effect
+-- and it needs no rule.
+--
+-- GTK and Qt apps paint an opaque background with no way to ask them not to.
+-- The only lever left is compositor opacity, which fades the *whole surface* --
+-- text included. That is why this list is empty by default rather than
+-- "every app": on a work machine, slightly translucent body text is a bad
+-- trade for a nicer-looking window.
+--
+-- Add classes here if you want it anyway. Good candidates are windows you
+-- look at rather than read: a music player, an image viewer, a calculator.
+------------------------------------------------------------------------------
+
+local GLASS_WINDOWS = {
+    -- "^org%.gnome%.Calculator$",
+    -- "^imv$",
+}
+
+for _, class in ipairs(GLASS_WINDOWS) do
+    hl.window_rule({
+        name    = "glass-" .. class,
+        match   = { class = class },
+        opacity = { 0.90, 0.82 }, -- active, inactive
+    })
+end
+
+------------------------------------------------------------------------------
 -- Don't idle-lock during meetings or playback
 ------------------------------------------------------------------------------
 

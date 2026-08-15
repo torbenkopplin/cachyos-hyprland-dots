@@ -100,6 +100,8 @@ link_tree() {
     [[ -d $src_root ]] || return 0
     while IFS= read -r -d '' file; do
         rel=${file#"$src_root"/}
+        # Documentation belongs in the repo, not scattered through ~/.config.
+        [[ $(basename "$rel") == README.md ]] && continue
         link "$file" "$dst_root/$rel"
     done < <(find "$src_root" -type f -print0 | sort -z)
 }
@@ -109,6 +111,8 @@ do_link() {
     link_tree "$REPO/config/hypr"     "$CONFIG_HOME/hypr"
     link_tree "$REPO/config/noctalia" "$CONFIG_HOME/noctalia"
     link_tree "$REPO/config/yazi"     "$CONFIG_HOME/yazi"
+    link_tree "$REPO/config/kitty"    "$CONFIG_HOME/kitty"
+    link_tree "$REPO/config/fish"     "$CONFIG_HOME/fish"
 
     heading "Scripts"
     local script
@@ -122,9 +126,16 @@ do_link() {
 # ---------------------------------------------------------------------------
 # Packages
 #
-# Package names are not verified against the CachyOS repos from here, so each
-# list is installed permissively: a name that does not resolve is reported at
-# the end instead of aborting the run. Check the summary before assuming the
+# pacman first, always. CachyOS rebuilds its repos with architecture-specific
+# optimisations (x86-64-v3/v4, LTO, BOLT), so a package that exists in the
+# repos is meaningfully better than the same package built locally from the
+# AUR. Everything below is therefore attempted with pacman regardless of where
+# it "usually" lives, and only what pacman cannot resolve falls through to an
+# AUR helper.
+#
+# Package names are not verified against the CachyOS repos from here, so
+# installs are permissive: a name that resolves nowhere is reported in the
+# summary instead of aborting the run. Check that summary before assuming the
 # setup is complete.
 # ---------------------------------------------------------------------------
 
@@ -154,16 +165,19 @@ PKGS_DEV=(
     curl wget unzip
 )
 
+# The shell, and the plugin manager used to get a fish-native nvm.
+PKGS_SHELL=( fish fisher )
+
 # yazi and its preview pipeline.
 PKGS_YAZI=(
     yazi ffmpeg p7zip jq poppler imagemagick chafa
 )
 
-PKGS_BROWSERS_REPO=( chromium firefox )
+PKGS_BROWSERS=( chromium firefox brave-bin zen-browser-bin )
 
-# Not in the standard repos. noctalia and satty are listed here but tried in
-# the repos first, since CachyOS may ship them.
-PKGS_AUR=( noctalia brave-bin zen-browser-bin satty nvm )
+# Usually AUR-only -- but still attempted with pacman first, because CachyOS
+# ships some of these in its own repos and a repo build beats a local one.
+PKGS_LIKELY_AUR=( noctalia satty nvm )
 
 # Installed with npm rather than pacman. LSP servers are deliberately absent:
 # your neovim config installs those through mason (tsgo, eslint, vimls,
@@ -178,33 +192,63 @@ detect_aur_helper() {
     return 1
 }
 
-# install_with <command...> -- <packages...>
+# Names that pacman could not resolve, collected for the AUR pass.
+UNRESOLVED=()
+
+# pacman_install <packages...>
 #
 # Tries the whole list in one transaction, which is fast and resolves
 # dependencies together. If that fails, retries one at a time so a single
-# unknown name cannot block the other twenty.
-install_with() {
-    local -a cmd=()
-    while [[ $1 != "--" ]]; do cmd+=("$1"); shift; done
-    shift
+# unknown name cannot block the other twenty; anything still failing goes to
+# UNRESOLVED for the AUR pass rather than being reported as an error here.
+pacman_install() {
     local -a pkgs=("$@")
     (( ${#pkgs[@]} )) || return 0
 
+    local -a cmd=(sudo pacman -S --needed --noconfirm)
+
     if (( DRY_RUN )); then
-        say "would: ${cmd[*]} ${pkgs[*]}"
+        say "would: pacman -S --needed ${pkgs[*]}"
         return 0
     fi
 
     if "${cmd[@]}" "${pkgs[@]}" >/dev/null 2>&1; then
-        say "installed: ${pkgs[*]}"
+        say "pacman: ${pkgs[*]}"
         return 0
     fi
 
-    note "batch install failed, retrying individually"
+    note "batch failed, resolving individually"
     local pkg
     for pkg in "${pkgs[@]}"; do
         if "${cmd[@]}" "$pkg" >/dev/null 2>&1; then
-            say "installed: $pkg"
+            say "pacman: $pkg"
+        else
+            UNRESOLVED+=("$pkg")
+        fi
+    done
+}
+
+# Only reached for what pacman could not provide.
+aur_install() {
+    local -a pkgs=("$@")
+    (( ${#pkgs[@]} )) || return 0
+
+    local helper
+    if ! helper=$(detect_aur_helper); then
+        warn "no AUR helper (paru/yay) -- not installed: ${pkgs[*]}"
+        note "install paru, then rerun with --packages"
+        return 0
+    fi
+
+    if (( DRY_RUN )); then
+        say "would: $helper -S --needed ${pkgs[*]}"
+        return 0
+    fi
+
+    local pkg
+    for pkg in "${pkgs[@]}"; do
+        if "$helper" -S --needed --noconfirm "$pkg" >/dev/null 2>&1; then
+            say "$helper: $pkg"
         else
             warn "could not install: $pkg"
         fi
@@ -219,23 +263,23 @@ do_packages() {
         return 0
     fi
 
-    local -a PACMAN=(sudo pacman -S --needed --noconfirm)
-
+    # Everything goes at pacman first, including the names that are usually
+    # AUR-only: CachyOS builds its repos with architecture-specific
+    # optimisations, so a repo package is worth preferring wherever one exists.
     say "repositories"
-    install_with "${PACMAN[@]}" -- \
+    pacman_install \
         "${PKGS_DESKTOP[@]}" "${PKGS_SYSTEM[@]}" "${PKGS_DEV[@]}" \
-        "${PKGS_YAZI[@]}" "${PKGS_BROWSERS_REPO[@]}"
+        "${PKGS_SHELL[@]}" "${PKGS_YAZI[@]}" "${PKGS_BROWSERS[@]}" \
+        "${PKGS_LIKELY_AUR[@]}"
 
-    local helper
-    if helper=$(detect_aur_helper); then
-        say "AUR (via $helper)"
-        install_with "$helper" -S --needed --noconfirm -- "${PKGS_AUR[@]}"
-    else
-        warn "no AUR helper (paru/yay) found -- skipped: ${PKGS_AUR[*]}"
-        note "install paru first, then rerun with --packages"
+    if (( ${#UNRESOLVED[@]} )); then
+        heading "AUR fallback"
+        note "not in any enabled repo: ${UNRESOLVED[*]}"
+        aur_install "${UNRESOLVED[@]}"
     fi
 
     do_npm_globals
+    do_fish
     do_services
 }
 
@@ -248,6 +292,69 @@ do_npm_globals() {
     say "npm globals (prefix ~/.local)"
     run npm config set prefix "$HOME/.local"
     install_with npm install -g -- "${NPM_GLOBALS[@]}"
+}
+
+# ---------------------------------------------------------------------------
+# Fish
+#
+# Two things here, and the second is the non-obvious one.
+#
+# nvm is a bash/zsh *shell function*. It does not work in fish, and no amount
+# of PATH fixes that -- `nvm use` has to mutate the current shell. The fish
+# equivalent is jorgebucaran/nvm.fish, which reimplements it natively and keeps
+# the `nvm` command name, so muscle memory carries over. The AUR `nvm` package
+# is still installed, because bash is still there and still works.
+# ---------------------------------------------------------------------------
+
+do_fish() {
+    command -v fish >/dev/null 2>&1 || { warn "fish not installed, skipping shell setup"; return 0; }
+
+    heading "Fish"
+
+    # --- default shell -------------------------------------------------------
+    local fish_path current
+    fish_path=$(command -v fish)
+    current=$(getent passwd "$USER" | cut -d: -f7)
+
+    if [[ $current == "$fish_path" ]]; then
+        say "already the default shell"
+    elif (( DRY_RUN )); then
+        say "would: chsh -s $fish_path"
+    else
+        # chsh refuses a shell that is not listed in /etc/shells.
+        if ! grep -qxF "$fish_path" /etc/shells 2>/dev/null; then
+            say "adding $fish_path to /etc/shells"
+            printf '%s\n' "$fish_path" | sudo tee -a /etc/shells >/dev/null
+        fi
+        if chsh -s "$fish_path"; then
+            say "default shell -> fish (takes effect on next login)"
+        else
+            warn "chsh failed -- run 'chsh -s $fish_path' yourself"
+        fi
+    fi
+
+    # --- fish-native nvm -----------------------------------------------------
+    if fish -c 'type -q nvm' 2>/dev/null; then
+        say "nvm already available in fish"
+        return 0
+    fi
+
+    if (( DRY_RUN )); then
+        say "would: fisher install jorgebucaran/nvm.fish"
+        return 0
+    fi
+
+    if fish -c 'type -q fisher' 2>/dev/null; then
+        if fish -c 'fisher install jorgebucaran/nvm.fish' >/dev/null 2>&1; then
+            say "installed nvm.fish (fish-native nvm)"
+        else
+            warn "fisher could not install nvm.fish"
+        fi
+    else
+        warn "fisher not available -- fish has no nvm"
+        note "install it, then: fisher install jorgebucaran/nvm.fish"
+        note "the AUR nvm package still works in bash"
+    fi
 }
 
 do_services() {
