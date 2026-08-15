@@ -1,0 +1,21 @@
+{
+  "BraveRewardsDisabled": true,
+  "BraveWalletDisabled": true,
+  "BraveVPNDisabled": true,
+  "BraveAIChatEnabled": false,
+  "TorDisabled": true,
+
+  "MetricsReportingEnabled": false,
+  "SafeBrowsingExtendedReportingEnabled": false,
+  "UrlKeyedAnonymizedDataCollectionEnabled": false,
+  "FeedbackSurveysEnabled": false,
+
+  "PromotionalTabsEnabled": false,
+  "WelcomePageOnOSUpgradeEnabled": false,
+  "DefaultBrowserSettingEnabled": false,
+
+  "PasswordLeakDetectionEnabled": true,
+  "BackgroundModeEnabled": false,
+
+  "RestoreOnStartup": 1
+}

@@ -20,3 +20,7 @@ hl.env("ELECTRON_OZONE_PLATFORM_HINT", "auto")
 -- Terminal apps launched from the Noctalia launcher (.desktop Terminal=true)
 -- use $TERMINAL. Do NOT append -e here; Noctalia adds the exec flag itself.
 hl.env("TERMINAL", TERMINAL)
+
+-- yazi, git and anything else that shells out to an editor read these.
+hl.env("EDITOR", "nvim")
+hl.env("VISUAL", "nvim")

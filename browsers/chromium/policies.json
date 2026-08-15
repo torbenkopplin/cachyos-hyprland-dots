@@ -1,0 +1,13 @@
+{
+  "MetricsReportingEnabled": false,
+  "SafeBrowsingExtendedReportingEnabled": false,
+  "UrlKeyedAnonymizedDataCollectionEnabled": false,
+  "FeedbackSurveysEnabled": false,
+
+  "PromotionalTabsEnabled": false,
+  "WelcomePageOnOSUpgradeEnabled": false,
+  "DefaultBrowserSettingEnabled": false,
+
+  "BackgroundModeEnabled": false,
+  "PasswordLeakDetectionEnabled": true
+}

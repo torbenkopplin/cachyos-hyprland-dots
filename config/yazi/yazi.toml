@@ -1,0 +1,19 @@
+# yazi -- carried over verbatim from the Ubuntu setup, minus the two
+# Windows-only openers, which cannot fire on this machine.
+#
+# The `%s` placeholder and `${EDITOR:-vi}` fallback are left exactly as they
+# were rather than "modernised": this file works on your current yazi, and a
+# silent syntax change is the kind of thing that only surfaces the first time
+# you press Enter on a file. `$EDITOR` is set to nvim in
+# config/hypr/conf/env.lua, so the fallback never applies in a Hyprland
+# session. See TESTING.md for the check.
+
+[mgr]
+ratio        = [1, 2, 3]
+show_hidden  = true
+show_symlink = true
+
+[opener]
+edit = [
+	{ run = '${EDITOR:-vi} %s', desc = "$EDITOR", for = "unix", block = true },
+]
