@@ -304,6 +304,42 @@ The point of the whole setup — worth testing deliberately:
 
 ---
 
+## Open question for a future session: nav.lua vs wsnav.sh
+
+**Read this before changing anything about directional navigation.**
+
+Two implementations of the same behaviour exist, and the one in use here is
+the *unproven* one:
+
+| | `config/hypr/lib/nav.lua` (in use) | `~/repos/dots/.../scripts/wsnav.sh` (proven) |
+|---|---|---|
+| How | in-process Lua, reads the scrolling layout's own `window.layout` — `column.index`, `index_in_column`, `#column.windows` | bash + `hyprctl` + `jq`, compares window centre coordinates |
+| Cost per keypress | none — no process spawn | 2–4 processes |
+| Precision | exact: the layout's own bookkeeping | inferred from geometry |
+| Proven? | **no** — never run on a live session | **yes** — daily driver |
+| Workspace model | `m~n` selectors, monitor-relative | explicit per-monitor bands, computed live |
+
+`nav.lua` was chosen for being cheaper and reading the layout's real data
+structure rather than guessing from pixels. That is the better design *if the
+assumptions hold*. They are unverified:
+
+- `column.index` and `index_in_column` are **0-based** (read from
+  `LuaWindow.cpp`, not observed).
+- `window.layout` is populated for every tiled window on a scrolling workspace.
+- `hl.get_workspace_windows(<id>)` accepts a numeric workspace id.
+- Focus changes are synchronous, so the address comparison in `focus_moved()`
+  sees the result.
+
+**If any of that turns out wrong**, `wsnav.sh` already works and is a drop-in:
+copy it to `config/hypr/scripts/`, and replace the four `nav.*` bindings in
+`conf/binds.lua` with `hl.dsp.exec_cmd(wsnav .. " focus up|down")` and
+`" movecol left|right"`. Note it also needs `jq`, which is already in the
+package list for yazi.
+
+Section 2 above is the test that decides this.
+
+---
+
 ## Known-uncertain details
 
 Written from documentation, not from a running system. Check these first if

@@ -296,8 +296,42 @@ noct-glass show                      # level currently in effect
 
 ## Install
 
+### From a GitHub link
+
+Like end-4's, one command on a fresh system — it installs git if needed,
+clones, and hands over to `install.sh`:
+
 ```sh
-git clone <this repo> ~/repos/cachyos-hyprland-dots
+bash <(curl -fsSL https://raw.githubusercontent.com/torbenkopplin/cachyos-hyprland-dots/master/bootstrap.sh) --all
+```
+
+Arguments pass straight through, so look first:
+
+```sh
+bash <(curl -fsSL https://raw.githubusercontent.com/torbenkopplin/cachyos-hyprland-dots/master/bootstrap.sh) --all --dry-run
+```
+
+Two environment variables if the defaults do not suit:
+
+```sh
+DOTS_DEST=~/src/dots DOTS_BRANCH=testing bash <(curl -fsSL .../bootstrap.sh)
+```
+
+`bootstrap.sh` clones over HTTPS so it works before any SSH key exists, then
+switches the remote to SSH so you can push. It refuses to run as root — a
+dotfiles install writes throughout `$HOME`, and doing that as root leaves you
+with a root-owned `~/.config` you cannot edit.
+
+Worth knowing about this pattern generally: `curl | bash` runs whatever is at
+that URL at the moment you run it, before you have seen it. For your own repo
+on your own machine that is a reasonable trade. If you ever hand the link to
+someone else, point them at a tag rather than `master` so the thing they run is
+the thing you tested.
+
+### From a clone
+
+```sh
+git clone git@github.com:torbenkopplin/cachyos-hyprland-dots.git ~/repos/cachyos-hyprland-dots
 cd ~/repos/cachyos-hyprland-dots
 ./install.sh --all --dry-run   # look first, always
 ./install.sh --all
@@ -430,8 +464,10 @@ bin/
   noct-power          power profiles, night light, caffeine
   noct-theme          colour scheme picker
   noct-glass          frosted glass level, per scheme
+bootstrap.sh          curl-able one-command installer
 install.sh
-TESTING.md            post-install checklist — start here on first boot
+TESTING.md            post-install checklist — start here on first boot,
+                      and the open nav.lua/wsnav.sh question
 ```
 
 To change almost anything, start in `config/hypr/conf/options.lua`.
