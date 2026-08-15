@@ -1,0 +1,70 @@
+## Noctalia -- the bar.
+##
+## Design: there is no bar while you work. It appears for two reasons only:
+##
+##   1. a Noctalia panel opened (launcher, control centre, clipboard, session,
+##      window switcher);
+##   2. you pressed SUPER+B to pin it.
+##
+## Both are driven from the compositor by config/hypr/lib/bar.lua, which
+## watches layer.opened / layer.closed and issues bar-show / bar-hide.
+##
+## auto_hide is OFF on purpose. Noctalia's own auto-hide is pointer-proximity
+## based, and it would retract the bar again the moment we revealed it for a
+## keyboard-opened launcher. With auto_hide off, bar-hide/bar-show are absolute
+## and the state is exactly what lib/bar.lua last asked for.
+##
+## reserve_space is off too, so the bar never claims an exclusive zone:
+## windows keep the full height of the display and nothing reflows when it
+## appears or disappears.
+##
+## Because it is summoned rather than lived with, it is worth putting real
+## information on it -- this is a HUD, not decoration.
+
+[bar.default]
+position = "top"
+
+auto_hide                = false   # see above -- lib/bar.lua owns visibility
+smart_auto_hide          = false
+show_on_workspace_switch = false   # workspace changes must not flash the bar
+reserve_space            = false   # no exclusive zone: full-height windows
+layer                    = "overlay"  # visible even over a fullscreen window
+
+thickness          = 34
+background_opacity = 0.92
+padding            = 14
+widget_spacing     = 8
+margin_edge        = 0
+margin_ends        = 0
+concave_edge_corners = true
+radius_bottom_left   = 12
+radius_bottom_right  = 12
+radius_top_left      = 0
+radius_top_right     = 0
+
+shadow          = false
+hover_highlight = true
+font_weight     = 500
+
+## Widget ids are upstream's own spelling, which is inconsistent on purpose:
+## most are snake_case, "control-center" is not.
+start  = ["workspaces", "gap", "active_window"]
+center = ["clock"]
+end    = ["media", "gap", "tray", "notifications", "network", "bluetooth", "volume", "battery", "control-center"]
+
+[widget.gap]
+type   = "spacer"
+length = 16
+
+[widget.clock]
+format = "{:%H:%M  ·  %a %d %b}"
+
+[widget.media]
+hide_when_no_media = true
+title_scroll       = "on_hover"
+
+## The bar is hidden while you work, so when it does appear the window title is
+## useful context rather than permanent noise -- give it room.
+[widget.active_window]
+max_length   = 420
+title_scroll = "on_hover"

@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# noct-audio -- PipeWire output/input device picker for the Noctalia launcher.
+#
+#   noct-audio list sinks|sources    emit launcher candidates
+#   noct-audio act "<selected line>" switch to the chosen device
+#
+# Candidates are "<title>\t<base64 device name>". Noctalia hands the whole
+# selected line back to `act`, which is why the machine-readable half is
+# base64: device names are safe, but this keeps every provider identical and
+# immune to odd characters. Titles are stripped of shell metacharacters
+# because they are interpolated into a double-quoted `exec` string.
+
+set -uo pipefail
+
+# shellcheck source=lib/common.sh
+. "$(dirname "$(readlink -f "$0")")/noct-common.sh"
+
+usage() { echo "usage: $0 list {sinks|sources} | $0 act <line>" >&2; exit 2; }
+
+# ---------------------------------------------------------------------------
+# list
+# ---------------------------------------------------------------------------
+
+list() {
+    local kind=$1 singular default
+    singular=${kind%s}
+
+    need pactl || return 0
+
+    default=$(pactl "get-default-$singular" 2>/dev/null)
+
+    # `pactl list` is a stanza format; pair each Name: with the Description:
+    # that follows it. \x1f separates the two so device names containing
+    # whitespace survive the read below.
+    pactl list "$kind" 2>/dev/null | awk '
+        /^[[:space:]]*Name:[[:space:]]/ {
+            sub(/^[[:space:]]*Name:[[:space:]]*/, ""); name = $0; next
+        }
+        /^[[:space:]]*Description:[[:space:]]/ {
+            sub(/^[[:space:]]*Description:[[:space:]]*/, "")
+            if (name != "") { printf "%s\x1f%s\n", name, $0; name = "" }
+        }
+    ' | while IFS=$'\x1f' read -r name desc; do
+        # Monitor sources are loopbacks of an output, not real inputs.
+        [[ $kind == sources && $name == *.monitor ]] && continue
+
+        local mark="  "
+        [[ $name == "$default" ]] && mark="● "
+
+        emit "${mark}${desc}" "$(enc "$name")"
+    done
+}
+
+# ---------------------------------------------------------------------------
+# act
+# ---------------------------------------------------------------------------
+
+act() {
+    local name kind singular streams move
+    name=$(dec "$(token "$1")")
+    [[ -z $name ]] && exit 0
+
+    # Work out which side of the pipeline this device is on.
+    if pactl list short sinks 2>/dev/null | grep -qF "	$name	"; then
+        kind=sinks
+    else
+        kind=sources
+    fi
+    singular=${kind%s}
+
+    pactl "set-default-$singular" "$name" || exit 1
+
+    # Setting the default only affects *new* streams, which is never what you
+    # mean when you pick a device: move what is already playing too.
+    if [[ $kind == sinks ]]; then
+        streams="sink-inputs"; move="move-sink-input"
+    else
+        streams="source-outputs"; move="move-source-output"
+    fi
+
+    while read -r id _; do
+        [[ -n $id ]] && pactl "$move" "$id" "$name" 2>/dev/null
+    done < <(pactl list short "$streams" 2>/dev/null)
+
+    # Confirm the switch on screen.
+    if [[ $kind == sinks ]]; then
+        noctalia msg volume-osd >/dev/null 2>&1
+    else
+        noctalia msg mic-volume-osd >/dev/null 2>&1
+    fi
+}
+
+# ---------------------------------------------------------------------------
+
+case "${1:-}" in
+    list) [[ $# -ge 2 ]] || usage; list "$2" ;;
+    act)  [[ $# -ge 2 ]] || usage; act "$2" ;;
+    *)    usage ;;
+esac

@@ -1,0 +1,23 @@
+## Noctalia -- theming.
+##
+## Colours are derived from the wallpaper and pushed into apps through
+## Noctalia's templates, so the terminal, GTK and Qt all follow the shell
+## without anything else to maintain.
+
+## source options: builtin | wallpaper | community | custom
+##   builtin   -> a fixed palette; set `builtin = "Gruvbox"` (or Ayu,
+##                Catppuccin, Dracula, Eldritch, Kanagawa, Noctalia, Nord,
+##                Rosé Pine, Tokyo-Night). Pick this if you want your colours
+##                to stop moving.
+##   wallpaper -> regenerate the palette from the wallpaper every time it
+##                changes, using `wallpaper_scheme` as the generator.
+[theme]
+mode             = "dark"
+source           = "wallpaper"
+wallpaper_scheme = "m3-tonal-spot"   # or m3-content, m3-fruit-salad,
+                                     # m3-monochrome, m3-rainbow
+
+## Which apps the palette gets rendered into lives in 40-templates.toml.
+
+[accessibility]
+ui_scale = 1.0

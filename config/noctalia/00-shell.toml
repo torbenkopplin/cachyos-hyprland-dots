@@ -1,0 +1,90 @@
+## Noctalia -- shell behaviour and keyboard navigation.
+##
+## Files in ~/.config/noctalia/ are merged alphabetically, which is why these
+## are numbered. Nothing here is ever rewritten by the app: Noctalia saves GUI
+## changes to ~/.local/state/noctalia/settings.toml instead, and that layer
+## loads last, so a setting you change in the GUI will quietly override the
+## same setting here. If something in this file appears to be ignored, look
+## there first.
+
+[shell]
+font_family           = "sans-serif"
+corner_radius_scale   = 1.0
+settings_show_advanced = true
+
+## Noctalia registers as the polkit agent, so authentication prompts are
+## keyboard-navigable shell dialogs rather than a stray GTK window.
+polkit_agent          = true
+
+## Each launched app gets its own systemd scope: one app crashing or eating
+## memory cannot take the session with it.
+launch_apps_as_systemd_services = true
+
+## No outbound requests you did not ask for.
+telemetry_enabled     = false
+external_ip_enabled   = false
+
+time_format = "{:%H:%M}"
+date_format = "%A, %d %B"
+
+## ---------------------------------------------------------------------------
+## Launcher
+## ---------------------------------------------------------------------------
+
+[shell.launcher]
+provider_prefix = "/"     # "/net", "/bt", ... see 20-launcher.toml
+categories      = false   # filter chips are mouse furniture; type instead
+show_icons      = true
+compact         = false
+app_grid        = false
+sort_by_usage   = true    # what you actually open floats to the top
+
+[shell.launcher.providers.calculator]
+prefix = "calc"
+global = true             # bare arithmetic works without the prefix
+
+[shell.launcher.providers.windows]
+prefix = "win"            # "/win" -- jump to any open window by title
+
+[shell.launcher.providers.session]
+prefix = "session"
+global = false            # never surface "Shut down" in an app search
+
+[shell.launcher.providers.emoji]
+prefix = "emo"
+
+[shell.launcher.providers.wallpaper]
+prefix = "wall"
+
+## ---------------------------------------------------------------------------
+## Keyboard navigation inside Noctalia's own surfaces
+##
+## The launcher search box swallows plain h/j/k/l -- you are typing into it --
+## so movement is on Ctrl. Arrow keys keep working alongside.
+##
+## Only ctrl, shift and alt are accepted here; super chords are rejected with
+## a config parse error, since the compositor owns those.
+## ---------------------------------------------------------------------------
+
+[keybinds]
+up           = ["up",    "ctrl+k"]
+down         = ["down",  "ctrl+j"]
+left         = ["left",  "ctrl+h"]
+right        = ["right", "ctrl+l"]
+validate     = ["return", "kp_enter"]
+cancel       = ["escape"]
+tab_next     = ["tab",       "ctrl+n"]
+tab_previous = ["shift+tab", "iso_left_tab", "ctrl+p"]
+copy         = ["ctrl+c"]
+delete       = ["del"]
+
+## ---------------------------------------------------------------------------
+## Notifications and OSD -- present, but never in the way
+## ---------------------------------------------------------------------------
+
+[osd]
+enabled = true
+
+[shell.panel]
+session_placement = "floating"
+session_position  = "center"

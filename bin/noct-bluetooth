@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# noct-bluetooth -- Bluetooth device picker for the Noctalia launcher.
+#
+#   noct-bluetooth list             emit launcher candidates
+#   noct-bluetooth act "<line>"     connect / disconnect / power / scan
+#
+# The list shows what the action will DO, not what the device currently is:
+# a connected device offers "Disconnect", a known one offers "Connect". You
+# read the verb, you press Enter, you get that.
+
+set -uo pipefail
+
+. "$(dirname "$(readlink -f "$0")")/noct-common.sh"
+
+usage() { echo "usage: $0 list | $0 act <line>" >&2; exit 2; }
+
+# ---------------------------------------------------------------------------
+
+list() {
+    need bluetoothctl || return 0
+
+    local powered connected
+    powered=$(bluetoothctl show 2>/dev/null | awk '/Powered:/ {print $2; exit}')
+
+    if [[ $powered != yes ]]; then
+        emit "Turn Bluetooth on" "$(enc "power:on")"
+        emit "Scan for devices" "$(enc "scan:")"
+        return 0
+    fi
+
+    # MACs of everything currently connected, one per line.
+    connected=$(bluetoothctl devices Connected 2>/dev/null | awk '{print $2}')
+
+    # `bluetoothctl devices` prints: Device <MAC> <name with spaces>
+    while read -r _ mac name; do
+        [[ -z ${mac:-} ]] && continue
+        [[ -z ${name:-} ]] && name=$mac
+
+        if grep -qxF "$mac" <<<"$connected"; then
+            emit "● Disconnect  $name" "$(enc "disconnect:$mac")"
+        else
+            emit "  Connect     $name" "$(enc "connect:$mac")"
+        fi
+    done < <(bluetoothctl devices 2>/dev/null)
+
+    emit "Scan for devices" "$(enc "scan:")"
+    emit "Turn Bluetooth off" "$(enc "power:off")"
+}
+
+# ---------------------------------------------------------------------------
+
+act() {
+    local payload action arg
+    payload=$(dec "$(token "$1")")
+    [[ -z $payload ]] && exit 0
+
+    action=${payload%%:*}
+    arg=${payload#*:}
+
+    case "$action" in
+        connect)
+            # Trusting means it will reconnect on its own next time.
+            bluetoothctl trust "$arg" >/dev/null 2>&1
+            if bluetoothctl connect "$arg" >/dev/null 2>&1; then
+                notify-send -a Bluetooth "Connected" "$arg" 2>/dev/null
+            else
+                notify-send -a Bluetooth -u critical "Could not connect" "$arg" 2>/dev/null
+            fi
+            ;;
+        disconnect)
+            bluetoothctl disconnect "$arg" >/dev/null 2>&1
+            notify-send -a Bluetooth "Disconnected" "$arg" 2>/dev/null
+            ;;
+        power)
+            if [[ $arg == on ]]; then
+                noctalia msg bluetooth-enable >/dev/null 2>&1
+            else
+                noctalia msg bluetooth-disable >/dev/null 2>&1
+            fi
+            ;;
+        scan)
+            # Discovery has to run for a while before anything shows up, so
+            # scan first, then reopen the launcher on this provider.
+            noctalia msg bluetooth-enable >/dev/null 2>&1
+            bluetoothctl --timeout 10 scan on >/dev/null 2>&1
+            noctalia msg panel-toggle launcher "/bt " >/dev/null 2>&1
+            ;;
+    esac
+}
+
+# ---------------------------------------------------------------------------
+
+case "${1:-}" in
+    list) list ;;
+    act)  [[ $# -ge 2 ]] || usage; act "$2" ;;
+    *)    usage ;;
+esac

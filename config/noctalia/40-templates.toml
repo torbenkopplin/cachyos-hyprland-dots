@@ -1,0 +1,57 @@
+## Noctalia -- app theming templates.
+##
+## Whenever the palette changes, Noctalia re-renders every enabled template and
+## writes the result into the target app's config. That is the whole mechanism:
+## one palette, many rendered config files.
+##
+## Built-ins cover apps Noctalia knows about. The two user templates below fill
+## the gaps that matter for this setup -- Hyprland's window borders, and
+## repainting terminals that are *already open*.
+##
+## To see every id available on your machine:  noctalia theme --list-templates
+## To re-render without changing the theme:    noctalia msg templates-apply
+
+[theme.templates]
+enable_builtin_templates = true
+
+## kitty      -> ~/.config/kitty/  (applies to newly started terminals)
+## gtk3/gtk4  -> GTK app colours
+## qt         -> qt5ct/qt6ct palettes; needs QT_QPA_PLATFORMTHEME=qt6ct,
+##               which conf/env.lua sets
+## kcolorscheme -> kdeglobals, for the KDE apps CachyOS ships (dolphin, ark)
+## btop       -> btop's theme
+builtin_ids = ["kitty", "gtk3", "gtk4", "qt", "kcolorscheme", "btop"]
+
+## ---------------------------------------------------------------------------
+## Hyprland window borders
+##
+## There is no built-in Hyprland template, so this is what makes the focused
+## window's border track the palette. It renders a small Lua file that
+## hyprland.lua requires last, then reloads the compositor.
+## ---------------------------------------------------------------------------
+
+[theme.templates.user.hyprland]
+input_path  = "$XDG_CONFIG_HOME/noctalia/templates/hyprland-colors.lua"
+output_path = "$XDG_CONFIG_HOME/hypr/generated/colors.lua"
+post_hook   = "hyprctl reload"
+
+## ---------------------------------------------------------------------------
+## Live terminal repaint
+##
+## The kitty built-in above only affects terminals started after the change.
+## This one pushes OSC colour sequences into every pty you already have open,
+## so running shells, vim and btop all change colour immediately -- and it
+## works for any terminal emulator, not just kitty.
+##
+## Drop this entry if you would rather terminals only change on restart, or if
+## the momentary repaint of a full-screen TUI bothers you.
+## ---------------------------------------------------------------------------
+
+## Note the two different expansions. Noctalia resolves $XDG_CACHE_HOME in
+## output_path per the XDG spec (falling back to ~/.cache when the variable is
+## unset). post_hook is handed to a shell instead, which would expand an unset
+## $XDG_CACHE_HOME to nothing -- hence the explicit :- default there.
+[theme.templates.user.terminal_live]
+input_path  = "$XDG_CONFIG_HOME/noctalia/templates/terminal-colors.sh"
+output_path = "$XDG_CACHE_HOME/noctalia/terminal-colors.sh"
+post_hook   = "bash \"${XDG_CACHE_HOME:-$HOME/.cache}/noctalia/terminal-colors.sh\""

@@ -1,0 +1,63 @@
+## Noctalia -- system control from the launcher.
+##
+## Each entry is a dmenu-style provider: `command` prints one candidate per
+## line, `exec` runs when you pick one, with {selection} replaced by the whole
+## selected line. A tab in a line splits it into title and subtitle.
+##
+## The scripts behind these live in bin/ and are installed to ~/.local/bin.
+## They emit "<human title><TAB><base64 payload>" and decode the payload on
+## activation, so a network name containing quotes or spaces can never end up
+## being interpreted as shell syntax.
+##
+## `prefix` is a BARE trigger word. It gets composed with
+## shell.launcher.provider_prefix ("/" in 00-shell.toml), so `prefix = "net"`
+## is typed as "/net".
+##
+## global = false throughout: these must never pollute an ordinary app search.
+## Reach them by prefix, or with the SUPER+CTRL+<letter> binds in
+## config/hypr/conf/binds.lua that open the launcher already filtered.
+
+## Audio output -- SUPER+CTRL+O
+[shell.launcher.dmenu.entry.aout]
+label   = "Audio Output"
+prefix  = "aout"
+glyph   = "volume"
+global  = false
+command = "noct-audio list sinks"
+exec    = "noct-audio act \"{selection}\""
+
+## Audio input -- SUPER+CTRL+I
+[shell.launcher.dmenu.entry.ain]
+label   = "Audio Input"
+prefix  = "ain"
+glyph   = "microphone"
+global  = false
+command = "noct-audio list sources"
+exec    = "noct-audio act \"{selection}\""
+
+## Bluetooth -- SUPER+CTRL+B
+[shell.launcher.dmenu.entry.bt]
+label   = "Bluetooth"
+prefix  = "bt"
+glyph   = "bluetooth"
+global  = false
+command = "noct-bluetooth list"
+exec    = "noct-bluetooth act \"{selection}\""
+
+## Networks -- SUPER+CTRL+N
+[shell.launcher.dmenu.entry.net]
+label   = "Network"
+prefix  = "net"
+glyph   = "wifi"
+global  = false
+command = "noct-network list"
+exec    = "noct-network act \"{selection}\""
+
+## Power profile, night light, caffeine -- SUPER+CTRL+P
+[shell.launcher.dmenu.entry.power]
+label   = "Power"
+prefix  = "power"
+glyph   = "battery"
+global  = false
+command = "noct-power list"
+exec    = "noct-power act \"{selection}\""

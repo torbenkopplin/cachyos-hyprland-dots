@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# noct-power -- power profile and screen-comfort toggles for the launcher.
+#
+#   noct-power list           emit launcher candidates
+#   noct-power act "<line>"   apply the chosen setting
+#
+# Profiles come from power-profiles-daemon via UPower, which is the same source
+# Noctalia's own power widget uses, so the two never disagree.
+
+set -uo pipefail
+
+. "$(dirname "$(readlink -f "$0")")/noct-common.sh"
+
+usage() { echo "usage: $0 list | $0 act <line>" >&2; exit 2; }
+
+# ---------------------------------------------------------------------------
+
+list() {
+    if command -v powerprofilesctl >/dev/null 2>&1; then
+        local active
+        active=$(powerprofilesctl get 2>/dev/null)
+
+        # `powerprofilesctl list` marks the active profile with '*' and indents
+        # each name as "  name:".
+        while IFS= read -r profile; do
+            [[ -z $profile ]] && continue
+            local mark="  "
+            [[ $profile == "$active" ]] && mark="● "
+            emit "${mark}Power: ${profile}" "$(enc "profile:$profile")"
+        done < <(powerprofilesctl list 2>/dev/null |
+                 awk '/^[[:space:]]*\*?[[:space:]]*[a-z-]+:/ {
+                        gsub(/[ *:]/, ""); print
+                      }')
+    else
+        emit "power-profiles-daemon is not installed" "$(enc "")"
+    fi
+
+    emit "Night light: toggle schedule" "$(enc "night:schedule")"
+    emit "Night light: force on / off"  "$(enc "night:force")"
+    emit "Caffeine: keep the screen awake" "$(enc "caffeine:toggle")"
+}
+
+# ---------------------------------------------------------------------------
+
+act() {
+    local payload action arg
+    payload=$(dec "$(token "$1")")
+    [[ -z $payload ]] && exit 0
+
+    action=${payload%%:*}
+    arg=${payload#*:}
+
+    case "$action" in
+        profile)  noctalia msg power-set "$arg" >/dev/null 2>&1 ;;
+        caffeine) noctalia msg caffeine-toggle  >/dev/null 2>&1 ;;
+        night)
+            if [[ $arg == force ]]; then
+                noctalia msg nightlight-force-toggle >/dev/null 2>&1
+            else
+                noctalia msg nightlight-toggle >/dev/null 2>&1
+            fi
+            ;;
+    esac
+}
+
+# ---------------------------------------------------------------------------
+
+case "${1:-}" in
+    list) list ;;
+    act)  [[ $# -ge 2 ]] || usage; act "$2" ;;
+    *)    usage ;;
+esac

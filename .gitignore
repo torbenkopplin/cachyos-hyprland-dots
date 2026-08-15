@@ -1,0 +1,6 @@
+# Backups install.sh moves aside
+*.bak-*
+
+# Editor / LSP scratch
+.luarc-local.json
+*.swp

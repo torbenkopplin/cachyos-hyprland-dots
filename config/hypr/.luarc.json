@@ -1,0 +1,30 @@
+{
+  "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
+  "runtime.version": "Lua 5.4",
+  "workspace.library": [
+    "/usr/share/hypr/stubs"
+  ],
+  "diagnostics.globals": [
+    "hl",
+    "TERMINAL",
+    "FILE_MANAGER",
+    "BROWSER",
+    "LAUNCH_PREFIX",
+    "NOCT",
+    "MOD",
+    "KB_LAYOUT",
+    "KB_VARIANT",
+    "KB_OPTIONS",
+    "WORKSPACES_PER_MONITOR",
+    "SUPER_TAP_ENABLED",
+    "SUPER_TAP_MS",
+    "BAR_FOLLOWS_PANELS",
+    "GAPS_IN",
+    "GAPS_OUT",
+    "BORDER",
+    "ROUNDING",
+    "INACTIVE_OPACITY",
+    "TERMINAL_FLOAT",
+    "TERMINAL_FLOAT_CLASS"
+  ]
+}
