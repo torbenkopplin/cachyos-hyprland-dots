@@ -56,9 +56,17 @@ WORKSPACE_BAND = 10
 -- Behaviour toggles
 ------------------------------------------------------------------------------
 
--- Tap SUPER on its own to open the launcher. Detection is time-bounded and
--- cancelled by any other key, so SUPER+J etc. never trigger it.
-SUPER_TAP_ENABLED = true
+-- Tap SUPER on its own to open the launcher.
+--
+-- false = use the plain release bind in conf/binds.lua, which is what the
+-- wiki documents for binding a bare modifier and what ~/repos/dots has been
+-- running. Leave it here.
+--
+-- true  = use lib/supertap.lua instead, which watches raw key events and
+-- requires the tap to be quick and uninterrupted. Only worth switching on if
+-- the release bind turns out to also fire after ordinary SUPER chords (open
+-- the launcher, press SUPER+J, release SUPER -- see TESTING.md section 3).
+SUPER_TAP_ENABLED = false
 SUPER_TAP_MS      = 250 -- max press-to-release time still counted as a "tap"
 
 -- Reveal the bar while a Noctalia panel is open, hide it again on close.

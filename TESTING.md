@@ -62,20 +62,21 @@ shape of `window.layout`.
 > ```
 > The assumption in `lib/nav.lua` is that both indices are **0-based**.
 
-## 3. Tap SUPER — `lib/supertap.lua`
+## 3. Tap SUPER — the `SUPER + SUPER_L` release bind
 
-The failure mode to watch for is the launcher opening after ordinary chords.
+Same bind `~/repos/dots` uses, so this should already behave. The failure mode
+to watch for is the launcher also opening after ordinary chords.
 
 - [ ] Tapping and releasing `SUPER` alone opens the launcher.
 - [ ] `SUPER+J`, then releasing `SUPER`, does **not** open the launcher.
 - [ ] `SUPER+T`, then releasing, does **not** open the launcher.
-- [ ] Holding `SUPER` for a second and releasing does **not** open it.
-- [ ] `SUPER+Space` opens the launcher as a fallback.
+- [ ] `SUPER+Space` opens the launcher as well (kept as a fallback).
 
-> If it never fires, the keycodes may differ — check yours with `wev` and
-> compare against `SUPER_L = 133` / `SUPER_R = 134` in `lib/supertap.lua`.
-> If it fires too eagerly, lower `SUPER_TAP_MS` in `conf/options.lua`.
-> To disable entirely: `SUPER_TAP_ENABLED = false`.
+> If it does misfire after chords, set `SUPER_TAP_ENABLED = true` in
+> `conf/options.lua`. That swaps in `lib/supertap.lua`, which watches raw key
+> events and requires the tap to be quick and uninterrupted. It is kept for
+> exactly this case; if the release bind behaves, leave it off — the plain
+> bind is the documented approach and far less machinery.
 
 ## 4. The bar — `lib/bar.lua` + `10-bar.toml`
 

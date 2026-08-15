@@ -140,20 +140,19 @@ into the search box, since you are typing).
 
 ## Three things worth knowing
 
-### Tapping SUPER is not a release-bind
+### Tapping SUPER is a release-bind, and that is fine
 
-The obvious way to bind a bare modifier is
-`hl.bind("SUPER + SUPER_L", …, { release = true })`. That does not work when
-`SUPER` is also your main modifier: Hyprland registers the release callback when
-`SUPER_L` goes down and fires it unconditionally when it comes back up, with no
-check for whether another key was pressed in between. Every `SUPER+J` would also
-pop the launcher.
+`hl.bind("SUPER + SUPER_L", …, { release = true })` is how the wiki says to
+bind a bare modifier, and it is what `~/repos/dots` has been running. The
+modmask has to name the mod being pressed — `SUPER + SUPER_L`, not `SUPER_L`.
 
-`lib/supertap.lua` instead watches `input.keyboard.key`, which Hyprland emits
-*before* the keybind manager sees the event — so it observes every key, even
-ones binds consume. Arm on `SUPER` down, disarm on any other key down, fire on
-`SUPER` up if it was quick enough. `SUPER_TAP_MS` in `conf/options.lua` sets
-"quick enough"; `SUPER_TAP_ENABLED = false` turns it off.
+Hyprland's keybind manager has dedicated arming and sub-chord suppression for
+release binds, so this does not simply fire every time you let go of SUPER
+after a chord. `lib/supertap.lua` exists as a fallback if it ever does: it
+watches `input.keyboard.key`, which is emitted *before* the keybind manager
+sees the event and therefore sees every key including ones binds consume, and
+requires the tap to be both quick and uninterrupted. Switch it on with
+`SUPER_TAP_ENABLED = true` in `conf/options.lua`.
 
 ### The bar is event-driven, not timed
 

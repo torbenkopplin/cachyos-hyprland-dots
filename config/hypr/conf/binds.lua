@@ -31,9 +31,21 @@ end
 -- Launcher
 ------------------------------------------------------------------------------
 
--- Tap SUPER on its own. See lib/supertap.lua for why this isn't a release bind.
+-- Tap SUPER on its own to open the launcher.
+--
+-- The modmask has to name the mod being pressed ("SUPER + SUPER_L", not just
+-- "SUPER_L"), which is what the wiki means by "the TARGET modmask". Carried
+-- over from ~/repos/dots, where it has been in use -- with `release` as a
+-- boolean rather than the string "true"; a string is truthy in Lua so both
+-- work, but the boolean is what the API documents.
+--
+-- lib/supertap.lua is the fallback if this ever fires after ordinary SUPER
+-- chords; flip SUPER_TAP_ENABLED in conf/options.lua.
 if SUPER_TAP_ENABLED then
     supertap.setup(NOCT .. "panel-toggle launcher", SUPER_TAP_MS)
+else
+    hl.bind(mod .. " + SUPER_L", hl.dsp.exec_cmd(NOCT .. "panel-toggle launcher"),
+        { release = true, description = "Launcher (tap SUPER)" })
 end
 
 -- Kept as a fallback: if the tap detector ever misbehaves you are not locked
