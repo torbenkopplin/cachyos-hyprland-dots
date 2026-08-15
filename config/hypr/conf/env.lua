@@ -24,3 +24,6 @@ hl.env("TERMINAL", TERMINAL)
 -- yazi, git and anything else that shells out to an editor read these.
 hl.env("EDITOR", "nvim")
 hl.env("VISUAL", "nvim")
+
+-- Carried over from ~/repos/dots.
+hl.env("MANPAGER", "bat -plman")

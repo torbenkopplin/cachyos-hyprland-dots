@@ -1,0 +1,49 @@
+-- host.lua -- machine-specific Hyprland settings.
+--
+-- Copy to ~/.config/hypr/host.lua and edit. NOT tracked by this repo and NOT
+-- linked by install.sh: it is the one file that is meant to differ per machine,
+-- which is exactly what should not be shared between them.
+--
+-- hyprland.lua loads it with pcall(dofile, ...) before anything else, so it can
+-- set globals the rest of the config reads -- WSBANDS in particular.
+--
+-- Find your monitor names and ids with:  hyprctl monitors
+
+------------------------------------------------------------------------------
+-- Monitors
+------------------------------------------------------------------------------
+
+-- hl.monitor({ output = "DP-3",     mode = "preferred", position = "auto", scale = "auto" })
+-- hl.monitor({ output = "HDMI-A-1", mode = "preferred", position = "auto", scale = "auto",
+--              transform = 1 })  -- 1 = 90 degrees, i.e. portrait
+
+------------------------------------------------------------------------------
+-- Workspace bands
+------------------------------------------------------------------------------
+--
+-- One entry per monitor. `base` must be the monitor's id x WORKSPACE_BAND (10),
+-- so monitor 0 owns workspaces 1-10, monitor 1 owns 11-20, and so on.
+--
+-- `direction` is the scrolling layout's own axis for that band -- which is the
+-- point of doing it per monitor. A portrait screen is far more usable scrolling
+-- down than sideways.
+--
+-- `column_width` is the default fraction of the monitor a new column takes.
+-- A portrait monitor wants 1.0 (one column fills the width); a wide landscape
+-- one wants a third.
+
+-- WSBANDS = {
+--     { base =  0, monitor = "DP-3",     direction = "right", column_width = 0.333 },
+--     { base = 10, monitor = "HDMI-A-1", direction = "down",  column_width = 1.0   },
+-- }
+
+------------------------------------------------------------------------------
+-- Host environment
+------------------------------------------------------------------------------
+
+-- GPU-specific variables belong here rather than in conf/env.lua, since they
+-- are wrong on any machine with different hardware.
+--
+-- hl.env("PROTON_ENABLE_NGX_UPDATER", "1")
+-- hl.env("LIBVA_DRIVER_NAME", "nvidia")
+-- hl.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia")

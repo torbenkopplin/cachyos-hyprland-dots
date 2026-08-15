@@ -80,32 +80,29 @@ hl.window_rule({
 })
 
 ------------------------------------------------------------------------------
--- Frosted glass for apps that cannot do it themselves
+-- Opting out of frosted glass
 --
--- kitty draws its own translucent background, so the compositor blurs behind
--- it and the text stays fully opaque. That is the good version of this effect
--- and it needs no rule.
+-- bin/noct-glass sets active_opacity for every window, so the frosted look is
+-- universal by default -- including GTK and Qt apps, which have no
+-- transparency of their own.
 --
--- GTK and Qt apps paint an opaque background with no way to ask them not to.
--- The only lever left is compositor opacity, which fades the *whole surface* --
--- text included. That is why this list is empty by default rather than
--- "every app": on a work machine, slightly translucent body text is a bad
--- trade for a nicer-looking window.
---
--- Add classes here if you want it anyway. Good candidates are windows you
--- look at rather than read: a music player, an image viewer, a calculator.
+-- These are the windows where that is wrong. Anything whose job is to show you
+-- accurate pixels should not have the wallpaper mixed into them: you cannot
+-- judge a photo, grade a video or pick a colour through 10% of your desktop.
 ------------------------------------------------------------------------------
 
-local GLASS_WINDOWS = {
-    -- "^org%.gnome%.Calculator$",
-    -- "^imv$",
+local OPAQUE_WINDOWS = {
+    "^(mpv|vlc|imv|org%.gnome%.Loupe|qimgv)$",
+    "^(gimp|krita|inkscape|darktable)$",
+    "^(obs|com%.obsproject%.Studio)$",
+    "^hyprpicker$",
 }
 
-for _, class in ipairs(GLASS_WINDOWS) do
+for i, class in ipairs(OPAQUE_WINDOWS) do
     hl.window_rule({
-        name    = "glass-" .. class,
+        name    = "opaque-" .. i,
         match   = { class = class },
-        opacity = { 0.90, 0.82 }, -- active, inactive
+        opacity = { 1.0, 1.0 }, -- active, inactive
     })
 end
 

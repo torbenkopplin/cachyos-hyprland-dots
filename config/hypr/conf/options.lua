@@ -7,8 +7,10 @@
 -- Programs
 ------------------------------------------------------------------------------
 
-TERMINAL     = "kitty"
-FILE_MANAGER = "dolphin"
+-- `-1` makes kitty a single instance: new windows attach to the running
+-- process instead of starting another. Carried over from ~/repos/dots.
+TERMINAL     = "kitty -1"
+FILE_MANAGER = "nautilus"
 BROWSER      = "firefox"
 
 -- The floating scratch terminal on SUPER+SHIFT+Return. It is launched under
@@ -31,20 +33,24 @@ NOCT = "noctalia msg "
 
 MOD = "SUPER"
 
-KB_LAYOUT  = "us"
+KB_LAYOUT  = "se"
 KB_VARIANT = ""
--- Caps Lock as a second Escape is the single highest-value remap for vim work.
--- Use "caps:escape" if you never want it to latch, "" to leave it alone.
-KB_OPTIONS = "caps:escape"
+-- Caps as an additional Ctrl, carried over from ~/repos/dots. ("caps:escape"
+-- is the other common vim choice; you picked Ctrl, so Ctrl it is.)
+KB_OPTIONS = "caps:ctrl_modifier"
 
 ------------------------------------------------------------------------------
 -- Workspaces
 ------------------------------------------------------------------------------
 
--- Workspaces are created per monitor and made persistent, so SUPER+J/K can
--- always walk up and down a known stack instead of falling off into nothing.
--- Keep this small: a distraction-free setup wants few, meaningful workspaces.
-WORKSPACES_PER_MONITOR = 5
+-- Workspaces are organised in per-monitor bands: monitor id N owns workspaces
+-- N*WORKSPACE_BAND+1 .. N*WORKSPACE_BAND+WORKSPACE_BAND. Ten per monitor, so
+-- the number keys map one-to-one (1..9 then 0).
+--
+-- The per-machine band table (which monitor, which scroll direction, which
+-- column width) is the WSBANDS global from host.lua -- see
+-- config/hypr/host.lua.example. conf/workspaces.lua builds the rules from it.
+WORKSPACE_BAND = 10
 
 ------------------------------------------------------------------------------
 -- Behaviour toggles
@@ -62,10 +68,14 @@ BAR_FOLLOWS_PANELS = true
 -- Look
 ------------------------------------------------------------------------------
 
-GAPS_IN  = 4
-GAPS_OUT = 8
+-- Carried over from ~/repos/dots. The generous outer gap earns its keep here:
+-- it is what you see the blurred wallpaper through.
+GAPS_IN  = 5
+GAPS_OUT = 20
 BORDER   = 2
-ROUNDING = 8
+ROUNDING = 10
 
--- Dimming unfocused windows is the cheapest possible focus aid. 1.0 disables.
-INACTIVE_OPACITY = 0.94
+-- Animations are off in ~/repos/dots. Kept off: it is the most consistent
+-- choice for a setup whose whole point is not pulling your eye around. Set to
+-- true for the short, non-bouncy set defined in conf/look.lua.
+ANIMATIONS = false

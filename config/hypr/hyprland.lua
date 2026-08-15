@@ -7,6 +7,15 @@
 -- Paths in require() are always relative to THIS file's directory.
 
 require("conf.options")   -- must be first: defines the globals everything else reads
+
+-- Machine-specific settings: monitors, GPU/host environment, and the WSBANDS
+-- table conf/workspaces.lua builds workspaces from. Pattern adopted from
+-- ~/repos/dots, where hosts/<hostname>/ supplies the file.
+--
+-- dofile rather than require so `hyprctl reload` always re-reads it, and pcall
+-- so a machine without one still gets a working session (Hyprland then
+-- auto-configures monitors and workspaces.lua falls back to a single band).
+pcall(dofile, os.getenv("HOME") .. "/.config/hypr/host.lua")
 require("conf.env")
 require("conf.look")
 require("conf.input")

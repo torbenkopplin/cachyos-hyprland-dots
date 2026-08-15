@@ -22,7 +22,7 @@ hl.config({
         repeat_delay = 250,
 
         touchpad = {
-            natural_scroll    = true,
+            natural_scroll    = false,   -- as in ~/repos/dots
             disable_while_typing = true,
             clickfinger_behavior = true,
             scroll_factor     = 0.6,

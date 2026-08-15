@@ -13,12 +13,15 @@
 
 hl.config({
     scrolling = {
-        -- One window on a workspace fills the screen. Two share it. That is
-        -- the whole point of a focused work setup.
-        fullscreen_on_one_column = true,
+        -- Off, as in ~/repos/dots: with column_width 0.333 you want a lone
+        -- window to keep its third, not snap to the whole screen every time
+        -- you close its neighbours.
+        fullscreen_on_one_column = false,
 
-        -- Default column width as a fraction of the monitor.
-        column_width = 0.5,
+        -- Default column width. Overridden per band in conf/workspaces.lua,
+        -- so a portrait monitor can use the full width while this stays a
+        -- third on a wide one.
+        column_width = 0.333,
 
         -- 1 = fit the focused column into view rather than always centring it.
         -- Centring on every focus change makes wide monitors feel seasick.
@@ -27,8 +30,8 @@ hl.config({
         follow_focus       = true,
         follow_min_visible = 0.4,
 
-        -- Cycled by SUPER+W / SUPER+SHIFT+W.
-        explicit_column_widths = "0.333, 0.5, 0.667, 1.0",
+        -- Cycled by SUPER+PLUS / SUPER+MINUS. Six steps, from ~/repos/dots.
+        explicit_column_widths = "0.25, 0.333, 0.5, 0.667, 0.75, 1.0",
 
         -- Both must stay false. Wrapping would make the tape loop around
         -- instead of reporting an edge, and the edge is exactly the signal

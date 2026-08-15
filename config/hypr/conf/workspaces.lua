@@ -1,47 +1,37 @@
--- conf/workspaces.lua -- one persistent workspace stack per monitor.
+-- conf/workspaces.lua -- one workspace band per monitor.
 --
--- SUPER+J/K walk up and down this stack when they run out of windows, so the
--- stack has to actually exist. Persistent workspaces mean the ends are
--- predictable (you can always go down until you hit the last one) and Noctalia
--- can show the whole stack in its workspace indicator instead of only the
--- workspaces that happen to have windows in them right now.
+-- Adopted from ~/repos/dots, because the band model does something the naive
+-- "N persistent workspaces per monitor" version cannot: it carries a scrolling
+-- *direction* and column width per band. A portrait monitor can scroll down
+-- while a landscape one scrolls right, at the same time.
 --
--- Monitors are numbered left to right by physical position, so the leftmost
--- screen owns workspaces 1..N, the next one N+1..2N, and so on. Binds address
--- them with the `m~<n>` selector ("n-th workspace on THIS monitor"), so
--- SUPER+2 always means "second workspace on the screen I'm looking at"
--- regardless of which monitor that is.
+-- Monitor id N owns workspaces N*BAND+1 .. N*BAND+BAND, so the ids alone say
+-- which monitor a workspace belongs to and a workspace never migrates.
+--
+-- The band table is machine-specific (monitor names and ids), so it comes from
+-- host.lua as the global WSBANDS -- see the note in hyprland.lua. The fallback
+-- below is what a host with no host.lua gets: one band on whichever monitor
+-- Hyprland picks.
 
-local applied = {} -- monitor name -> true, so reruns don't stack duplicate rules
+local bands = WSBANDS or {
+    { base = 0, direction = "right", column_width = 0.333 },
+}
 
-local function apply()
-    local monitors = hl.get_monitors()
-    if not monitors or #monitors == 0 then return end
+for _, band in ipairs(bands) do
+    for n = 1, WORKSPACE_BAND do
+        hl.workspace_rule({
+            workspace = tostring(band.base + n),
+            monitor   = band.monitor,
 
-    -- Left to right, then top to bottom for stacked displays.
-    table.sort(monitors, function(a, b)
-        if a.x ~= b.x then return a.x < b.x end
-        return a.y < b.y
-    end)
+            -- The first workspace of each band is that monitor's home, so a
+            -- fresh login lands somewhere predictable on every screen.
+            default   = (n == 1),
 
-    for index, monitor in ipairs(monitors) do
-        if not applied[monitor.name] then
-            applied[monitor.name] = true
-
-            local base = (index - 1) * WORKSPACES_PER_MONITOR
-            for n = 1, WORKSPACES_PER_MONITOR do
-                hl.workspace_rule({
-                    workspace  = tostring(base + n),
-                    monitor    = monitor.name,
-                    persistent = true,
-                })
-            end
-        end
+            -- Per-band layout: this is the whole reason for the band model.
+            layout_opts = {
+                direction    = band.direction,
+                column_width = band.column_width,
+            },
+        })
     end
 end
-
--- Monitors may not be enumerated yet when the config is first parsed, so cover
--- all three moments: config load (a reload), session start, and hotplug.
-apply()
-hl.on("hyprland.start", apply)
-hl.on("monitor.added", apply)

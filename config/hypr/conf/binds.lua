@@ -92,8 +92,9 @@ hl.bind(mod .. " + SHIFT + L", hl.dsp.layout("swapcol r"), { description = "Swap
 
 -- Stack / unstack windows within a column. This is PaperWM's core gesture:
 -- pull the neighbouring window into my column, or push mine back out.
-hl.bind(mod .. " + comma",  hl.dsp.layout("consume"), { description = "Pull window into this column" })
-hl.bind(mod .. " + period", hl.dsp.layout("expel"),   { description = "Push window out to its own column" })
+-- O/I from ~/repos/dots.
+hl.bind(mod .. " + O", hl.dsp.layout("consume"), { description = "Pull window into this column" })
+hl.bind(mod .. " + I", hl.dsp.layout("expel"),   { description = "Push window out to its own column" })
 hl.bind(mod .. " + SHIFT + period", hl.dsp.layout("promote"),
     { description = "Promote window to a new column" })
 
@@ -111,13 +112,14 @@ hl.bind(mod .. " + SHIFT + Z", hl.dsp.layout("inhibit_scroll"),
 -- Sizing
 ------------------------------------------------------------------------------
 
--- Cycle the preset widths from scrolling.explicit_column_widths.
-hl.bind(mod .. " + W",         hl.dsp.layout("colresize +conf"), { description = "Next column width" })
-hl.bind(mod .. " + SHIFT + W", hl.dsp.layout("colresize -conf"), { description = "Previous column width" })
+-- Cycle the six preset widths from scrolling.explicit_column_widths.
+-- PLUS/MINUS as in ~/repos/dots.
+hl.bind(mod .. " + plus",  hl.dsp.layout("colresize +conf"), { description = "Next column width" })
+hl.bind(mod .. " + minus", hl.dsp.layout("colresize -conf"), { description = "Previous column width" })
 
 -- Fine adjustment.
-hl.bind(mod .. " + minus", hl.dsp.layout("colresize -0.05"), { repeating = true, description = "Narrow column" })
-hl.bind(mod .. " + equal", hl.dsp.layout("colresize +0.05"), { repeating = true, description = "Widen column" })
+hl.bind(mod .. " + equal",         hl.dsp.layout("colresize +0.05"), { repeating = true, description = "Widen column" })
+hl.bind(mod .. " + SHIFT + minus", hl.dsp.layout("colresize -0.05"), { repeating = true, description = "Narrow column" })
 
 -- Take all the free space on the monitor / share it out evenly.
 hl.bind(mod .. " + SHIFT + F", hl.dsp.layout("fit expand"),  { description = "Expand into free space" })
@@ -142,6 +144,8 @@ end)
 -- Window state
 ------------------------------------------------------------------------------
 
+-- BACKSPACE from ~/repos/dots; Q kept as an alias.
+hl.bind(mod .. " + BackSpace", hl.dsp.window.close(), { description = "Close window" })
 hl.bind(mod .. " + Q",         hl.dsp.window.close(), { description = "Close window" })
 hl.bind(mod .. " + SHIFT + Q", hl.dsp.window.kill(),  { description = "Kill window" })
 
@@ -159,10 +163,12 @@ hl.bind(mod .. " + Tab", hl.dsp.exec_cmd(NOCT .. "window-switcher"), { descripti
 -- the same thing on every screen.
 ------------------------------------------------------------------------------
 
-for n = 1, WORKSPACES_PER_MONITOR do
-    hl.bind(mod .. " + " .. n, hl.dsp.focus({ workspace = "m~" .. n }),
+-- One key per workspace in the band: 1..9 then 0 for the tenth.
+for n = 1, WORKSPACE_BAND do
+    local key = n % 10
+    hl.bind(mod .. " + " .. key, hl.dsp.focus({ workspace = "m~" .. n }),
         { description = "Workspace " .. n })
-    hl.bind(mod .. " + SHIFT + " .. n, hl.dsp.window.move({ workspace = "m~" .. n, follow = true }),
+    hl.bind(mod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = "m~" .. n, follow = true }),
         { description = "Send window to workspace " .. n })
 end
 
@@ -170,15 +176,18 @@ hl.bind(mod .. " + grave", hl.dsp.focus({ workspace = "previous_per_monitor" }),
     { description = "Last workspace" })
 
 -- Scratchpad.
-hl.bind(mod .. " + S",         hl.dsp.workspace.toggle_special("scratch"), { description = "Scratchpad" })
-hl.bind(mod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:scratch" }),
+hl.bind(mod .. " + S",         hl.dsp.workspace.toggle_special("magic"), { description = "Scratchpad" })
+hl.bind(mod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:magic" }),
     { description = "Send to scratchpad" })
 
 ------------------------------------------------------------------------------
 -- Applications
 ------------------------------------------------------------------------------
 
-hl.bind(mod .. " + Return",         hl.dsp.exec_cmd(run .. TERMINAL), { description = "Terminal" })
+-- SUPER+T is the one from ~/repos/dots; Return is kept as an alias so both
+-- habits work.
+hl.bind(mod .. " + T",      hl.dsp.exec_cmd(run .. TERMINAL), { description = "Terminal" })
+hl.bind(mod .. " + Return", hl.dsp.exec_cmd(run .. TERMINAL), { description = "Terminal" })
 -- Floats and sizes itself via the scratchterm window rule in conf/rules.lua.
 hl.bind(mod .. " + SHIFT + Return", hl.dsp.exec_cmd(run .. TERMINAL_FLOAT),
     { description = "Floating terminal" })
@@ -192,7 +201,10 @@ hl.bind(mod .. " + SHIFT + B", hl.dsp.exec_cmd(run .. BROWSER),      { descripti
 hl.bind(mod .. " + A", hl.dsp.exec_cmd(NOCT .. "panel-toggle control-center"), { description = "Control centre" })
 hl.bind(mod .. " + N", hl.dsp.exec_cmd(NOCT .. "panel-toggle control-center notifications"), { description = "Notifications" })
 hl.bind(mod .. " + X", hl.dsp.exec_cmd(NOCT .. "panel-toggle clipboard"), { description = "Clipboard history" })
-hl.bind(mod .. " + O", hl.dsp.exec_cmd(NOCT .. "settings-toggle"), { description = "Shell settings" })
+-- SUPER+W was wallpaper in ~/repos/dots (a script); here it is Noctalia's panel.
+hl.bind(mod .. " + W", hl.dsp.exec_cmd(NOCT .. "panel-toggle wallpaper"), { description = "Wallpaper" })
+-- Moved off O, which is consume now. comma is also what Noctalia's own docs use.
+hl.bind(mod .. " + comma", hl.dsp.exec_cmd(NOCT .. "settings-toggle"), { description = "Shell settings" })
 
 -- Step the frosted-glass level: opaque -> light -> default -> heavy. Overrides
 -- the per-scheme level until you next change scheme. Applies to new terminal
@@ -213,7 +225,7 @@ end, { description = "Pin / unpin the bar" })
 
 -- SUPER+L is focus-right, so locking moves out of the way.
 hl.bind(mod .. " + CTRL + Escape", hl.dsp.exec_cmd(NOCT .. "session lock"), { description = "Lock" })
-hl.bind(mod .. " + SHIFT + Escape", hl.dsp.exec_cmd(NOCT .. "panel-toggle session"), { description = "Session menu" })
+hl.bind(mod .. " + Escape", hl.dsp.exec_cmd(NOCT .. "panel-toggle session"), { description = "Session menu" })
 
 ------------------------------------------------------------------------------
 -- System control, from the keyboard, through the launcher

@@ -37,29 +37,26 @@ hl.config({
         -- frosted-glass level configured per colour scheme in
         -- ~/.config/noctalia/glass.conf.
         --
-        -- Windows are rendered fully opaque on purpose. The frosted look comes
-        -- from the *app* drawing a translucent background (kitty's
-        -- background_opacity) with the compositor blurring behind it. Lowering
-        -- opacity here instead would fade the text along with the background.
         active_opacity   = 1.0,
-        inactive_opacity = INACTIVE_OPACITY,
+        inactive_opacity = 1.0,
 
         shadow = {
             enabled = false, -- shadows on a scrolling tape are just noise
         },
 
         blur = {
-            enabled  = true,
-            size     = 6,
-            passes   = 2,
-            xray     = true,
-            vibrancy = 0.1696,
-            popups   = true,
+            enabled        = true,
+            size           = 8,
+            passes         = 2,
+            xray           = true,
+            ignore_opacity = true,
+            vibrancy       = 0.1696,
+            popups         = true,
         },
     },
 
     animations = {
-        enabled = true,
+        enabled = ANIMATIONS,
     },
 })
 

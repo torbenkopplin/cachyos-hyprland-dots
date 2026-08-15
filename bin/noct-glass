@@ -1,34 +1,38 @@
 #!/usr/bin/env bash
 # noct-glass -- frosted glass, applied per colour scheme.
 #
-#   noct-glass apply          work out the level for the active scheme, apply it
-#   noct-glass set <0.0-1.0>  override until the next scheme change
-#   noct-glass cycle          step through opaque / light / full glass
-#   noct-glass show           print the level currently in effect
+#   noct-glass apply           work out the levels for the active scheme, apply
+#   noct-glass set <0.0-1.0>   override the window level until the next change
+#   noct-glass cycle           step through opaque / light / default / heavy
+#   noct-glass show            print the levels currently in effect
 #
 # `apply` is wired to Noctalia's colors_changed hook in 50-glass.toml, so
-# switching scheme from /theme (or from the settings GUI, or from IPC) lands
-# the matching glass level without anything else being involved.
+# switching scheme from /theme (or the settings GUI, or IPC) lands the matching
+# glass level without anything else being involved.
 #
-# What "frosted glass" actually is here
-# -------------------------------------
-# The compositor blurs whatever is behind a window. That only shows if the
-# window itself draws a translucent background. So the level below is applied
-# to kitty's `background_opacity`, and Hyprland is left rendering windows at
-# full opacity -- lowering *its* opacity would fade the text along with the
-# background, which is unreadable for work.
+# How the effect is built
+# -----------------------
+# Hyprland blurs whatever is behind a window wherever that window is not fully
+# opaque. Two levels feed that, and they do different jobs:
 #
-# That is also why "every app possible" is a short list: GTK and Qt apps paint
-# an opaque background and offer no way to ask them not to. Adding them to
-# WINDOW_GLASS in conf/rules.lua fades their text too; it is offered as an
-# opt-in there, not done by default.
+#   window    -> decoration.active_opacity / inactive_opacity, i.e. EVERY
+#                window. This is what makes GTK and Qt apps frosted, since
+#                they draw an opaque background and offer no way not to. The
+#                cost is that the compositor cannot separate a window's text
+#                from its background, so text fades with it.
+#
+#   terminal  -> kitty's background_opacity. kitty leaves glyphs opaque, so
+#                this is transparency that costs no legibility. It compounds
+#                with the window level.
+#
+# Set window = 1.0 in glass.conf for app-translucency only.
 
 set -uo pipefail
 
 # Every number this script writes is parsed by Lua or by kitty, both of which
 # require a '.' decimal separator. awk formats and compares numbers according
-# to the locale, so under a sv_SE/de_DE session it would emit "0,90" and
-# Hyprland would refuse to load the generated config. Pin the locale.
+# to the locale, so under a sv_SE session it would emit "0,90" and Hyprland
+# would refuse to load the generated config. Pin the locale.
 export LC_ALL=C
 
 CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
@@ -40,16 +44,16 @@ OVERRIDE_FILE="$STATE_HOME/noctalia/glass-override"
 KITTY_OUT="$CONFIG_HOME/kitty/generated-glass.conf"
 HYPR_OUT="$CONFIG_HOME/hypr/generated/glass.lua"
 
-CYCLE_STEPS=(1.00 0.90 0.82 0.70)
+CYCLE_STEPS=(1.00 0.95 0.90 0.82)
 
-usage() { sed -n '3,8p' "$0" | sed 's/^# \?//'; exit 2; }
+usage() { sed -n '3,7p' "$0" | sed 's/^# \?//'; exit 2; }
 
 # ---------------------------------------------------------------------------
-# Working out the level
+# Reading the levels
 # ---------------------------------------------------------------------------
 
-# Read "key = value" out of glass.conf, ignoring comments and whitespace.
-read_level() {
+# read_key <key> -- "key = value" from glass.conf, comments and spaces ignored.
+read_key() {
     local key=$1
     [[ -f $LEVELS_FILE ]] || return 1
     awk -F= -v k="$key" '
@@ -64,82 +68,90 @@ read_level() {
 }
 
 current_scheme() {
-    # "wallpaper m3-content" -> "wallpaper:m3-content"
     local s
     s=$(noctalia msg color-scheme-get 2>/dev/null) || return 1
     [[ -z $s ]] && return 1
-    printf '%s:%s' "${s%% *}" "${s#* }"
+    printf '%s:%s' "${s%% *}" "${s#* }"   # "custom noirblaze" -> "custom:noirblaze"
 }
 
-# A manual override wins until the scheme changes, which is what makes `cycle`
-# feel immediate without permanently editing the per-scheme table.
-effective_level() {
-    if [[ -f $OVERRIDE_FILE ]]; then
-        cat "$OVERRIDE_FILE"
-        return 0
-    fi
-
-    local scheme
+# level <window|terminal> -- per-scheme override, else the bare default.
+level() {
+    local what=$1 scheme
     if scheme=$(current_scheme); then
-        read_level "$scheme" && return 0
+        read_key "$scheme.$what" && return 0
     fi
+    read_key "$what" && return 0
+    [[ $what == window ]] && printf '0.90' || printf '0.85'
+}
 
-    read_level default || printf '0.82'
+window_level() {
+    # A manual override wins until the scheme changes, which is what makes
+    # `cycle` feel immediate without editing the per-scheme table.
+    [[ -f $OVERRIDE_FILE ]] && { cat "$OVERRIDE_FILE"; return 0; }
+    level window
 }
 
 # ---------------------------------------------------------------------------
-# Applying it
+# Applying
 # ---------------------------------------------------------------------------
 
 write_kitty() {
-    local level=$1
     mkdir -p "$(dirname "$KITTY_OUT")"
     cat >"$KITTY_OUT" <<EOF
 # Generated by noct-glass. Do not edit -- see ~/.config/noctalia/glass.conf.
-background_opacity $level
+background_opacity $1
 EOF
 }
 
 write_hypr() {
-    local level=$1
+    local win=$1
 
-    # Blur costs GPU time proportional to passes x size. Two passes is the
-    # point where it reads as frosted rather than merely soft; more is mostly
-    # heat. Skip it entirely when nothing is translucent.
+    # Blur costs GPU time proportional to passes x size. Skip it entirely when
+    # nothing is translucent; two passes is where it reads as frosted rather
+    # than merely soft, and more is mostly heat.
     local blur_enabled="true"
-    awk -v l="$level" 'BEGIN { exit !(l >= 0.995) }' && blur_enabled="false"
+    awk -v l="$win" 'BEGIN { exit !(l >= 0.995) }' && blur_enabled="false"
+
+    # Unfocused windows sit one step further back. Never below 0.6, or an
+    # inactive terminal becomes unreadable rather than merely dimmed.
+    local inactive
+    inactive=$(awk -v l="$win" 'BEGIN { v = l - 0.06; if (v < 0.6) v = 0.6; printf "%.2f", v }')
 
     mkdir -p "$(dirname "$HYPR_OUT")"
     cat >"$HYPR_OUT" <<EOF
 -- Generated by noct-glass from the active colour scheme. Do not edit;
 -- change the levels in ~/.config/noctalia/glass.conf instead.
 --
--- Windows stay at full opacity on purpose: the translucency comes from the
--- app (kitty's background_opacity), so text stays crisp while the background
--- is blurred. Only unfocused windows are dimmed, as a focus cue.
+-- active/inactive_opacity apply to EVERY window, which is what frosts GTK and
+-- Qt apps that have no transparency of their own. Text fades with them: the
+-- compositor cannot tell a window's glyphs from its background. kitty gets its
+-- own, sharper treatment through background_opacity.
 
 hl.config({
     decoration = {
-        active_opacity   = 1.0,
-        inactive_opacity = $(awk -v l="$level" 'BEGIN { printf "%.2f", (l >= 0.995 ? 0.94 : 0.90) }'),
+        active_opacity   = $win,
+        inactive_opacity = $inactive,
 
         blur = {
             enabled = $blur_enabled,
-            size    = 6,
+            size    = 8,
             passes  = 2,
 
-            -- Sample the wallpaper rather than the windows underneath, so a
-            -- busy window behind the terminal does not show through as noise.
-            xray    = true,
+            -- Blur behind a window at full strength regardless of how
+            -- translucent that window is; without it a 0.9 window gets only a
+            -- tenth of the blur and the effect disappears.
+            ignore_opacity = true,
 
-            -- Slight darkening keeps light text legible over a bright
-            -- wallpaper without needing more opacity.
+            -- Sample the wallpaper rather than the windows underneath, so a
+            -- busy window behind does not show through as noise.
+            xray = true,
+
             brightness = 0.85,
             contrast   = 1.0,
             noise      = 0.01,
-            vibrancy   = 0.17,
+            vibrancy   = 0.1696,
 
-            popups          = true,
+            popups             = true,
             popups_ignorealpha = 0.4,
             new_optimizations  = true,
         },
@@ -149,19 +161,18 @@ EOF
 }
 
 apply() {
-    local level
-    level=$(effective_level)
+    local win term
+    win=$(window_level)
+    term=$(level terminal)
 
-    write_kitty "$level"
-    write_hypr "$level"
+    write_kitty "$term"
+    write_hypr "$win"
 
     # Hyprland reloads on config change, but generated/glass.lua is reached
     # through a require() and we do not rely on those being watched.
     command -v hyprctl >/dev/null 2>&1 && hyprctl reload >/dev/null 2>&1
 
-    # kitty applies background_opacity at startup, so open windows keep the
-    # old level. Colours, by contrast, repaint live through the OSC template.
-    printf '%s\n' "$level"
+    printf 'window %s  terminal %s\n' "$win" "$term"
 }
 
 # ---------------------------------------------------------------------------
@@ -178,7 +189,7 @@ case "${1:-apply}" in
         apply >/dev/null
         ;;
     cycle)
-        current=$(effective_level)
+        current=$(window_level)
         next=${CYCLE_STEPS[0]}
         for i in "${!CYCLE_STEPS[@]}"; do
             if [[ ${CYCLE_STEPS[$i]} == "$current" ]]; then
@@ -189,10 +200,10 @@ case "${1:-apply}" in
         mkdir -p "$(dirname "$OVERRIDE_FILE")"
         printf '%s' "$next" >"$OVERRIDE_FILE"
         apply >/dev/null
-        notify-send -a Glass "Frosted glass" "opacity $next (new terminals)" 2>/dev/null
+        notify-send -a Glass "Frosted glass" "window opacity $next" 2>/dev/null
         ;;
     show)
-        effective_level; echo
+        apply
         ;;
     *) usage ;;
 esac
