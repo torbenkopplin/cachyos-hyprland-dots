@@ -2,10 +2,10 @@
 # noct-network -- NetworkManager picker for the Noctalia launcher.
 #
 #   noct-network list           emit launcher candidates
-#   noct-network act "<line>"   connect / disconnect / forget / toggle radio
+#   noct-network act "<line>"   connect / disconnect / toggle radio
 #
 # Ordering is deliberate: what you can turn OFF comes first (you usually open
-# this to disconnect from something), then saved profiles, then whatever is in
+# this to disconnect from something), then saved profiles, then what is in
 # the air.
 
 set -uo pipefail
@@ -20,10 +20,11 @@ unescape() { sed 's/\\:/:/g'; }
 # ---------------------------------------------------------------------------
 
 list() {
+    provider network
+    begin_list
     need nmcli || return 0
 
     local active saved wifi_enabled
-
     active=$(nmcli -g NAME connection show --active 2>/dev/null | unescape)
     saved=$(nmcli -g NAME connection show 2>/dev/null | unescape)
     wifi_enabled=$(nmcli radio wifi 2>/dev/null)
@@ -31,53 +32,52 @@ list() {
     # --- currently connected -------------------------------------------------
     while IFS= read -r name; do
         [[ -z $name ]] && continue
-        emit "● Disconnect  $name" "$(enc "down:$name")"
+        item "● Disconnect  $name" "connected" "down:$name"
     done <<<"$active"
 
     # --- saved but not connected --------------------------------------------
     while IFS= read -r name; do
         [[ -z $name ]] && continue
         grep -qxF "$name" <<<"$active" && continue
-        emit "  Connect     $name" "$(enc "up:$name")"
+        item "Connect  $name" "saved profile" "up:$name"
     done <<<"$saved"
 
     # --- in range ------------------------------------------------------------
     if [[ $wifi_enabled == enabled ]]; then
-        # Three single-field queries rather than one multi-field one: nmcli
-        # only escapes its separator, and requesting one field at a time
-        # sidesteps the problem entirely. The rows line up.
-        local ssids signals security
+        # Three single-field queries rather than one multi-field query: nmcli
+        # only escapes its separator, and asking for one field at a time
+        # sidesteps that entirely. The rows line up.
+        local ssids signals security seen=""
         ssids=$(nmcli -g SSID device wifi list 2>/dev/null | unescape)
         signals=$(nmcli -g SIGNAL device wifi list 2>/dev/null)
         security=$(nmcli -g SECURITY device wifi list 2>/dev/null | unescape)
 
-        local seen=""
         while IFS=$'\x1f' read -r ssid signal sec; do
             [[ -z $ssid ]] && continue                  # hidden network
             grep -qxF "$ssid" <<<"$saved" && continue   # already offered above
             grep -qxF "$ssid" <<<"$seen" && continue    # same AP, several bands
             seen+="$ssid"$'\n'
 
-            local lock=""
-            [[ -n ${sec// /} ]] && lock=" ${sec}"
-            emit "  Wi-Fi       $ssid  (${signal}%)${lock}" "$(enc "wifi:$ssid")"
+            item "$ssid" "${signal}%${sec:+ · $sec}" "wifi:$ssid"
         done < <(paste -d$'\x1f' <(echo "$ssids") <(echo "$signals") <(echo "$security"))
 
-        emit "Turn Wi-Fi off" "$(enc "radio:off")"
+        item "Turn Wi-Fi off" "" "radio:off"
     else
-        emit "Turn Wi-Fi on" "$(enc "radio:on")"
+        item "Turn Wi-Fi on" "the radio is off" "radio:on"
     fi
 }
 
 # ---------------------------------------------------------------------------
 
 act() {
-    local payload action arg
-    payload=$(dec "$(token "$1")")
-    [[ -z $payload ]] && exit 0
+    provider network
 
-    action=${payload%%:*}
-    arg=${payload#*:}
+    local data action arg
+    data=$(payload "$1")
+    [[ -z $data ]] && exit 0
+
+    action=${data%%:*}
+    arg=${data#*:}
 
     case "$action" in
         up)
@@ -102,9 +102,6 @@ act() {
             else
                 noctalia msg wifi-disable >/dev/null 2>&1
             fi
-            ;;
-        forget)
-            nmcli connection delete "$arg" >/dev/null 2>&1
             ;;
     esac
 }

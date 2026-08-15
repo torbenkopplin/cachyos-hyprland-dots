@@ -4,7 +4,7 @@
 #   noct-power list           emit launcher candidates
 #   noct-power act "<line>"   apply the chosen setting
 #
-# Profiles come from power-profiles-daemon via UPower, which is the same source
+# Profiles come from power-profiles-daemon via UPower, the same source
 # Noctalia's own power widget uses, so the two never disagree.
 
 set -uo pipefail
@@ -16,39 +16,44 @@ usage() { echo "usage: $0 list | $0 act <line>" >&2; exit 2; }
 # ---------------------------------------------------------------------------
 
 list() {
+    provider power
+    begin_list
+
     if command -v powerprofilesctl >/dev/null 2>&1; then
         local active
         active=$(powerprofilesctl get 2>/dev/null)
 
-        # `powerprofilesctl list` marks the active profile with '*' and indents
-        # each name as "  name:".
+        # `powerprofilesctl list` marks the active profile with '*' and prints
+        # each name indented as "  name:".
         while IFS= read -r profile; do
             [[ -z $profile ]] && continue
-            local mark="  "
-            [[ $profile == "$active" ]] && mark="● "
-            emit "${mark}Power: ${profile}" "$(enc "profile:$profile")"
+            if [[ $profile == "$active" ]]; then
+                item "● Power: $profile" "active" "profile:$profile"
+            else
+                item "Power: $profile" "" "profile:$profile"
+            fi
         done < <(powerprofilesctl list 2>/dev/null |
-                 awk '/^[[:space:]]*\*?[[:space:]]*[a-z-]+:/ {
-                        gsub(/[ *:]/, ""); print
-                      }')
+                 awk '/^[[:space:]]*\*?[[:space:]]*[a-z-]+:/ { gsub(/[ *:]/, ""); print }')
     else
-        emit "power-profiles-daemon is not installed" "$(enc "")"
+        item "power-profiles-daemon is not installed" "no power profiles available" ""
     fi
 
-    emit "Night light: toggle schedule" "$(enc "night:schedule")"
-    emit "Night light: force on / off"  "$(enc "night:force")"
-    emit "Caffeine: keep the screen awake" "$(enc "caffeine:toggle")"
+    item "Night light: toggle schedule" "" "night:schedule"
+    item "Night light: force on / off"  "ignore the schedule" "night:force"
+    item "Caffeine"                     "keep the screen awake" "caffeine:toggle"
 }
 
 # ---------------------------------------------------------------------------
 
 act() {
-    local payload action arg
-    payload=$(dec "$(token "$1")")
-    [[ -z $payload ]] && exit 0
+    provider power
 
-    action=${payload%%:*}
-    arg=${payload#*:}
+    local data action arg
+    data=$(payload "$1")
+    [[ -z $data ]] && exit 0
+
+    action=${data%%:*}
+    arg=${data#*:}
 
     case "$action" in
         profile)  noctalia msg power-set "$arg" >/dev/null 2>&1 ;;

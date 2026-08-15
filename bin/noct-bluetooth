@@ -4,9 +4,9 @@
 #   noct-bluetooth list             emit launcher candidates
 #   noct-bluetooth act "<line>"     connect / disconnect / power / scan
 #
-# The list shows what the action will DO, not what the device currently is:
-# a connected device offers "Disconnect", a known one offers "Connect". You
-# read the verb, you press Enter, you get that.
+# Titles say what activating will DO, not what the device currently is: a
+# connected device offers "Disconnect", a known one offers "Connect". You read
+# the verb, you press Enter, you get that.
 
 set -uo pipefail
 
@@ -17,14 +17,16 @@ usage() { echo "usage: $0 list | $0 act <line>" >&2; exit 2; }
 # ---------------------------------------------------------------------------
 
 list() {
+    provider bluetooth
+    begin_list
     need bluetoothctl || return 0
 
     local powered connected
     powered=$(bluetoothctl show 2>/dev/null | awk '/Powered:/ {print $2; exit}')
 
     if [[ $powered != yes ]]; then
-        emit "Turn Bluetooth on" "$(enc "power:on")"
-        emit "Scan for devices" "$(enc "scan:")"
+        item "Turn Bluetooth on" "the adapter is powered off" "power:on"
+        item "Scan for devices"  "powers the adapter on first" "scan:"
         return 0
     fi
 
@@ -37,29 +39,31 @@ list() {
         [[ -z ${name:-} ]] && name=$mac
 
         if grep -qxF "$mac" <<<"$connected"; then
-            emit "● Disconnect  $name" "$(enc "disconnect:$mac")"
+            item "● Disconnect  $name" "$mac" "disconnect:$mac"
         else
-            emit "  Connect     $name" "$(enc "connect:$mac")"
+            item "Connect  $name" "$mac" "connect:$mac"
         fi
     done < <(bluetoothctl devices 2>/dev/null)
 
-    emit "Scan for devices" "$(enc "scan:")"
-    emit "Turn Bluetooth off" "$(enc "power:off")"
+    item "Scan for devices"   "10s discovery, then reopens this list" "scan:"
+    item "Turn Bluetooth off" "" "power:off"
 }
 
 # ---------------------------------------------------------------------------
 
 act() {
-    local payload action arg
-    payload=$(dec "$(token "$1")")
-    [[ -z $payload ]] && exit 0
+    provider bluetooth
 
-    action=${payload%%:*}
-    arg=${payload#*:}
+    local data action arg
+    data=$(payload "$1")
+    [[ -z $data ]] && exit 0
+
+    action=${data%%:*}
+    arg=${data#*:}
 
     case "$action" in
         connect)
-            # Trusting means it will reconnect on its own next time.
+            # Trusting means it reconnects on its own next time.
             bluetoothctl trust "$arg" >/dev/null 2>&1
             if bluetoothctl connect "$arg" >/dev/null 2>&1; then
                 notify-send -a Bluetooth "Connected" "$arg" 2>/dev/null
@@ -79,8 +83,8 @@ act() {
             fi
             ;;
         scan)
-            # Discovery has to run for a while before anything shows up, so
-            # scan first, then reopen the launcher on this provider.
+            # Discovery has to run a while before anything appears, so scan
+            # first, then reopen the launcher on this provider.
             noctalia msg bluetooth-enable >/dev/null 2>&1
             bluetoothctl --timeout 10 scan on >/dev/null 2>&1
             noctalia msg panel-toggle launcher "/bt " >/dev/null 2>&1

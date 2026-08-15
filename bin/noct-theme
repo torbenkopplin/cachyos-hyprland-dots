@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+# noct-theme -- colour scheme picker for the Noctalia launcher.
+#
+#   noct-theme list           emit launcher candidates
+#   noct-theme act "<line>"   switch scheme / mode
+#
+# Three kinds of scheme, all switched through one IPC call:
+#
+#   custom    <name>       a JSON file in ~/.config/noctalia/palettes/
+#   builtin   <name>       a palette compiled into Noctalia
+#   wallpaper <generator>  derive the palette from the current wallpaper
+#
+# Custom palettes are discovered from disk rather than hardcoded, so dropping
+# another .json into that folder makes it appear here with no edit to this
+# script.
+#
+# Whatever you pick, Noctalia re-renders every enabled template, so the
+# terminal, GTK/Qt apps and Hyprland's window borders all follow. See
+# config/noctalia/40-templates.toml.
+
+set -uo pipefail
+
+. "$(dirname "$(readlink -f "$0")")/noct-common.sh"
+
+usage() { echo "usage: $0 list | $0 act <line>" >&2; exit 2; }
+
+PALETTE_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/noctalia/palettes"
+
+# Wallpaper generators, from `color-scheme-set` in the Noctalia IPC reference.
+WALLPAPER_SCHEMES=(
+    "m3-tonal-spot:Tonal Spot"
+    "m3-content:Content"
+    "m3-fruit-salad:Fruit Salad"
+    "m3-rainbow:Rainbow"
+    "m3-monochrome:Monochrome"
+    "vibrant:Vibrant"
+    "faithful:Faithful"
+    "soft:Soft"
+    "muted:Muted"
+)
+
+# Palettes compiled into the binary.
+BUILTIN_PALETTES=(
+    "Ayu" "Catppuccin" "Dracula" "Eldritch" "Gruvbox"
+    "Kanagawa" "Noctalia" "Nord" "Rosé Pine" "Tokyo-Night"
+)
+
+# ---------------------------------------------------------------------------
+
+list() {
+    provider theme
+    begin_list
+
+    # `color-scheme-get` prints two tokens, e.g. "wallpaper m3-content",
+    # "builtin Gruvbox" or "custom noirblaze".
+    local current kind name
+    current=$(noctalia msg color-scheme-get 2>/dev/null)
+    kind=${current%% *}
+    name=${current#* }
+
+    # Marks the active scheme, and returns the label to show.
+    label() {  # <kind> <id> <text>
+        if [[ $1 == "$kind" && $2 == "$name" ]]; then
+            printf '● %s' "$3"
+        else
+            printf '%s' "$3"
+        fi
+    }
+
+    # --- your own palettes first: the ones you actually chose ----------------
+    local file id
+    for file in "$PALETTE_DIR"/*.json; do
+        [[ -e $file ]] || continue
+        id=$(basename "$file" .json)
+        item "$(label custom "$id" "$id")" "your palette" "custom:$id"
+    done
+
+    # --- built-ins -----------------------------------------------------------
+    local palette
+    for palette in "${BUILTIN_PALETTES[@]}"; do
+        item "$(label builtin "$palette" "$palette")" "built-in" "builtin:$palette"
+    done
+
+    # --- wallpaper-derived ---------------------------------------------------
+    local entry gen text
+    for entry in "${WALLPAPER_SCHEMES[@]}"; do
+        gen=${entry%%:*}
+        text=${entry#*:}
+        item "$(label wallpaper "$gen" "Wallpaper: $text")" \
+             "regenerated from the wallpaper" "wallpaper:$gen"
+    done
+
+    # --- mode and maintenance ------------------------------------------------
+    local mode
+    mode=$(noctalia msg theme-mode-get 2>/dev/null)
+    item "Toggle dark / light" "currently ${mode:-unknown}" "mode:toggle"
+    item "Re-apply templates"  "repaint apps without changing the palette" "apply:"
+}
+
+# ---------------------------------------------------------------------------
+
+act() {
+    provider theme
+
+    local data action arg
+    data=$(payload "$1")
+    [[ -z $data ]] && exit 0
+
+    action=${data%%:*}
+    arg=${data#*:}
+
+    case "$action" in
+        custom|builtin|wallpaper)
+            noctalia msg color-scheme-set "$action" "$arg" >/dev/null 2>&1 \
+                || notify-send -a Theme -u critical "Could not switch scheme" \
+                       "$action $arg" 2>/dev/null
+            ;;
+        mode)  noctalia msg theme-mode-toggle >/dev/null 2>&1 ;;
+        apply) noctalia msg templates-apply   >/dev/null 2>&1 ;;
+    esac
+}
+
+# ---------------------------------------------------------------------------
+
+case "${1:-}" in
+    list) list ;;
+    act)  [[ $# -ge 2 ]] || usage; act "$2" ;;
+    *)    usage ;;
+esac

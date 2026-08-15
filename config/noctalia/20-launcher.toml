@@ -2,12 +2,15 @@
 ##
 ## Each entry is a dmenu-style provider: `command` prints one candidate per
 ## line, `exec` runs when you pick one, with {selection} replaced by the whole
-## selected line. A tab in a line splits it into title and subtitle.
+## selected line. A tab in a line splits it into title and subtitle, and both
+## halves are shown.
 ##
 ## The scripts behind these live in bin/ and are installed to ~/.local/bin.
-## They emit "<human title><TAB><base64 payload>" and decode the payload on
-## activation, so a network name containing quotes or spaces can never end up
-## being interpreted as shell syntax.
+## Because every part of the emitted line is visible, none of it carries a
+## machine-readable payload: each script records "title -> payload" in a side
+## map under $XDG_RUNTIME_DIR and looks the selection back up on activation.
+## That keeps the results readable and means a network name or device id never
+## reaches a shell as syntax. See bin/noct-common.sh.
 ##
 ## `prefix` is a BARE trigger word. It gets composed with
 ## shell.launcher.provider_prefix ("/" in 00-shell.toml), so `prefix = "net"`
@@ -24,7 +27,7 @@ prefix  = "aout"
 glyph   = "volume"
 global  = false
 command = "noct-audio list sinks"
-exec    = "noct-audio act \"{selection}\""
+exec    = "noct-audio act sinks \"{selection}\""
 
 ## Audio input -- SUPER+CTRL+I
 [shell.launcher.dmenu.entry.ain]
@@ -33,7 +36,7 @@ prefix  = "ain"
 glyph   = "microphone"
 global  = false
 command = "noct-audio list sources"
-exec    = "noct-audio act \"{selection}\""
+exec    = "noct-audio act sources \"{selection}\""
 
 ## Bluetooth -- SUPER+CTRL+B
 [shell.launcher.dmenu.entry.bt]
@@ -61,3 +64,17 @@ glyph   = "battery"
 global  = false
 command = "noct-power list"
 exec    = "noct-power act \"{selection}\""
+
+## Colour schemes -- SUPER+CTRL+T
+##
+## Switch between the wallpaper-derived palette, any built-in palette
+## (Catppuccin, Gruvbox, Ayu, Nord, Kanagawa, ...), and your own palettes in
+## ~/.config/noctalia/palettes/ -- noirblaze ships there, ported from your
+## neovim colourscheme. Also toggles dark/light and re-applies templates.
+[shell.launcher.dmenu.entry.theme]
+label   = "Colour scheme"
+prefix  = "theme"
+glyph   = "palette"
+global  = false
+command = "noct-theme list"
+exec    = "noct-theme act \"{selection}\""

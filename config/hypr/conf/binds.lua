@@ -226,6 +226,7 @@ hl.bind(mod .. " + CTRL + I", provider("/ain"),   { description = "Audio input d
 hl.bind(mod .. " + CTRL + B", provider("/bt"),    { description = "Bluetooth devices" })
 hl.bind(mod .. " + CTRL + N", provider("/net"),   { description = "Networks" })
 hl.bind(mod .. " + CTRL + P", provider("/power"), { description = "Power profile" })
+hl.bind(mod .. " + CTRL + T", provider("/theme"), { description = "Colour scheme" })
 
 ------------------------------------------------------------------------------
 -- Hardware keys

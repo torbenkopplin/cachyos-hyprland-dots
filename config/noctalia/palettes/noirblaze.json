@@ -1,0 +1,77 @@
+{
+  "_comment": [
+    "noirblaze -- ported from ~/.config/nvim/colors/noirblaze.lua so the desktop",
+    "matches the editor. Monochrome greys with a single hot-pink accent.",
+    "",
+    "Source colours, using the names from the neovim theme:",
+    "  bg #121212  bg2 #212121  bg3 #323232",
+    "  dim1 #535353  dim2 #737373  dim3 #787878  dim4 #7a7a7a  mid #949494",
+    "  fg4 #a7a7a7  fg3 #b0b0b0  fg2 #b4b4b4  fg1 #d5d5d5  fg0 #f5f5f5",
+    "  white #ffffff  pink #ff0088",
+    "",
+    "Dark only, deliberately: the neovim theme has no light variant, and",
+    "inventing one here would mean shipping colours you never chose. Noctalia",
+    "falls back to the dark variant when mode = light, so nothing breaks -- it",
+    "just stays dark. Add a \"light\" object alongside \"dark\" if you ever want one.",
+    "",
+    "Selected with:  noctalia msg color-scheme-set custom noirblaze",
+    "or from the launcher:  /theme"
+  ],
+
+  "dark": {
+    "mPrimary": "#ff0088",
+    "mOnPrimary": "#121212",
+
+    "mSecondary": "#949494",
+    "mOnSecondary": "#121212",
+
+    "mTertiary": "#ffffff",
+    "mOnTertiary": "#121212",
+
+    "mError": "#ff0088",
+    "mOnError": "#121212",
+
+    "mSurface": "#121212",
+    "mOnSurface": "#b4b4b4",
+
+    "mSurfaceVariant": "#323232",
+    "mOnSurfaceVariant": "#b0b0b0",
+
+    "mOutline": "#535353",
+    "mShadow": "#000000",
+
+    "mHover": "#212121",
+    "mOnHover": "#f5f5f5",
+
+    "terminal": {
+      "background": "#121212",
+      "foreground": "#b4b4b4",
+      "cursor": "#ff0088",
+      "cursorText": "#121212",
+      "selectionBg": "#323232",
+      "selectionFg": "#f5f5f5",
+
+      "normal": {
+        "black": "#212121",
+        "red": "#ff0088",
+        "green": "#787878",
+        "yellow": "#949494",
+        "blue": "#7a7a7a",
+        "magenta": "#ff0088",
+        "cyan": "#737373",
+        "white": "#b4b4b4"
+      },
+
+      "bright": {
+        "black": "#535353",
+        "red": "#ff3ba3",
+        "green": "#b0b0b0",
+        "yellow": "#a7a7a7",
+        "blue": "#949494",
+        "magenta": "#ff3ba3",
+        "cyan": "#a7a7a7",
+        "white": "#ffffff"
+      }
+    }
+  }
+}
