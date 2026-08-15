@@ -1,0 +1,168 @@
+#!/usr/bin/env bash
+# noct-wallfetch -- populate the wallpaper directories from Wallhaven.
+#
+#   noct-wallfetch              fetch every set
+#   noct-wallfetch <set> ...    fetch only the named sets
+#   noct-wallfetch --list       show the configured sets and what is on disk
+#   noct-wallfetch --dry-run    show what would be downloaded
+#
+# Sets live in ~/.config/noctalia/wallpapers.conf, one per line:
+#
+#   <name>  <subdir>  <count>  <wallhaven search params>
+#
+# Each set maps to a directory, and each directory maps to a monitor through
+# [wallpaper.monitor.*] in 60-wallpaper.toml. That is the whole point: an
+# ultrawide and a 16:9 screen want genuinely different images, not the same
+# image cropped twice.
+#
+# Images are downloaded, never committed. They are other people's artwork, the
+# repo has no business redistributing them, and a wallpaper folder would dwarf
+# everything else in it.
+#
+# Wallhaven's API is public and needs no key for SFW results. Set
+# WALLHAVEN_API_KEY to raise the rate limit (45 requests/minute anonymous).
+
+set -uo pipefail
+
+API="https://wallhaven.cc/api/v1/search"
+CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
+SETS_FILE="$CONFIG_HOME/noctalia/wallpapers.conf"
+ROOT="${WALLPAPER_ROOT:-$HOME/Pictures/Wallpapers}"
+
+DRY_RUN=0
+LIST=0
+declare -a WANTED=()
+
+for arg in "$@"; do
+    case "$arg" in
+        --dry-run) DRY_RUN=1 ;;
+        --list)    LIST=1 ;;
+        -h|--help) sed -n '3,10p' "$0" | sed 's/^# \?//'; exit 0 ;;
+        -*)        echo "unknown option: $arg" >&2; exit 2 ;;
+        *)         WANTED+=("$arg") ;;
+    esac
+done
+
+for tool in curl jq; do
+    command -v "$tool" >/dev/null 2>&1 || { echo "noct-wallfetch: needs $tool" >&2; exit 1; }
+done
+[[ -f $SETS_FILE ]] || { echo "noct-wallfetch: no $SETS_FILE" >&2; exit 1; }
+
+# ---------------------------------------------------------------------------
+
+# Emits "name<TAB>subdir<TAB>count<TAB>params" for each configured set.
+read_sets() {
+    awk '
+        /^[[:space:]]*#/ { next }
+        /^[[:space:]]*$/ { next }
+        {
+            name = $1; subdir = $2; count = $3
+            params = ""
+            for (i = 4; i <= NF; i++) params = params (params == "" ? "" : " ") $i
+            printf "%s\t%s\t%s\t%s\n", name, subdir, count, params
+        }
+    ' "$SETS_FILE"
+}
+
+wanted() {
+    (( ${#WANTED[@]} == 0 )) && return 0
+    local w
+    for w in "${WANTED[@]}"; do [[ $w == "$1" ]] && return 0; done
+    return 1
+}
+
+# fetch_set <name> <subdir> <count> <params>
+fetch_set() {
+    local name=$1 subdir=$2 count=$3 params=$4
+    local dir="$ROOT/$subdir"
+    local page=1 got=0 new=0 skipped=0 total
+
+    printf '\n  %s -> %s (want %s)\n' "$name" "${dir/#$HOME/\~}" "$count"
+
+    # Wallhaven returns 24 per page; keep paging until we have enough or run out.
+    while (( got < count )); do
+        local body
+        # -d, not a bare argument: curl would take an unflagged "a=b&c=d" as a
+        # second URL and fail the whole request. With -G every -d is folded
+        # into the query string.
+        body=$(curl -sG "$API" \
+                    ${WALLHAVEN_API_KEY:+-H "X-API-Key: $WALLHAVEN_API_KEY"} \
+                    -d "page=$page" \
+                    -d "$params" 2>/dev/null) || break
+
+        # A malformed query returns an error object rather than .data.
+        if ! jq -e '.data' >/dev/null 2>&1 <<<"$body"; then
+            printf '    !! query rejected -- check the params for this set\n'
+            return 1
+        fi
+
+        if (( page == 1 )); then
+            total=$(jq -r '.meta.total' <<<"$body")
+            printf '    %s match this search\n' "$total"
+            (( total == 0 )) && return 0
+        fi
+
+        local n
+        n=$(jq -r '.data | length' <<<"$body")
+        (( n == 0 )) && break
+
+        local url id ext dest
+        while IFS=$'\t' read -r id url; do
+            (( got >= count )) && break
+            got=$((got + 1))
+            ext=${url##*.}
+            dest="$dir/wallhaven-$id.$ext"
+
+            if [[ -f $dest ]]; then
+                skipped=$((skipped + 1))
+                continue
+            fi
+
+            if (( DRY_RUN )); then
+                printf '    would fetch %s\n' "$(basename "$dest")"
+                new=$((new + 1))
+                continue
+            fi
+
+            mkdir -p "$dir"
+            if curl -sfL "$url" -o "$dest.part" && mv "$dest.part" "$dest"; then
+                new=$((new + 1))
+            else
+                rm -f "$dest.part"
+                printf '    !! failed: %s\n' "$url"
+            fi
+        done < <(jq -r '.data[] | "\(.id)\t\(.path)"' <<<"$body")
+
+        page=$((page + 1))
+        # Anonymous API allows 45 requests/minute; this keeps a long multi-set
+        # run comfortably under it without making a short one feel slow.
+        (( DRY_RUN )) || sleep 1
+    done
+
+    printf '    %s new, %s already had\n' "$new" "$skipped"
+}
+
+# ---------------------------------------------------------------------------
+
+if (( LIST )); then
+    printf '%-18s %-12s %-7s %s\n' SET DIRECTORY ON-DISK WANTED
+    while IFS=$'\t' read -r name subdir count _; do
+        have=$(find "$ROOT/$subdir" -maxdepth 1 -type f 2>/dev/null | wc -l)
+        printf '%-18s %-12s %-7s %s\n' "$name" "$subdir" "$have" "$count"
+    done < <(read_sets)
+    printf '\nroot: %s\n' "${ROOT/#$HOME/\~}"
+    exit 0
+fi
+
+printf 'wallhaven -> %s\n' "${ROOT/#$HOME/\~}"
+(( DRY_RUN )) && printf '(dry run)\n'
+
+found=0
+while IFS=$'\t' read -r name subdir count params; do
+    wanted "$name" || continue
+    found=1
+    fetch_set "$name" "$subdir" "$count" "$params"
+done < <(read_sets)
+
+(( found )) || { echo "no matching set in $SETS_FILE" >&2; exit 1; }
+printf '\ndone.\n'

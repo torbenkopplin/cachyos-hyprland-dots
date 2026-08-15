@@ -215,6 +215,10 @@ hl.bind(mod .. " + N", hl.dsp.exec_cmd(NOCT .. "panel-toggle control-center noti
 hl.bind(mod .. " + X", hl.dsp.exec_cmd(NOCT .. "panel-toggle clipboard"), { description = "Clipboard history" })
 -- SUPER+W was wallpaper in ~/repos/dots (a script); here it is Noctalia's panel.
 hl.bind(mod .. " + W", hl.dsp.exec_cmd(NOCT .. "panel-toggle wallpaper"), { description = "Wallpaper" })
+-- Browse Wallhaven without leaving the shell, for when the local folders have
+-- nothing you want. Needs the noctalia/wallhaven plugin (60-wallpaper.toml).
+hl.bind(mod .. " + SHIFT + W", hl.dsp.exec_cmd(NOCT .. "panel-toggle noctalia/wallhaven:browser"),
+    { description = "Browse Wallhaven" })
 -- Moved off O, which is consume now. comma is also what Noctalia's own docs use.
 hl.bind(mod .. " + comma", hl.dsp.exec_cmd(NOCT .. "settings-toggle"), { description = "Shell settings" })
 

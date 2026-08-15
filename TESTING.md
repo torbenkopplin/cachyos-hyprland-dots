@@ -261,6 +261,30 @@ Then through the launcher:
       there only if you actually want tty1 autostart, and read the warning in
       the file first.
 
+## 8e. Wallpapers — `noct-wallfetch` + `60-wallpaper.toml`
+
+- [ ] **Rename the monitor sections in `60-wallpaper.toml`.** `DP-3` and
+      `HDMI-A-1` are placeholders; check `hyprctl monitors`. An unmatched
+      `[wallpaper.monitor.X]` is ignored silently, so a typo here looks like
+      "per-monitor directories don't work" rather than an error.
+- [ ] `noct-wallfetch --list` shows the six sets.
+- [ ] `noct-wallfetch --dry-run` lists files without downloading.
+- [ ] `noct-wallfetch` fills `~/Pictures/Wallpapers/{ultrawide,standard,portrait}`.
+- [ ] Re-running is idempotent — second run reports "already had", not new
+      downloads.
+- [ ] The ultrawide folder has genuinely wide images (`file *.jpg` should show
+      3440×1440 or 3840×1080), not cropped 16:9.
+- [ ] `SUPER+W` picker shows the folder for the monitor selected in its
+      toolbar, and a different set when you switch monitor.
+- [ ] Applying a wallpaper recolours the shell (palette is wallpaper-derived).
+- [ ] `SUPER+SHIFT+W` opens the Wallhaven browser. If nothing happens the
+      plugin did not enable — check `noctalia msg plugins list`.
+
+> Only **four** true-ultrawide Dragon Ball wallpapers exist on Wallhaven, which
+> is why the ultrawide folder is filled from three sets. If you would rather
+> have only Dragon Ball there, delete the `anime-ultrawide` line from
+> `wallpapers.conf` and accept four images.
+
 ## 9. Installer — `install.sh`
 
 - [ ] `./install.sh --all --dry-run` completes with no errors before you run
@@ -365,6 +389,8 @@ something misbehaves:
 | Noctalia's `kitty` template writes `current-theme.conf` | Inferred from CachyOS's shipped kitty.conf, which includes exactly that filename under a `BEGIN_KITTY_THEME` marker | `config/kitty/kitty.conf` |
 | `fisher` exists as a package | If not, install it by its documented one-liner and rerun; the installer warns rather than failing | `install.sh` |
 | `colors_changed` fires on a scheme change, not only a wallpaper change | Documented as "after the theme palette is resolved"; if it only fires for wallpapers, call `noct-glass apply` from `noct-theme act` instead | `50-glass.toml` |
+| Wallhaven result counts hold over time | Measured 2026-08-15; the 21:9 Dragon Ball supply was 4 and can only grow | `wallpapers.conf` |
+| `[plugins].enabled` activates the wallhaven plugin declaratively | Documented, but the plugin system is beta; `noctalia msg plugins enable noctalia/wallhaven` is the fallback | `60-wallpaper.toml` |
 | `blur.xray` samples the wallpaper rather than windows behind | Documented behaviour; turn it off in `noct-glass` if windows behind show through oddly | `bin/noct-glass` |
 | `uwsm start -S -F hyprland.desktop` is the right invocation | Adapted from your `start-hyprland`; the original is kept as a fallback in the same file | `config/fish/auto-Hypr.fish` |
 | `starship`, `eza`, `rustup`, `fastfetch`, `claude-code` resolve as package names | Same caveat as every other package name here | `install.sh` |

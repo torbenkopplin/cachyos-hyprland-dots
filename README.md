@@ -106,6 +106,7 @@ window along.
 | `M + X` | Clipboard history |
 | `M + ,` | Shell settings |
 | `M + W` | Wallpaper picker |
+| `M + SHIFT + W` | Browse Wallhaven |
 | `M + B` | Pin / unpin the bar |
 | `M + SHIFT + G` | Cycle frosted glass level |
 | `M + CTRL + Escape` | Lock |
@@ -244,6 +245,67 @@ nothing needs per-tool configuration.
 Drop the `terminal_live` entry from `40-templates.toml` if you would rather
 terminals only changed on restart.
 
+### Wallpapers
+
+The palette is derived from the wallpaper, so this is not decoration — it is
+where every colour in the desktop comes from.
+
+**Per monitor, not per desktop.** `fill_mode = "crop"` scales to cover and
+discards the overflow, so a 16:9 image on a 21:9 screen loses about a third of
+its height, which is usually where the subject was. `60-wallpaper.toml` sets
+`per_monitor_directories = true` and points each output at its own folder:
+
+```
+~/Pictures/Wallpapers/
+  ultrawide/   21:9 and 32:9
+  standard/    16:9, ≥2560×1440
+  portrait/    9:16
+```
+
+Fill them with `noct-wallfetch`, which pulls from Wallhaven's public API using
+the sets in `config/noctalia/wallpapers.conf`:
+
+```sh
+noct-wallfetch --list          # sets, and what is already on disk
+noct-wallfetch --dry-run       # what it would download
+noct-wallfetch                 # all sets
+noct-wallfetch db-standard     # just one
+```
+
+Re-runs skip what is already there, so it is safe to run repeatedly. Set
+`WALLHAVEN_API_KEY` to raise the anonymous 45 req/min rate limit.
+
+**On Dragon Ball specifically — the supply is lopsided.** Measured against the
+API rather than guessed:
+
+| Search | Results |
+|---|---|
+| `dragonball`, any ratio | 1225 |
+| `dragonball`, 16:9, ≥2560×1440 | 353 |
+| `dragonball`, 9:16 portrait | 42 |
+| **`dragonball`, 21:9 or 32:9** | **4** |
+
+Four. True ultrawide Dragon Ball art essentially does not exist. So the
+ultrawide folder is filled from three sets rather than one: those four, then
+Dragon Ball art at ≥3440px wide that survives a centre crop, then a general
+anime-ultrawide pool so rotation has somewhere to go. Adjust the balance by
+editing the counts in `wallpapers.conf` — if you would rather have only true
+Dragon Ball on the wide screen, drop the `anime-ultrawide` line and accept four
+images.
+
+For finding one image now rather than filling a folder, **`SUPER+SHIFT+W`**
+opens the Wallhaven browser (the official Noctalia plugin, enabled in
+`60-wallpaper.toml`). `SUPER+W` is the local picker.
+
+Images are downloaded, never committed — they are other people's artwork, and a
+wallpaper folder would dwarf the rest of the repo. `wallpapers.conf` is the
+tracked part; the images are reproducible from it.
+
+**Rotation is off by default.** With `[wallpaper.automation]` enabled the
+palette changes on a timer, which means your whole desktop recolours
+mid-task. It is a real preference rather than an oversight — turn it on in
+`60-wallpaper.toml` if you want it.
+
 ### Frosted glass
 
 On by default, tied to the scheme, and done in the compositor.
@@ -343,6 +405,7 @@ cd ~/repos/cachyos-hyprland-dots
 | `--packages` | Install everything below via pacman, an AUR helper, and npm |
 | `--nvim` | Clone `torbenkopplin/nvimrc` to `~/.config/nvim` |
 | `--browsers` | Install browser policies and `user.js` (needs sudo) |
+| `--wallpapers` | Download wallpapers. **Not** in `--all` — it is a few hundred MB |
 | `--all` | All of the above, in dependency order |
 | `--dry-run` | Print what any of the above would do |
 | `--unlink` | Remove only the links this script created |
@@ -464,6 +527,7 @@ bin/
   noct-power          power profiles, night light, caffeine
   noct-theme          colour scheme picker
   noct-glass          frosted glass level, per scheme
+  noct-wallfetch      fills the wallpaper folders from Wallhaven
 bootstrap.sh          curl-able one-command installer
 install.sh
 TESTING.md            post-install checklist — start here on first boot,

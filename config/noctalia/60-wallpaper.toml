@@ -1,0 +1,75 @@
+## Noctalia -- wallpapers.
+##
+## Per-monitor directories, because an ultrawide and a 16:9 screen genuinely
+## want different images. `crop` scales to cover and throws away the overflow,
+## so a 16:9 image on a 21:9 monitor loses a third of its height -- usually the
+## subject's head. Pointing each monitor at its own folder avoids that instead
+## of fighting it with fill modes.
+##
+## Folders are filled by `noct-wallfetch` from the sets in wallpapers.conf.
+## Nothing here creates them; run that first or the picker is empty.
+##
+## Monitor names below are placeholders. Find yours with `hyprctl monitors`
+## and rename the sections to match -- an unmatched [wallpaper.monitor.X]
+## section is simply ignored, which fails silently.
+
+[wallpaper]
+enabled   = true
+fill_mode = "crop"
+
+## Shown behind `center`/`fit`, and while a wallpaper loads. A palette role
+## rather than a hex value, so it follows the active colour scheme.
+fill_color = "surface"
+
+## The picker's default folder, and what any monitor without an override uses.
+directory = "~/Pictures/Wallpapers/standard"
+
+## The setting that makes the per-monitor sections below do anything.
+per_monitor_directories = true
+
+transition            = ["fade"]
+transition_duration   = 900
+transition_on_startup = false
+
+## Rotation is off by default. The palette is derived from the wallpaper, so
+## with automation on your entire desktop recolours on a timer -- including
+## mid-task. Turn it on if you want that; it is a real preference, not an
+## oversight.
+[wallpaper.automation]
+enabled          = false
+interval_seconds = 3600
+order            = "random"
+recursive        = false
+
+## ---------------------------------------------------------------------------
+## Per-monitor overrides -- rename to your actual connector names
+## ---------------------------------------------------------------------------
+
+## Ultrawide.
+[wallpaper.monitor.DP-3]
+directory = "~/Pictures/Wallpapers/ultrawide"
+
+## Portrait. `~/repos/dots` describes an HDMI screen in portrait, which is why
+## wallpapers.conf has a 9:16 set at all.
+[wallpaper.monitor.HDMI-A-1]
+directory = "~/Pictures/Wallpapers/portrait"
+
+## ---------------------------------------------------------------------------
+## Wallhaven browser
+##
+## The official plugin: search and apply wallpapers from inside the shell,
+## without going near a browser. Complements noct-wallfetch rather than
+## replacing it -- the plugin is for finding one image now, the script is for
+## filling a folder so rotation and the picker have something to work with.
+##
+##   noctalia msg panel-toggle noctalia/wallhaven:browser
+## ---------------------------------------------------------------------------
+
+[plugins]
+enabled = ["noctalia/wallhaven"]
+
+[[plugins.source]]
+name     = "official"
+kind     = "git"
+location = "https://github.com/noctalia-dev/official-plugins"
+enabled  = true

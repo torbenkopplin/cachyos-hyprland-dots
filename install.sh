@@ -5,6 +5,7 @@
 #   ./install.sh --packages      install everything the setup needs
 #   ./install.sh --nvim          clone the neovim config
 #   ./install.sh --browsers      install browser policies (needs sudo)
+#   ./install.sh --wallpapers    download wallpapers into ~/Pictures/Wallpapers
 #   ./install.sh --all           all of the above, in the right order
 #
 #   ./install.sh --dry-run       show what any of the above would do
@@ -31,7 +32,7 @@ BIN_HOME=$HOME/.local/bin
 STAMP=$(date +%Y%m%d-%H%M%S)
 
 DRY_RUN=0 UNLINK=0
-DO_LINK=0 DO_PACKAGES=0 DO_BROWSERS=0 DO_NVIM=0
+DO_LINK=0 DO_PACKAGES=0 DO_BROWSERS=0 DO_NVIM=0 DO_WALLPAPERS=0
 
 for arg in "$@"; do
     case "$arg" in
@@ -40,13 +41,14 @@ for arg in "$@"; do
         --packages) DO_PACKAGES=1 ;;
         --browsers) DO_BROWSERS=1 ;;
         --nvim)     DO_NVIM=1 ;;
+        --wallpapers) DO_WALLPAPERS=1 ;;
         --all)      DO_LINK=1; DO_PACKAGES=1; DO_BROWSERS=1; DO_NVIM=1 ;;
         -h|--help)  sed -n '2,18p' "$0" | sed 's/^# \?//'; exit 0 ;;
         *) echo "unknown option: $arg" >&2; exit 2 ;;
     esac
 done
 # No action flags at all -> just link, which is the common case.
-(( DO_PACKAGES || DO_BROWSERS || DO_NVIM || DO_LINK )) || DO_LINK=1
+(( DO_PACKAGES || DO_BROWSERS || DO_NVIM || DO_WALLPAPERS || DO_LINK )) || DO_LINK=1
 
 # ---------------------------------------------------------------------------
 # Output helpers
@@ -491,6 +493,33 @@ install_user_js() {  # <source user.js> <profiles root> <label>
     (( found )) || note "$label: no profiles found under ${root/#$HOME/\~}"
 }
 
+# ---------------------------------------------------------------------------
+# Wallpapers
+#
+# Not part of --all on purpose: this pulls a few hundred megabytes of images
+# over the network, which is not something an install script should do without
+# being asked. The palette is wallpaper-derived, though, so the desktop is not
+# really finished until this has run once.
+# ---------------------------------------------------------------------------
+
+do_wallpapers() {
+    heading "Wallpapers"
+
+    if ! command -v noct-wallfetch >/dev/null 2>&1; then
+        warn "noct-wallfetch not on PATH -- run the linking step first"
+        return 0
+    fi
+
+    if (( DRY_RUN )); then
+        run noct-wallfetch --dry-run
+        return 0
+    fi
+
+    noct-wallfetch || warn "wallpaper fetch reported problems"
+    note "monitor names in 60-wallpaper.toml are placeholders --"
+    note "check them against 'hyprctl monitors'"
+}
+
 do_browsers() {
     heading "Browser policies"
     note "declarative settings only -- no profile data is copied or tracked"
@@ -515,7 +544,8 @@ printf '%shyprland + noctalia dotfiles%s\n' "$BOLD" "$RESET"
 (( DO_PACKAGES )) && do_packages
 (( DO_NVIM ))     && do_nvim
 (( DO_LINK ))     && do_link
-(( DO_BROWSERS )) && do_browsers
+(( DO_BROWSERS ))   && do_browsers
+(( DO_WALLPAPERS )) && do_wallpapers
 
 if (( UNLINK )); then
     heading "Done"
@@ -539,4 +569,7 @@ cat <<'EOF'
      could not be verified without a live session.
   3. Sign into browser sync for bookmarks and extensions; nothing in this
      repo carries them.
+  4. ./install.sh --wallpapers  -- not included in --all, since it downloads
+     a few hundred megabytes. The colour palette is derived from whatever
+     wallpaper is active, so this is worth running.
 EOF
