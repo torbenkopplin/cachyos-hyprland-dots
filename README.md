@@ -63,8 +63,8 @@ window along.
 | Key | Action |
 |---|---|
 | `M + SHIFT + H` / `L` | Swap this column with its neighbour |
-| `M + ,` | Consume — pull the next window into this column |
-| `M + .` | Expel — push this window out into its own column |
+| `M + O` | Consume — pull the next window into this column |
+| `M + I` | Expel — push this window out into its own column |
 | `M + SHIFT + .` | Promote to a new column |
 | `M + [` / `]` | Scroll the tape without moving focus |
 | `M + Z` | Bring the focused column back into view |
@@ -74,8 +74,8 @@ window along.
 
 | Key | Action |
 |---|---|
-| `M + W` / `SHIFT + W` | Cycle column width presets (⅓, ½, ⅔, full) |
-| `M + -` / `=` | Narrow / widen by 5% |
+| `M + +` / `-` | Cycle the six column width presets (¼ … full) |
+| `M + =` / `SHIFT + -` | Widen / narrow by 5% |
 | `M + SHIFT + F` | Expand into whatever free space is left |
 | `M + SHIFT + E` | Even out the visible columns |
 | `M + R` | **Resize mode**: `hl` width, `jk` height, `Esc`/`Enter` to leave |
@@ -84,13 +84,14 @@ window along.
 
 | Key | Action |
 |---|---|
-| `M + Q` / `SHIFT + Q` | Close / kill |
+| `M + BackSpace` / `Q` | Close window (either) |
+| `M + SHIFT + Q` | Kill |
 | `M + F` / `M` | Fullscreen / maximize |
 | `M + V` | Toggle floating |
 | `M + P` | Pin above workspaces |
 | `M + G` | Toggle tab group |
-| `M + 1…5` | Workspace *n* **on this monitor** |
-| `M + SHIFT + 1…5` | Send window to workspace *n* on this monitor |
+| `M + 1…9`, `0` | Workspace *n* **on this monitor** |
+| `M + SHIFT + 1…9`, `0` | Send window to workspace *n* on this monitor |
 | `` M + ` `` | Previous workspace |
 | `M + S` / `SHIFT + S` | Scratchpad: toggle / send to |
 
@@ -103,11 +104,12 @@ window along.
 | `M + A` | Control centre |
 | `M + N` | Notifications |
 | `M + X` | Clipboard history |
-| `M + O` | Shell settings |
+| `M + ,` | Shell settings |
+| `M + W` | Wallpaper picker |
 | `M + B` | Pin / unpin the bar |
 | `M + SHIFT + G` | Cycle frosted glass level |
 | `M + CTRL + Escape` | Lock |
-| `M + SHIFT + Escape` | Session menu |
+| `M + Escape` | Session menu |
 
 ### System control — straight into the launcher
 
@@ -127,7 +129,7 @@ into the search box, since you are typing).
 
 | Key | Action |
 |---|---|
-| `M + Return` | kitty |
+| `M + T` / `Return` | kitty (either) |
 | `M + SHIFT + Return` | Floating kitty |
 | `M + E` | File manager |
 | `M + SHIFT + B` | Browser |
@@ -245,35 +247,41 @@ terminals only changed on restart.
 
 ### Frosted glass
 
-On by default, and tied to the scheme. `bin/noct-glass` runs from Noctalia's
-`colors_changed` hook, so the level follows whatever you pick in `/theme` —
-levels live in `config/noctalia/glass.conf`, keyed by scheme. **`SUPER+SHIFT+G`**
-cycles opaque → light → default → heavy as a temporary override.
+On by default, tied to the scheme, and done in the compositor.
+`bin/noct-glass` runs from Noctalia's `colors_changed` hook, so the level
+follows whatever `/theme` selects. **`SUPER+SHIFT+G`** cycles as a temporary
+override. Levels live in `config/noctalia/glass.conf`.
 
-The effect is not "make windows transparent". Compositor opacity fades a
-window's *text* along with its background, which is unreadable for work. Real
-frosted glass is the app drawing a translucent background while the compositor
-blurs what is behind it:
+Two knobs, because they are different trades:
 
-| Surface | Frosted? | How |
+| Knob | Applies to | Cost |
 |---|---|---|
-| kitty | yes | `background_opacity` + Hyprland blur behind it |
-| Noctalia bar and panels | yes | `background_opacity` + the layer blur rule |
-| GTK / Qt apps | **no** | they paint an opaque background and offer no way not to |
+| `window` | Hyprland's `active_opacity` — **every window**, including GTK and Qt apps with no transparency of their own | fades text too; the compositor cannot tell a window's glyphs from its background |
+| `terminal` | kitty's `background_opacity` | none — kitty leaves glyphs opaque |
 
-That last row is why "every app possible" is a genuinely short list. If you
-want it anyway for a specific app, add its class to `GLASS_WINDOWS` in
-`conf/rules.lua` — it is left empty rather than populated, because the trade is
-translucent body text.
+They compound: at `window = 0.90` and `terminal = 0.85`, a terminal background
+lands around 0.77 while its text stays at 0.90.
+
+`blur.ignore_opacity` is on. Without it Hyprland scales the blur by the
+window's own alpha, so a 0.9 window gets a tenth of the blur and the effect
+disappears — this is the setting that makes compositor-driven glass actually
+look frosted rather than merely faded.
+
+Set `window = 1.0` for app-translucency only, which is what `~/repos/dots`
+does today: nothing fades except surfaces an app draws translucent itself.
+
+`conf/rules.lua` has an **opt-out** list for windows whose job is accurate
+pixels — mpv, imv, gimp, obs, hyprpicker. You cannot judge a photo or pick a
+colour through 10% of your wallpaper.
 
 Two consequences worth knowing:
 
-- **Colour changes apply live; glass changes need a new terminal.** kitty reads
-  `background_opacity` at startup, whereas colours arrive over OSC sequences.
-- **Neovim will look opaque inside a transparent kitty.** Your `noirblaze.lua`
-  paints `Normal` with `bg = #121212`. Making it `bg = "none"` fixes that — but
-  it is a change in *your nvim repo*, not this one, so it has not been made.
-  `config/kitty/README.md` has the snippet and the trade-off.
+- **Window opacity applies live; the terminal level needs a new window.** kitty
+  reads `background_opacity` at startup, whereas Hyprland re-reads its config.
+- **Neovim inside a transparent kitty.** Your `noirblaze.lua` paints `Normal`
+  with `bg = #121212`, so the editor stays opaque against kitty's translucent
+  background. `bg = "none"` fixes it — a change in *your nvim repo*, not this
+  one. `config/kitty/README.md` has the snippet and the trade-off.
 
 Useful commands:
 
@@ -370,6 +378,8 @@ for `vim.pack` (0.12+), which your config uses.
 ```
 config/hypr/
   hyprland.lua        requires everything below, in order
+  host.lua.example    per-machine template: monitors, WSBANDS, GPU env
+                      (copy to ~/.config/hypr/host.lua; never tracked)
   conf/
     options.lua       ← start here: apps, modifiers, workspace count, toggles
     env.lua           session environment
@@ -377,7 +387,7 @@ config/hypr/
     input.lua         keyboard, touchpad, focus behaviour, gestures
     layout.lua        the scrolling layout
     rules.lua         window + layer rules
-    workspaces.lua    persistent workspace stack, per monitor
+    workspaces.lua    per-monitor workspace bands, built from WSBANDS
     autostart.lua
     binds.lua         every keybind
   lib/

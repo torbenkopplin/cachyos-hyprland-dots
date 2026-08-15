@@ -29,9 +29,11 @@ right-hand column.
 ## 1. Layout — `conf/layout.lua`
 
 - [ ] `hyprctl getoption general:layout` says `scrolling`.
-- [ ] Opening one window fills the screen; opening a second gives you two
-      half-width columns.
+- [ ] Opening one window gives it a **third** of the screen, not the whole
+      screen — `fullscreen_on_one_column` is off and `column_width` is 0.333,
+      both carried over from `~/repos/dots`.
 - [ ] Opening several windows scrolls the tape rightwards.
+- [ ] `SUPER + +` / `-` cycles the six width presets.
 
 ## 2. Navigation — `lib/nav.lua`
 
@@ -40,7 +42,7 @@ shape of `window.layout`.
 
 - [ ] `SUPER+H`/`L` moves between columns.
 - [ ] `SUPER+J`/`K` moves between windows **within a column** (stack two windows
-      in one column with `SUPER+,` first).
+      in one column with `SUPER+O` first).
 - [ ] At the **last column**, `SUPER+L` moves focus to the next monitor.
 - [ ] At the **first column**, `SUPER+H` moves to the previous monitor.
 - [ ] At the **bottom of a column**, `SUPER+J` goes to the next workspace.
@@ -66,7 +68,7 @@ The failure mode to watch for is the launcher opening after ordinary chords.
 
 - [ ] Tapping and releasing `SUPER` alone opens the launcher.
 - [ ] `SUPER+J`, then releasing `SUPER`, does **not** open the launcher.
-- [ ] `SUPER+Return`, then releasing, does **not** open the launcher.
+- [ ] `SUPER+T`, then releasing, does **not** open the launcher.
 - [ ] Holding `SUPER` for a second and releasing does **not** open it.
 - [ ] `SUPER+Space` opens the launcher as a fallback.
 
@@ -92,13 +94,22 @@ The failure mode to watch for is the launcher opening after ordinary chords.
 > `hyprctl layers | grep noctalia`
 > and reconcile with `PANEL_NAMESPACES` in `lib/bar.lua`.
 
-## 5. Workspaces — `conf/workspaces.lua`
+## 5. Workspaces — `conf/workspaces.lua` + `host.lua`
 
-- [ ] `hyprctl workspaces` shows 5 persistent workspaces **per monitor**.
-- [ ] The leftmost monitor owns 1–5, the next 6–10, and so on.
+The band model is adopted from `~/repos/dots`: monitor id N owns workspaces
+N*10+1 … N*10+10, and each band carries its own scroll direction.
+
+- [ ] Copy `config/hypr/host.lua.example` to `~/.config/hypr/host.lua` and fill
+      in `WSBANDS` with your real monitor names and ids (`hyprctl monitors`).
+- [ ] Without a `host.lua`, Hyprland still starts — the fallback is a single
+      band. Confirm this before relying on the pcall.
+- [ ] `hyprctl workspaces` shows one band of 10 per monitor.
 - [ ] `SUPER+2` goes to the second workspace **on the monitor you are looking
       at**, whichever that is.
-- [ ] Hotplugging a monitor gives it its own stack.
+- [ ] A workspace never migrates to a monitor outside its band.
+- [ ] With a portrait monitor configured `direction = "down"`, that band
+      genuinely scrolls vertically while a landscape band scrolls right —
+      this is the whole reason for the band model over a flat list.
 
 ## 6. Launcher providers — `bin/noct-*` + `20-launcher.toml`
 
@@ -194,7 +205,8 @@ Then through the launcher:
 
 ## 8c. Frosted glass — `bin/noct-glass`
 
-- [ ] `noct-glass show` prints a number with a **decimal point**, not a comma.
+- [ ] `noct-glass show` prints **two** levels (`window` and `terminal`), each
+      with a **decimal point**, not a comma.
       (awk formats per locale; the script pins `LC_ALL=C` to prevent `0,90`,
       which Hyprland would refuse to parse. Worth re-checking if you ever edit
       the script.)
@@ -202,8 +214,12 @@ Then through the launcher:
       `~/.config/kitty/generated-glass.conf` both exist after the first scheme
       change, and contain real numbers.
 - [ ] A new kitty window is translucent, with the wallpaper blurred behind it.
-- [ ] **Text stays fully opaque** — only the background is see-through.
-- [ ] Switching to noirblaze via `/theme` changes the glass level to 0.80
+- [ ] **A GTK app (nautilus) and a Qt app are frosted too** — this is the point
+      of driving it from the compositor rather than per-app.
+- [ ] Text is legible at the default level. If not, raise `window` in
+      `glass.conf`; the compositor fades glyphs along with the background.
+- [ ] mpv/imv/gimp/obs stay **fully opaque** (the opt-out list in rules.lua).
+- [ ] Switching to noirblaze via `/theme` changes the terminal level to 0.80
       (`noct-glass show` confirms it) without you doing anything else.
 - [ ] `SUPER+SHIFT+G` cycles the level; a new terminal shows the change.
 - [ ] At level `1.00`, `glass.lua` has `enabled = false` for blur.
