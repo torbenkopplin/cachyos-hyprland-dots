@@ -113,6 +113,7 @@ do_link() {
     link_tree "$REPO/config/yazi"     "$CONFIG_HOME/yazi"
     link_tree "$REPO/config/kitty"    "$CONFIG_HOME/kitty"
     link_tree "$REPO/config/fish"     "$CONFIG_HOME/fish"
+    link      "$REPO/config/starship/starship.toml" "$CONFIG_HOME/starship.toml"
 
     heading "Scripts"
     local script
@@ -165,8 +166,13 @@ PKGS_DEV=(
     curl wget unzip
 )
 
+# Referenced directly by the carried-over fish config: starship builds the
+# prompt, eza backs `ls`/`lt`, bat backs `cat`, rustup provides the cargo env
+# that conf.d/rustup.fish sources.
+PKGS_PROMPT=( starship eza rustup )
+
 # The shell, and the plugin manager used to get a fish-native nvm.
-PKGS_SHELL=( fish fisher )
+PKGS_SHELL=( fish fisher fastfetch )
 
 # yazi and its preview pipeline.
 PKGS_YAZI=(
@@ -177,7 +183,7 @@ PKGS_BROWSERS=( chromium firefox brave-bin zen-browser-bin )
 
 # Usually AUR-only -- but still attempted with pacman first, because CachyOS
 # ships some of these in its own repos and a repo build beats a local one.
-PKGS_LIKELY_AUR=( noctalia satty nvm )
+PKGS_LIKELY_AUR=( noctalia satty claude-code )
 
 # Installed with npm rather than pacman. LSP servers are deliberately absent:
 # your neovim config installs those through mason (tsgo, eslint, vimls,
@@ -269,7 +275,8 @@ do_packages() {
     say "repositories"
     pacman_install \
         "${PKGS_DESKTOP[@]}" "${PKGS_SYSTEM[@]}" "${PKGS_DEV[@]}" \
-        "${PKGS_SHELL[@]}" "${PKGS_YAZI[@]}" "${PKGS_BROWSERS[@]}" \
+        "${PKGS_SHELL[@]}" "${PKGS_PROMPT[@]}" \
+        "${PKGS_YAZI[@]}" "${PKGS_BROWSERS[@]}" \
         "${PKGS_LIKELY_AUR[@]}"
 
     if (( ${#UNRESOLVED[@]} )); then
@@ -279,6 +286,7 @@ do_packages() {
     fi
 
     do_npm_globals
+    do_claude
     do_fish
     do_services
 }
@@ -297,13 +305,17 @@ do_npm_globals() {
 # ---------------------------------------------------------------------------
 # Fish
 #
-# Two things here, and the second is the non-obvious one.
+# Two things: make it the login shell, and restore its plugins.
 #
-# nvm is a bash/zsh *shell function*. It does not work in fish, and no amount
-# of PATH fixes that -- `nvm use` has to mutate the current shell. The fish
-# equivalent is jorgebucaran/nvm.fish, which reimplements it natively and keeps
-# the `nvm` command name, so muscle memory carries over. The AUR `nvm` package
-# is still installed, because bash is still there and still works.
+# Plugins are not vendored -- config/fish/fish_plugins is the source of truth
+# and `fisher update` installs everything listed in it. That is the whole point
+# of a plugin manager, and it is how nvm gets into fish: the list names
+# jorgebucaran/nvm.fish, a native reimplementation.
+#
+# Why that is needed at all: `nvm` proper is a bash/zsh *shell function*, not a
+# program. `nvm use 20` has to mutate the environment of the calling shell, so
+# there is no binary to put on PATH and no way to make the bash version work
+# under fish.
 # ---------------------------------------------------------------------------
 
 do_fish() {
@@ -333,27 +345,52 @@ do_fish() {
         fi
     fi
 
-    # --- fish-native nvm -----------------------------------------------------
-    if fish -c 'type -q nvm' 2>/dev/null; then
-        say "nvm already available in fish"
+    # --- plugins from fish_plugins ------------------------------------------
+    if (( DRY_RUN )); then
+        say "would: fisher update  (installs everything in fish_plugins)"
         return 0
     fi
+
+    if ! fish -c 'type -q fisher' >/dev/null 2>&1; then
+        # fisher is a single function file; bootstrapping it by hand is its
+        # own documented install path, and cheaper than failing here.
+        say "bootstrapping fisher"
+        if ! fish -c 'curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source && fisher install jorgebucaran/fisher' >/dev/null 2>&1; then
+            warn "could not bootstrap fisher -- fish plugins (incl. nvm) unavailable"
+            note "install fisher, then run: fisher update"
+            return 0
+        fi
+    fi
+
+    if fish -c 'fisher update' >/dev/null 2>&1; then
+        say "fisher: installed plugins from fish_plugins"
+    else
+        warn "fisher update failed -- check 'fisher list' in a fish shell"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Claude Code
+#
+# Tried as a package first like everything else; npm is the documented fallback
+# and the one that works when no AUR build exists.
+# ---------------------------------------------------------------------------
+
+do_claude() {
+    command -v claude >/dev/null 2>&1 && { say "claude-code already installed"; return 0; }
 
     if (( DRY_RUN )); then
-        say "would: fisher install jorgebucaran/nvm.fish"
+        say "would: npm install -g @anthropic-ai/claude-code  (if no package)"
         return 0
     fi
 
-    if fish -c 'type -q fisher' 2>/dev/null; then
-        if fish -c 'fisher install jorgebucaran/nvm.fish' >/dev/null 2>&1; then
-            say "installed nvm.fish (fish-native nvm)"
-        else
-            warn "fisher could not install nvm.fish"
-        fi
+    command -v npm >/dev/null 2>&1 || { warn "claude-code not installed (no package, no npm)"; return 0; }
+
+    say "claude-code via npm"
+    if npm install -g @anthropic-ai/claude-code >/dev/null 2>&1; then
+        say "installed: @anthropic-ai/claude-code"
     else
-        warn "fisher not available -- fish has no nvm"
-        note "install it, then: fisher install jorgebucaran/nvm.fish"
-        note "the AUR nvm package still works in bash"
+        warn "could not install claude-code"
     fi
 }
 

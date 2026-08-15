@@ -224,11 +224,25 @@ Then through the launcher:
       and kitty should warn rather than fail.
 - [ ] `echo $SHELL` reports fish **after a fresh login** (chsh does not affect
       the shell you ran the installer from).
-- [ ] Vi keys work at the prompt, and the cursor changes shape between modes.
+- [ ] The starship prompt renders, with the nerd-font glyphs intact.
 - [ ] `y` opens yazi and leaves the shell in the directory you quit from.
+- [ ] `cat`, `ls` and `lt` work — these are aliased to `bat` and `eza`, and
+      `cat` in particular was `batcat` on Debian, so a wrong package name here
+      shows up as "command not found" on every use.
+- [ ] `update` runs `pacman -Syu` (the alias branches on `/etc/arch-release`).
+- [ ] `fisher list` shows `jorgebucaran/fisher` and `jorgebucaran/nvm.fish`.
 - [ ] `nvm --version` works **in fish** (this is nvm.fish, not the bash one).
 - [ ] `node --version` works in a shell where no nvm version is selected —
       this is the system package mason depends on.
+- [ ] `cargo --version` works, i.e. `conf.d/rustup.fish` found
+      `~/.cargo/env.fish`. If rustup was installed but never initialised, that
+      file does not exist and fish reports an error on every startup — run
+      `rustup default stable` once.
+- [ ] `claude --version` works.
+- [ ] `auto-Hypr.fish` is still inert. It sits at the top level of the fish
+      config, which fish does **not** auto-source — only `conf.d/` is. Move it
+      there only if you actually want tty1 autostart, and read the warning in
+      the file first.
 
 ## 9. Installer — `install.sh`
 
@@ -299,3 +313,23 @@ something misbehaves:
 | `fisher` exists as a package | If not, install it by its documented one-liner and rerun; the installer warns rather than failing | `install.sh` |
 | `colors_changed` fires on a scheme change, not only a wallpaper change | Documented as "after the theme palette is resolved"; if it only fires for wallpapers, call `noct-glass apply` from `noct-theme act` instead | `50-glass.toml` |
 | `blur.xray` samples the wallpaper rather than windows behind | Documented behaviour; turn it off in `noct-glass` if windows behind show through oddly | `bin/noct-glass` |
+| `uwsm start -S -F hyprland.desktop` is the right invocation | Adapted from your `start-hyprland`; the original is kept as a fallback in the same file | `config/fish/auto-Hypr.fish` |
+| `starship`, `eza`, `rustup`, `fastfetch`, `claude-code` resolve as package names | Same caveat as every other package name here | `install.sh` |
+
+---
+
+## Overlap with `~/dotfiles`
+
+This repo now carries `fish`, `kitty` and `hypr`. Your existing `~/dotfiles`
+stow repo provides all three as well, plus things this repo does not cover:
+`gtk-3.0`, `gtk-4.0`, `kvantum`, `mpv`, `git`, `fastfetch`, `quickshell`,
+`illogical-impulse`.
+
+On the new machine only one of them should own each path. `install.sh` backs up
+whatever it finds, including a stow symlink, so running both is recoverable —
+but it is not a decision to make by accident.
+
+- [ ] Decide which repo owns `fish`, `kitty` and `hypr` before deploying both.
+- [ ] `~/.config/fish` is a directory of symlinks into *one* repo, not a mix.
+- [ ] The configs this repo does not carry (`gtk`, `mpv`, `git`, …) still come
+      from `~/dotfiles`.

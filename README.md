@@ -330,7 +330,9 @@ ignored, look there first.
 | noctalia, satty | the shell and its screenshot editor |
 | libpulse, networkmanager, bluez, power-profiles-daemon | the backends `/aout` `/ain` `/bt` `/net` `/power` shell out to — without these those providers just say "not installed" |
 | neovim, git, base-devel, nodejs, npm | editor, and what mason needs to build its servers |
-| fish, fisher | the login shell, and the plugin manager used to get a fish-native nvm |
+| fish, fisher, fastfetch | the login shell and its plugin manager |
+| starship, eza, rustup | what your fish config calls: the prompt, `ls`/`lt`, and the cargo env `conf.d/rustup.fish` sources |
+| claude-code | tried as a package, npm as fallback |
 | ripgrep, fd, fzf, bat | what the neovim config calls out to (fzf-lua and its previewer) |
 | yazi, ffmpeg, p7zip, jq, poppler, imagemagick, chafa | file manager and its preview pipeline |
 | brave-bin, zen-browser-bin, chromium, firefox | browsers |
@@ -341,10 +343,13 @@ ignored, look there first.
 second copy on `PATH` would only cause confusion. That is also why `nodejs` is
 in the list — mason needs it.
 
-`nvm` is installed for per-project Node versions, *alongside* system `nodejs`
-rather than instead of it. The system one is what mason finds when neovim is
-launched from the app launcher rather than a login shell; nvm shadows it in
-shells where you have sourced it.
+**nvm comes from `fish_plugins`, not from a package.** `nvm` proper is a bash
+shell function — `nvm use` mutates the calling shell, so there is no binary to
+put on `PATH` and it cannot work under fish. Your config already uses
+`jorgebucaran/nvm.fish`, the native reimplementation; the installer runs
+`fisher update` to restore it. System `nodejs` is installed alongside it
+because mason needs a `node` on `PATH` when neovim is launched from the app
+launcher, where nothing has sourced a version manager.
 
 Package names could not be verified against the CachyOS repos from here, so
 a failed batch retries package-by-package and anything unresolved is listed in
@@ -395,9 +400,13 @@ config/kitty/
   search.py           third-party kitten (GPLv3), scroll_mark.py
   README.md           what is not tracked here, and why
 config/fish/
-  config.fish         NEW -- there was no fish config to migrate
-  conf.d/environment.fish
-  README.md           the nvm-does-not-work-in-fish explanation
+  config.fish         carried over from ~/dotfiles, CHANGED lines marked
+  auto-Hypr.fish      tty1 autostart, adapted for uwsm
+  fish_plugins        fisher restores the plugins from this
+  conf.d/             frozen theme colours, rustup env
+  README.md           what changed, what is not tracked, and why
+config/starship/
+  starship.toml       carried over
 config/yazi/
   yazi.toml           carried over from the Ubuntu setup
 browsers/

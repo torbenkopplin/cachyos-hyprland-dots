@@ -1,35 +1,56 @@
 # fish
 
-**This config is new.** There was no fish configuration on the Ubuntu machine
-to carry over — only `shell fish` in `kitty.conf`, which showed the intent
-without any settings behind it. So what is here was written from the
-preferences you have already stated (vim keys, quiet, keyboard-first) rather
-than migrated. Treat it as a starting point.
+Carried over from `~/dotfiles/fish/.config/fish/`, which `~/.config/fish`
+symlinks to on the Ubuntu machine. Only platform-forced changes were made, and
+each is marked `CHANGED` in the file it appears in.
 
-`install.sh --packages` makes fish your login shell with `chsh`, adding it to
-`/etc/shells` first if the package did not. It takes effect at your next login,
-not in the shell you ran the installer from.
+## What changed, and why
 
-## nvm does not work in fish
+| Change | Reason |
+|---|---|
+| `batcat` → `bat` | Debian renames the binary to avoid a clash with its own `bat` package. Arch has no clash and ships it as `bat`. |
+| dropped the quickshell `sequences.txt` line | That was illogical-impulse writing terminal colours. Noctalia does it two other ways — its kitty template for new windows, its OSC template for open ones — and neither needs sourcing. |
+| dropped `alias q 'qs -c ii'` | Started quickshell with the illogical-impulse config, which this setup replaces. |
+| added `EDITOR` / `VISUAL` | Hyprland exports them, but a bare TTY or SSH session never goes through Hyprland, so `git commit` would fall back to vi there. |
+| `auto-Hypr.fish` starts via uwsm | The rest of this repo assumes uwsm. Original command kept as a fallback. |
 
-This is the one thing worth knowing before you hit it.
+Your `fish_prompt` function is kept even though `starship init fish` overrides
+it a few lines later — it is the fallback you get if starship is ever missing,
+and without it you would drop to fish's stock prompt rather than yours.
 
-`nvm` is a bash/zsh **shell function**, not a program. `nvm use 20` has to
-mutate the environment of the shell it runs in, which is why there is no binary
-to put on `PATH` and why no amount of `PATH` fixing makes it work under fish.
+## What is deliberately not tracked
 
-The installer handles this by installing
-[`jorgebucaran/nvm.fish`](https://github.com/jorgebucaran/nvm.fish) through
-fisher — a native reimplementation that keeps the `nvm` command name, so
-`nvm use`, `nvm install` and `nvm list` all behave as you expect. The AUR `nvm`
-package is still installed too, because bash is still on the system and still
-works.
+**`functions/` and `completions/`** — these are fisher-installed plugin files
+(`nvm.fish`, `fisher.fish`, `_nvm_*.fish`). `fish_plugins` is the source of
+truth and `fisher update` restores them, which is the whole point of a plugin
+manager. Versioning the installed copies would mean updating them by hand.
 
-If the fisher step failed (the installer says so), run:
+**`fish_variables`** — fish's universal variable store. Generated, machine-local
+state, rewritten constantly.
 
-```fish
-fisher install jorgebucaran/nvm.fish
-```
+**`conf.d/fish_frozen_key_bindings.fish`** — a fish 4.3 migration shim that
+erases a universal variable at every startup. It cleans up state on the machine
+that upgraded; it is not configuration and carrying it forward to a fresh
+install just re-runs a migration that never applied there.
+
+`conf.d/fish_frozen_theme.fish` **is** kept — despite the generated header, it
+holds your actual syntax-highlighting colours (`fish_color_comment red` is not
+a default). Editing it by hand is fine; just know `fish_config` will rewrite it
+if you use the web theme tool.
+
+## nvm
+
+You already solved this — `fish_plugins` lists `jorgebucaran/nvm.fish`, the
+fish-native reimplementation, and `conf.d/nvm.fish` comes from it.
+
+Worth recording why it is needed at all: `nvm` proper is a bash/zsh **shell
+function**, not a program. `nvm use 20` has to mutate the environment of the
+calling shell, so there is no binary to put on `PATH` and no way to make the
+bash version work under fish. That is why the commented-out `NVM_DIR` block in
+`config.fish` stays commented out.
+
+The installer runs `fisher update`, which reads `fish_plugins` and reinstalls
+both plugins on the new machine.
 
 Node itself also comes from pacman as a system package. That is deliberate
 rather than redundant: mason, inside neovim, needs a `node` on `PATH` even when
@@ -37,14 +58,11 @@ neovim was launched from the app launcher rather than a shell — where nothing
 has sourced a version manager. The system copy is the floor; nvm shadows it in
 shells where you have selected a version.
 
-## Layout
+## Overlap with ~/dotfiles
 
-| File | Loaded |
-|---|---|
-| `conf.d/*.fish` | automatically, before `config.fish`, for **every** shell |
-| `config.fish` | after `conf.d`, for every shell |
-
-`config.fish` guards its contents with `status is-interactive`, so scripts and
-the non-interactive shells that editors spawn stay fast and side-effect free.
-Environment that must exist everywhere — `PATH`, `EDITOR` — goes in
-`conf.d/environment.fish` instead, outside that guard.
+This repo now carries `fish`, `kitty` and `hypr`, all of which your existing
+`~/dotfiles` stow repo also provides. On the new machine, only one of them
+should own each of those paths. `~/dotfiles` still holds things this repo does
+not cover at all — `gtk-3.0`, `gtk-4.0`, `kvantum`, `mpv`, `git`, `fastfetch`,
+`quickshell`, `illogical-impulse` — so it is not redundant, just overlapping.
+Decide per directory before running both installers.
