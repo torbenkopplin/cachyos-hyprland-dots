@@ -102,13 +102,19 @@ The failure mode to watch for is the launcher opening after ordinary chords.
 
 ## 6. Launcher providers — `bin/noct-*` + `20-launcher.toml`
 
-First, straight from a terminal — this is where parsing bugs show up plainly:
+First, straight from a terminal — this is where parsing bugs show up plainly.
+Each should print readable `title <TAB> description` lines with **no base64 or
+device ids visible**; the payloads go to a side map in `$XDG_RUNTIME_DIR`:
 
-- [ ] `noct-audio list sinks` prints `title <TAB> base64` lines.
-- [ ] `noct-audio list sources` does too, with no `.monitor` entries.
+- [ ] `noct-audio list sinks` — outputs, current one marked `●`
+- [ ] `noct-audio list sources` — inputs, with no `.monitor` entries
 - [ ] `noct-bluetooth list`
 - [ ] `noct-network list`
 - [ ] `noct-power list`
+- [ ] `noct-theme list`
+- [ ] `cat "$XDG_RUNTIME_DIR"/noct-*.map` — one `title <TAB> payload` per result
+- [ ] Two devices with the *same* name both stay selectable (the second gets a
+      ` (2)` suffix). Only testable if you have a duplicate; skip otherwise.
 
 Then through the launcher:
 
@@ -123,7 +129,7 @@ Then through the launcher:
 - [ ] Connecting to a **new, secured** Wi-Fi network opens a kitty window with
       `nmcli --ask` and the passphrase is not echoed.
 - [ ] `/power` switches profile and toggles night light.
-- [ ] `SUPER+CTRL+O/I/B/N/P` each open the launcher already filtered.
+- [ ] `SUPER+CTRL+O/I/B/N/P/T` each open the launcher already filtered.
 
 > If a provider shows nothing at all, the launcher swallowed a shell error.
 > Run its `command` by hand first. If it says "not installed", see the
@@ -168,7 +174,57 @@ Then through the launcher:
 > bash "${XDG_CACHE_HOME:-$HOME/.cache}/noctalia/terminal-colors.sh"
 > ```
 
-## 9. Focus discipline
+## 8b. Colour scheme switching — `/theme`
+
+- [ ] `/theme` lists your palettes, the ten built-ins, the nine wallpaper
+      generators, and the mode toggle.
+- [ ] The active scheme is marked `●`.
+- [ ] Selecting **noirblaze** switches the shell to the monochrome + pink
+      palette from your neovim theme.
+- [ ] Terminals repaint to match, and open neovim looks at home in them.
+- [ ] Selecting **Gruvbox** (or any built-in) switches cleanly.
+- [ ] Selecting a **Wallpaper:** entry goes back to wallpaper-derived colours.
+- [ ] The choice survives a restart (it is persisted to `settings.toml`).
+- [ ] `noctalia msg color-scheme-get` agrees with what you picked.
+
+> noirblaze is dark-only by design. Toggling to light mode will keep the dark
+> colours — that is Noctalia's documented fallback when a palette omits
+> `light`, not a bug. Add a `"light"` object to `palettes/noirblaze.json` if
+> you want a real one.
+
+## 9. Installer — `install.sh`
+
+- [ ] `./install.sh --all --dry-run` completes with no errors before you run
+      it for real.
+- [ ] The **warning summary** at the end is empty. Any "could not install"
+      line is a package name that does not exist in the CachyOS repos and
+      needs correcting in `install.sh`.
+- [ ] `nvim` starts, mason installs `tsgo`, `eslint`, `vimls`, `lua_ls`,
+      `lemminx` on first launch, and `:checkhealth` is clean.
+- [ ] `yazi` opens; pressing Enter on a text file opens it in neovim — this
+      confirms both `$EDITOR` and that the carried-over `%s` opener syntax is
+      still valid on the current yazi.
+- [ ] `eslint --version` and `mmdc --version` work (npm globals in
+      `~/.local/bin`).
+- [ ] `nvm --version` works after sourcing it in a new shell.
+- [ ] Rerunning `./install.sh` is quiet and idempotent — no new backups.
+
+## 10. Browsers
+
+- [ ] Brave, Zen, Chromium and Firefox all launch.
+- [ ] `brave://policy` and `chrome://policy` show the keys applied, with **no
+      errors and no "unknown policy" entries**.
+- [ ] `about:policies` in Firefox likewise.
+- [ ] Firefox's new tab has no sponsored shortcuts or stories.
+- [ ] Sync still works in each browser — nothing here should have disabled it.
+- [ ] After launching Firefox and Zen once, rerun `./install.sh --browsers`
+      and confirm `user.js` landed in each profile.
+- [ ] `about:config` shows `browser.startup.page` = 3 in both.
+- [ ] **No profile data is tracked**: `git status` stays clean after a browsing
+      session, and `git ls-files | grep -iE 'cookies|logins|places'` finds
+      nothing.
+
+## 11. Focus discipline
 
 The point of the whole setup — worth testing deliberately:
 
@@ -196,3 +252,8 @@ something misbehaves:
 | Built-in template ids (`kitty`, `qt`, `kcolorscheme`, …) | Taken from CachyOS's shipped config; verify with `noctalia theme --list-templates` | `40-templates.toml` |
 | A `post_hook` is run through a shell (so `${VAR:-default}` expands) | Docs say hooks are rendered by the template engine then executed; shell semantics assumed | `40-templates.toml` |
 | `hyprctl reload` picks up a newly created `generated/colors.lua` | Hyprland reloads on config change; whether it watches `require`d files is unconfirmed, hence the explicit reload | `40-templates.toml` |
+| Every package name resolves on CachyOS | Not checkable from the authoring machine; `noctalia`, `satty` and the browser AUR names are the likeliest to differ | `install.sh` |
+| Noctalia reads custom palettes from `~/.config/noctalia/palettes/<name>.json` | Documented; the exact JSON key set for a palette was taken from the docs example | `palettes/noirblaze.json` |
+| yazi's `%s` opener placeholder is still current | Carried over verbatim from your working config rather than modernised | `config/yazi/yazi.toml` |
+| Brave policy names (`BraveRewardsDisabled`, `BraveAIChatEnabled`, …) | Brave-specific policies are less stable than Chromium's; `brave://policy` is the check | `browsers/brave/policies.json` |
+| Zen reads `user.js` from profiles under `~/.zen` | Zen is a Firefox fork so this should hold, but its profile root is not documented as firmly | `install.sh` |

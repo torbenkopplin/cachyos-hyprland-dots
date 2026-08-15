@@ -117,6 +117,7 @@ window along.
 | `M + CTRL + B` | `/bt` | Bluetooth — connect, disconnect, scan, radio |
 | `M + CTRL + N` | `/net` | Networks — connect, disconnect, Wi-Fi in range, radio |
 | `M + CTRL + P` | `/power` | Power profile, night light, caffeine |
+| `M + CTRL + T` | `/theme` | Colour scheme — wallpaper, built-in, or your own |
 
 Inside the launcher, `Ctrl+J` / `Ctrl+K` move the selection (plain `j`/`k` go
 into the search box, since you are typing).
@@ -188,10 +189,23 @@ app's own config format through templates, and pokes the app to reload.
                   + 22 terminal roles)
 ```
 
-Set in `30-theme.toml`. `source = "wallpaper"` regenerates the palette from the
-current wallpaper every time it changes; switch to `source = "builtin"` with
-`builtin = "Gruvbox"` (or Nord, Kanagawa, Tokyo-Night…) if you would rather your
-colours held still.
+### Switching scheme
+
+`/theme` in the launcher (**`SUPER+CTRL+T`**) lists everything and marks the
+active one with `●`:
+
+- **your own palettes** — anything in `~/.config/noctalia/palettes/`.
+  **noirblaze** ships there, ported from `~/.config/nvim/colors/noirblaze.lua`
+  so the desktop matches the editor. Dark only, like the original.
+- **built-ins** — Ayu, Catppuccin, Dracula, Eldritch, Gruvbox, Kanagawa,
+  Noctalia, Nord, Rosé Pine, Tokyo-Night.
+- **wallpaper-derived** — under any of nine generators (Tonal Spot, Content,
+  Monochrome, Vibrant, Muted…).
+- dark/light toggle, and a re-apply for when you have edited a template.
+
+Drop another palette JSON into that folder and it appears in the list with no
+edit to any script. The starting point is set in `30-theme.toml`; picking from
+the launcher persists it.
 
 **What follows the palette, and how:**
 
@@ -244,9 +258,23 @@ noctalia msg color-scheme-set builtin Gruvbox
 ```sh
 git clone <this repo> ~/repos/cachyos-hyprland-dots
 cd ~/repos/cachyos-hyprland-dots
-./install.sh --dry-run   # look first
-./install.sh
+./install.sh --all --dry-run   # look first, always
+./install.sh --all
 ```
+
+| Flag | Does |
+|---|---|
+| *(none)* | Link configs into `~/.config` and scripts into `~/.local/bin` |
+| `--packages` | Install everything below via pacman, an AUR helper, and npm |
+| `--nvim` | Clone `torbenkopplin/nvimrc` to `~/.config/nvim` |
+| `--browsers` | Install browser policies and `user.js` (needs sudo) |
+| `--all` | All of the above, in dependency order |
+| `--dry-run` | Print what any of the above would do |
+| `--unlink` | Remove only the links this script created |
+
+Run `--browsers` again after launching Firefox and Zen once — their profile
+directories have generated names and do not exist until first launch, so
+`user.js` cannot be placed before then. The script tells you when this applies.
 
 Files are symlinked, so edits in the repo are live immediately and `git diff`
 shows your real config. Anything already in the way is moved to
@@ -260,24 +288,40 @@ loads *after* your config, so **a setting changed in the Noctalia GUI silently
 wins over the same setting in these files.** If something here appears to be
 ignored, look there first.
 
-### Prerequisites
+### What `--packages` installs
 
-```sh
-# core
-sudo pacman -S hyprland noctalia kitty
+| Group | Why |
+|---|---|
+| hyprland, portals, kitty, qt6ct, hypr{picker,lock,idle}, fonts | the session itself |
+| noctalia, satty | the shell and its screenshot editor |
+| libpulse, networkmanager, bluez, power-profiles-daemon | the backends `/aout` `/ain` `/bt` `/net` `/power` shell out to — without these those providers just say "not installed" |
+| neovim, git, base-devel, nodejs, npm | editor, and what mason needs to build its servers |
+| ripgrep, fd, fzf, bat | what the neovim config calls out to (fzf-lua and its previewer) |
+| yazi, ffmpeg, p7zip, jq, poppler, imagemagick, chafa | file manager and its preview pipeline |
+| brave-bin, zen-browser-bin, chromium, firefox | browsers |
+| eslint, mermaid-cli (npm, into `~/.local`) | used directly by the neovim config |
 
-# what the launcher providers shell out to
-sudo pacman -S libpulse networkmanager bluez bluez-utils power-profiles-daemon
+**LSP servers are not installed.** Your neovim config already installs `tsgo`,
+`eslint`, `vimls`, `lua_ls` and `lemminx` through mason on first launch, and a
+second copy on `PATH` would only cause confusion. That is also why `nodejs` is
+in the list — mason needs it.
 
-# nice to have
-sudo pacman -S hyprpicker hyprlock hypridle satty
-```
+`nvm` is installed for per-project Node versions, *alongside* system `nodejs`
+rather than instead of it. The system one is what mason finds when neovim is
+launched from the app launcher rather than a login shell; nvm shadows it in
+shells where you have sourced it.
+
+Package names could not be verified against the CachyOS repos from here, so
+a failed batch retries package-by-package and anything unresolved is listed in
+a warning summary at the end. **Read that summary** rather than assuming a
+clean run.
 
 `~/.local/bin` must be on `PATH` — the launcher runs provider commands through
 `sh -lc`.
 
 Requires **Hyprland ≥ 0.55** for the Lua config and the built-in scrolling
-layout. On 0.54 and earlier none of this loads.
+layout. On 0.54 and earlier none of this loads. Neovim must be recent enough
+for `vim.pack` (0.12+), which your config uses.
 
 ---
 
@@ -306,15 +350,24 @@ config/noctalia/
   20-launcher.toml    the /aout /ain /bt /net /power providers
   30-theme.toml       palette source (wallpaper-derived by default)
   40-templates.toml   which apps the palette is rendered into
+  palettes/
+    noirblaze.json        your neovim colourscheme, as a desktop palette
   templates/
     hyprland-colors.lua   window borders -> hypr/generated/colors.lua
     terminal-colors.sh    OSC repaint of already-open terminals
+config/yazi/
+  yazi.toml           carried over from the Ubuntu setup
+browsers/
+  README.md           what is versioned here, and what deliberately is not
+  brave|chromium|firefox/policies.json
+  firefox|zen/user.js
 bin/
-  noct-common.sh      shared helpers for the providers
+  noct-common.sh      shared helpers: the title -> payload map, sanitising
   noct-audio          PipeWire sink/source switching
   noct-bluetooth      bluetoothctl
   noct-network        NetworkManager
   noct-power          power profiles, night light, caffeine
+  noct-theme          colour scheme picker
 install.sh
 TESTING.md            post-install checklist — start here on first boot
 ```
