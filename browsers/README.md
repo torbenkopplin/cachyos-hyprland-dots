@@ -72,7 +72,7 @@ are actually useful; `Locked: false` means you can still change them in the UI.
 so a terminal shows about a tenth of the image. Zen, with the "transparent zen"
 mod and its site styles, was showing nearly all of it: the same wallpaper, two
 completely different shades, side by side. `zen/user.js` tints Zen's own
-background instead, and the two alphas multiply — 0.6 there lands at ~0.53 once
+background instead, and the two alphas multiply — 0.6 there lands at 0.54 once
 the compositor has had its turn, which is glassier than a terminal on purpose but
 recognisably the same material. The alpha is the only number in that block worth
 touching. The desktop side is deliberately left alone: the compositor cannot tell

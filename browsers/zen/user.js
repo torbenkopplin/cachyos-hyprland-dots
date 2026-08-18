@@ -46,10 +46,11 @@ user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);
 // different shades:
 //
 //   * The desktop. bin/noct-glass sets Hyprland's window opacity for EVERY
-//     window (0.88-0.90 -- see ~/.config/noctalia/glass.conf), and the
-//     compositor blurs the wallpaper behind whatever is left. A terminal or a
-//     GTK app therefore shows about a tenth of the wallpaper: a dark surface
-//     with a hint of the image in it.
+//     window -- 0.90 by default, per scheme in ~/.config/noctalia/glass.conf,
+//     and `noct-glass show` says which is in force -- and the compositor blurs
+//     the wallpaper behind whatever is left. A terminal or a GTK app therefore
+//     shows about a tenth of the wallpaper: a dark surface with a hint of the
+//     image in it.
 //
 //   * Zen. The "transparent zen" mod (sameerasw) plus its companion site styles
 //     make the browser surface AND most page backgrounds fully transparent, so
@@ -57,7 +58,7 @@ user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);
 //     every other window on screen, which is the mismatch these prefs address.
 //
 // The two multiply: what you see is Zen's own alpha times the compositor's. So
-// a tint of 0.6 lands at 0.6 x 0.88 = ~0.53, i.e. roughly half the wallpaper
+// a tint of 0.6 lands at 0.6 x 0.90 = 0.54, i.e. roughly half the wallpaper
 // showing where the rest of the desktop shows a tenth of it. That is the
 // deliberate meeting point -- clearly glassier than a terminal, clearly the same
 // material. Raise it towards 1.0 to converge on the rest of the desktop, lower

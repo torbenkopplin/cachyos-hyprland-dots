@@ -169,7 +169,7 @@ rather than the screen edge:
       `id`, and the lanes reference them as `"group:<id>"`; a `name` key is
       accepted by the TOML but ignored, so the lane silently finds no group.
 - [ ] Capsules and windows show the **same** amount of wallpaper through them.
-      `capsule_opacity` is held at the glass level by hand (0.88) — `noct-glass`
+      `capsule_opacity` is held at the glass level by hand (0.90) — `noct-glass`
       deliberately does not write Noctalia config, so if you change the level in
       `glass.conf` this is the one number that does not follow.
 

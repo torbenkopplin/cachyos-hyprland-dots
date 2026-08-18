@@ -15,7 +15,7 @@ desktop, then delete:
       option, so `lib/colwidth.lua` sets that global as focus crosses monitors.
       It is a host-level setting, in `WSBANDS` where you expected it
 - [x] zen's translucency meets the desktop's: its own background is tinted to
-      0.6, which lands at ~0.53 once the compositor has had its turn, against a
+      0.6, which lands at 0.54 once the compositor has had its turn, against a
       tenth of the wallpaper for a terminal. Also fixes why no Zen pref had ever
       applied — the profile root is `~/.config/zen`, not `~/.zen`
 - [x] `SUPER+CTRL+hjkl` moves whole columns, and at the end of the tape the
@@ -67,7 +67,7 @@ desktop, then delete:
       raise it towards 1.0 to converge on the rest of the desktop. `TESTING.md`
       §10 has the two things that could still be wrong on the Zen side.
 - [ ] Say which of the three new numbers to move, if any: `ROUNDING = 2`
-      (`conf/options.lua`), `capsule_opacity = 0.88` (`10-bar.toml`), and the
+      (`conf/options.lua`), `capsule_opacity = 0.90` (`10-bar.toml`), and the
       Zen tint above. They are deliberately in three separate files because
       each governs a different surface.
 - [ ] The last unticked Wi-Fi check in `TESTING.md` §6 needs a **secured network
