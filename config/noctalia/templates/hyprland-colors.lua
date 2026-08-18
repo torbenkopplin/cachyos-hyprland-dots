@@ -1,9 +1,10 @@
 -- TEMPLATE -- rendered by Noctalia into ~/.config/hypr/generated/colors.lua
 -- whenever the palette changes. Do not edit the rendered copy; edit this one.
 --
--- Noctalia has no built-in Hyprland template, so this is how window borders
--- get to follow the wallpaper palette. hyprland.lua requires the rendered file
--- last, so these values win over the fallbacks in conf/look.lua.
+-- Noctalia's built-in `hyprland` id emits hyprland.conf syntax and this config
+-- is Lua, so this template is how window borders get to follow the wallpaper
+-- palette instead. hyprland.lua dofiles the rendered file last, so these values
+-- win over the fallbacks in conf/look.lua.
 --
 -- {{ ... }} is Noctalia's template syntax. Available colour roles and formats
 -- are listed at https://docs.noctalia.dev/noctalia/theming/templates/

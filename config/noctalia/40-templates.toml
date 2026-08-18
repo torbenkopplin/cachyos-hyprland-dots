@@ -4,9 +4,9 @@
 ## writes the result into the target app's config. That is the whole mechanism:
 ## one palette, many rendered config files.
 ##
-## Built-ins cover apps Noctalia knows about. The two user templates below fill
-## the gaps that matter for this setup -- Hyprland's window borders, and
-## repainting terminals that are *already open*.
+## Built-ins cover apps Noctalia knows about. The three user templates below
+## fill the gaps that matter for this setup -- Hyprland's window borders,
+## kitty's colours, and repainting terminals that are *already open*.
 ##
 ## To see every id available on your machine:  noctalia theme --list-templates
 ## To re-render without changing the theme:    noctalia msg templates-apply
@@ -14,20 +14,28 @@
 [theme.templates]
 enable_builtin_templates = true
 
-## kitty      -> ~/.config/kitty/  (applies to newly started terminals)
 ## gtk3/gtk4  -> GTK app colours
 ## qt         -> qt5ct/qt6ct palettes; needs QT_QPA_PLATFORMTHEME=qt6ct,
 ##               which conf/env.lua sets
 ## kcolorscheme -> kdeglobals, for the KDE apps CachyOS ships (dolphin, ark)
 ## btop       -> btop's theme
-builtin_ids = ["kitty", "gtk3", "gtk4", "qt", "kcolorscheme", "btop"]
+##
+## Every id here writes to a path this repo does NOT track, which is the rule
+## that keeps built-ins safe to enable: install.sh deploys by symlink, so a
+## built-in whose output path happens to be a tracked file edits the checkout
+## itself. `kitty` is exactly that case and is handled as a user template below.
+## Check where an id writes before adding it. `starship` and the community
+## `yazi` template are the ones to look at twice, since this repo tracks
+## starship.toml and yazi.toml.
+builtin_ids = ["gtk3", "gtk4", "qt", "kcolorscheme", "btop"]
 
 ## ---------------------------------------------------------------------------
 ## Hyprland window borders
 ##
-## There is no built-in Hyprland template, so this is what makes the focused
-## window's border track the palette. It renders a small Lua file that
-## hyprland.lua requires last, then reloads the compositor.
+## Noctalia v5 does ship a built-in `hyprland` id, but it emits hyprland.conf
+## syntax and this config is Lua, so it is no use here. The borders come from a
+## user template instead: it renders a small Lua file that hyprland.lua dofiles
+## last, then reloads the compositor.
 ## ---------------------------------------------------------------------------
 
 [theme.templates.user.hyprland]
@@ -36,9 +44,26 @@ output_path = "$XDG_CONFIG_HOME/hypr/generated/colors.lua"
 post_hook   = "hyprctl reload"
 
 ## ---------------------------------------------------------------------------
+## kitty colours (new windows)
+##
+## Replaces the built-in `kitty` id, which rewrites kitty.conf itself to point
+## at a file of its own choosing -- and kitty.conf is tracked and symlinked, so
+## that dirties the repo on every palette change. Rendering to a fixed path we
+## chose instead means kitty.conf can include it once and never be touched
+## again. See the header of templates/kitty-colors.conf.
+##
+## No post_hook: kitty only reads its config at startup, and repainting the
+## windows already open is what the terminal_live template below is for.
+## ---------------------------------------------------------------------------
+
+[theme.templates.user.kitty]
+input_path  = "$XDG_CONFIG_HOME/noctalia/templates/kitty-colors.conf"
+output_path = "$XDG_CONFIG_HOME/kitty/generated-colors.conf"
+
+## ---------------------------------------------------------------------------
 ## Live terminal repaint
 ##
-## The kitty built-in above only affects terminals started after the change.
+## The kitty template above only affects terminals started after the change.
 ## This one pushes OSC colour sequences into every pty you already have open,
 ## so running shells, vim and btop all change colour immediately -- and it
 ## works for any terminal emulator, not just kitty.

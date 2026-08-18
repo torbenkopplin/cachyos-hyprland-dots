@@ -13,15 +13,25 @@ carries its own header) or fetched at install time rather than vendored.
 
 ## Files this repo deliberately does not track
 
-**`current-theme.conf`** — Noctalia's `kitty` template rewrites it on every
-palette change. That is exactly how `/theme` reaches new terminal windows, so
-the file has to belong to the template engine. Tracking it would mean fighting
-for ownership on every scheme switch, and the copy in git would be stale the
-moment you changed anything.
+**`generated-colors.conf`** — the palette for new terminal windows, rendered from
+the active Noctalia scheme by the user template in
+`config/noctalia/templates/kitty-colors.conf`. That is how `/theme` reaches the
+terminal, so the file belongs to the template engine; the copy in git would be
+stale the moment you changed scheme.
 
-Your old static noirblaze theme lived in this file. It is not lost — it is now
-`config/noctalia/palettes/noirblaze.json`, where it drives the whole desktop
+Your old static noirblaze theme lived in a file like this. It is not lost — it is
+now `config/noctalia/palettes/noirblaze.json`, where it drives the whole desktop
 instead of just the terminal, and where `/theme` can select it.
+
+> **Do not enable Noctalia's built-in `kitty` template.** It writes
+> `themes/noctalia.conf` *and rewrites `kitty.conf`* to include it, replacing
+> whatever theme include it finds. `install.sh` symlinks `kitty.conf` into this
+> repo, so the built-in edits a tracked file — the checkout goes dirty on every
+> palette change and `git pull` on another machine conflicts over generated
+> output. That is why the colours come from a user template with an output path
+> of our own choosing. If you ever find a stray `~/.config/kitty/themes/` or an
+> `include themes/noctalia.conf` line in `kitty.conf`, the built-in got
+> re-enabled: drop `"kitty"` from `builtin_ids` in `40-templates.toml`.
 
 **`generated-glass.conf`** — written by `bin/noct-glass` with the frosted-glass
 level for the active scheme. Levels are configured in
