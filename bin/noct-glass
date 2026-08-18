@@ -73,7 +73,12 @@ HYPR_OUT="$CONFIG_HOME/hypr/generated/glass.lua"
 ZEN_ROOTS=("$CONFIG_HOME/zen" "$HOME/.zen")
 ZEN_SHEET="userChrome.css"
 
-CYCLE_STEPS=(1.00 0.95 0.90 0.82)
+# opaque -> light -> default -> heavy, and the middle two have to bracket the
+# level in glass.conf or the cycle is useless: `cycle` looks the current level
+# up in this list and takes the next one, so a list that does not contain it
+# restarts at the top. When these were 1.00/0.95/0.90/0.82 and the default
+# dropped to 0.60, one press jumped straight to fully opaque.
+CYCLE_STEPS=(1.00 0.75 0.60 0.50)
 
 usage() { sed -n '3,7p' "$0" | sed 's/^# \?//'; exit 2; }
 
@@ -103,14 +108,22 @@ current_scheme() {
     printf '%s:%s' "${s%% *}" "${s#* }"   # "custom noirblaze" -> "custom:noirblaze"
 }
 
-# level <window|terminal> -- per-scheme override, else the bare default.
-level() {
-    local what=$1 scheme
+# setting <key> <fallback> -- per-scheme override, else the bare key, else the
+# built-in. Every knob in glass.conf resolves through here, so a scheme can
+# override the blur the same way it overrides the levels: `builtin:Catppuccin.
+# blur_brightness = 0.8` is read before the bare `blur_brightness`.
+setting() {
+    local what=$1 fallback=$2 scheme
     if scheme=$(current_scheme); then
         read_key "$scheme.$what" && return 0
     fi
     read_key "$what" && return 0
-    printf '0.90'   # both default to the same level, i.e. terminals match
+    printf '%s' "$fallback"
+}
+
+# level <window|terminal|browser> -- the visible opacity of a surface.
+level() {
+    setting "$1" 0.90   # all three default alike, i.e. every surface matches
 }
 
 window_level() {
@@ -268,15 +281,29 @@ write_hypr() {
     local win=$1
 
     # Blur costs GPU time proportional to passes x size. Skip it entirely when
-    # nothing is translucent; two passes is where it reads as frosted rather
-    # than merely soft, and more is mostly heat.
+    # nothing is translucent -- there is nothing behind a window to blur.
     local blur_enabled="true"
     awk -v l="$win" 'BEGIN { exit !(l >= 0.995) }' && blur_enabled="false"
 
-    # Unfocused windows sit one step further back. Never below 0.6, or an
-    # inactive terminal becomes unreadable rather than merely dimmed.
+    # Unfocused windows sit one step further back. The floor is 0.50 rather
+    # than 0.60 because the levels moved: at window = 0.60 a 0.60 floor made
+    # active and inactive the same number and the focus cue disappeared
+    # silently. 0.50 still leaves an inactive terminal legible -- its text
+    # composites at about 130 of 255 against a backdrop in the 60s.
     local inactive
-    inactive=$(awk -v l="$win" 'BEGIN { v = l - 0.06; if (v < 0.6) v = 0.6; printf "%.2f", v }')
+    inactive=$(awk -v l="$win" 'BEGIN { v = l - 0.06; if (v < 0.50) v = 0.50; printf "%.2f", v }')
+
+    # The blur is what the wallpaper looks like by the time it reaches the back
+    # of a window, so it is half of the frosted effect and it belongs in
+    # glass.conf next to the other half. See the note there for what each knob
+    # costs; `noct-check glass-visible` measures the result.
+    local b_size b_passes b_bright b_contrast b_vibrancy
+    b_size=$(setting blur_size 8)
+    b_passes=$(setting blur_passes 3)
+    b_bright=$(setting blur_brightness 0.95)
+    b_contrast=$(setting blur_contrast 1.0)
+    b_vibrancy=$(setting blur_vibrancy 0.15)
+    local b_xray; b_xray=$(setting blur_xray false)
 
     mkdir -p "$(dirname "$HYPR_OUT")"
     cat >"$HYPR_OUT" <<EOF
@@ -285,9 +312,9 @@ write_hypr() {
 --
 -- active/inactive_opacity apply to EVERY window, which is what frosts GTK and
 -- Qt apps that have no transparency of their own. Text fades with them: the
--- compositor cannot tell a window's glyphs from its background. kitty is the
--- one window that also has an opacity of its own; noct-glass divides the two
--- out so a terminal ends up at the same visible level as everything else.
+-- compositor cannot tell a window's glyphs from its background. kitty and Zen
+-- are the two that also draw their own translucency; noct-glass divides the
+-- two out so every surface ends up at the same visible level.
 
 hl.config({
     decoration = {
@@ -297,46 +324,37 @@ hl.config({
         blur = {
             enabled = $blur_enabled,
 
-            -- Big and flat on purpose, and this is the setting that decides
-            -- whether the desktop looks like ONE material.
+            -- What you see through a window is
             --
-            -- With xray on, every window samples the wallpaper behind itself. At
-            -- size 8 / passes 2 the blur keeps the photo's local brightness, so
-            -- two windows at identical opacity read as different shades -- one
-            -- over a bright part of the image, one over a dark part. Measured
-            -- 2026-08-18 on this wallpaper: the backdrops behind two kitty
-            -- windows differed by 24-41 of 255, which landed as a 4-6 level
-            -- difference in what you saw. Nothing about the windows was
-            -- different; both measured an own-alpha of 1.00.
+            --   (backdrop - the window's own colour) x (1 - opacity)
             --
-            -- At size 32 / passes 4, dimmed and desaturated, the same two
-            -- backdrops differ by 5 and the windows land within 2 levels of each
-            -- other -- below what the eye picks up. passes = 5 buys the last
-            -- level if you want it, at another full blur pass.
-            --
-            -- The trade is real: the flatter this is, the less of the wallpaper's
-            -- shape you see through a window. The gaps between windows still show
-            -- it unblurred, which is where the image is meant to be looked at.
-            size    = 32,
-            passes  = 4,
+            -- so these knobs and the levels multiply. \`size\` and \`passes\` decide
+            -- whether the wallpaper arrives as shape or as a flat wash --
+            -- everything above roughly size 16 averages the image away and the
+            -- window reads as paint, whatever its opacity. \`brightness\` scales the
+            -- backdrop directly: at 0.65 a wallpaper of mean luma 99 arrives at
+            -- about 57, which against a near-black window leaves almost nothing
+            -- to see.
+            size    = $b_size,
+            passes  = $b_passes,
 
             -- Blur behind a window at full strength regardless of how
             -- translucent that window is; without it a 0.9 window gets only a
             -- tenth of the blur and the effect disappears.
             ignore_opacity = true,
 
-            -- Sample the wallpaper rather than the windows underneath, so a
-            -- busy window behind does not show through as noise.
-            xray = true,
+            -- Off: a window samples whatever is actually beneath it. For a
+            -- tiled window that IS the wallpaper -- columns do not overlap --
+            -- so this changes nothing there. For a floating window it is the
+            -- window underneath, and the translucency compounds the way
+            -- stacked glass does. Darker than a tiled window at the same
+            -- level, which is what being in front should look like.
+            xray = $b_xray,
 
-            -- Dimmer and nearly colourless: brightness is what stops a bright
-            -- patch of wallpaper from lifting a window out of the set, and
-            -- vibrancy is what stops it from tinting one window blue and its
-            -- neighbour orange.
-            brightness = 0.65,
-            contrast   = 0.90,
+            brightness = $b_bright,
+            contrast   = $b_contrast,
             noise      = 0.01,
-            vibrancy   = 0.05,
+            vibrancy   = $b_vibrancy,
 
             popups             = true,
             popups_ignorealpha = 0.4,
@@ -347,7 +365,12 @@ hl.config({
 EOF
 }
 
-apply() {
+# levels -- "<window> <terminal> <browser>", and nothing else. Reading the
+# configuration must not have side effects: `show` used to call apply(), so
+# asking what the levels were rewrote three files, reloaded Hyprland and
+# signalled every kitty. A check that has to disturb the thing it measures is
+# not a check.
+levels() {
     local win term browser
     win=$(window_level)
     term=$(level terminal)
@@ -361,6 +384,13 @@ apply() {
         term=$win
         browser=$win
     fi
+
+    printf '%s %s %s' "$win" "$term" "$browser"
+}
+
+apply() {
+    local win term browser
+    read -r win term browser <<<"$(levels)"
 
     write_kitty "$term" "$win"
     write_zen "$browser" "$win"
@@ -410,7 +440,9 @@ case "${1:-apply}" in
         notify-send -a Glass "Frosted glass" "window opacity $next" 2>/dev/null
         ;;
     show)
-        apply
+        # Read-only on purpose -- see levels().
+        # shellcheck disable=SC2046
+        printf 'window %s  terminal %s  browser %s\n' $(levels)
         ;;
     *) usage ;;
 esac

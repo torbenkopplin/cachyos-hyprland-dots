@@ -172,6 +172,10 @@ On by default, tied to the scheme, and done in the compositor.
 follows whatever `/theme` selects. **`SUPER+SHIFT+G`** cycles as a temporary
 override. Levels live in `config/noctalia/glass.conf`.
 
+`noct-check glass-visible` measures whether any of it reaches the screen — see
+[design.md](design.md#why-the-blur-is-small) for why that is not a question the
+eye can answer.
+
 Three knobs, and **all are stated as what you see**:
 
 | Knob | Means | Applies to |
@@ -195,35 +199,63 @@ An unfocused window is dimmed by 0.06 (`inactive_opacity`). So an app sitting
 0.06 below `window` looks *exactly like a window in the other focus state* — the
 symptom is "the browser when focused looks like the terminal when it isn't, but
 not the other way around". Anything meant to read as the same material has to sit
-well inside that 0.06, which is why `browser` is 0.88 against a `window` of 0.90.
+well inside that 0.06, which is why `browser` is 0.58 against a `window` of 0.60.
 
 The consequence is worth saying out loud: a browser page cannot be both
-noticeably glassier than a terminal *and* indistinguishable from one. 0.83 buys
-the glassy look and puts them a step apart; 0.88 makes them the same material and
-leaves the transparency mod contributing a whisper. One number, in `glass.conf`.
+noticeably glassier than a terminal *and* indistinguishable from one. Two
+hundredths under makes them the same material; a tenth under buys the glassier
+look and puts them a focus step apart. One number, in `glass.conf`.
+
+### Why the levels are as low as 0.60
+
+Because the lift — how much brighter a translucent window is than an opaque one —
+is `(backdrop − the window's own colour) × (1 − opacity)`, and on a dark palette
+over a blurred photo the first bracket is small. Measured here: the window's own
+colour is 29 of 255 and the backdrop reaches 72, so there are 43 levels to
+divide. At `window = 0.90` that is a lift of 4; at 0.80, 9; at 0.60, 17.
+
+Which means the frosted look is far more sensitive to the level than it looks
+like it should be, and that the range where it reads as glass at all starts lower
+than a number like 0.9 suggests. `blur_brightness` is the other half — it scales
+the backdrop directly — but it is capped at what the wallpaper actually is.
 
 ### What applies live, and what waits for a restart
 
-Only the compositor's `window` level. Measured on 2026-08-18: **kitty re-reads
-colours on `SIGUSR1` but not `background_opacity`** — a running terminal stayed
-at 1.00 while its generated config said 0.94 — and Zen reads stylesheets at
-startup. That is why `terminal` is kept equal to `window` by default: a
-terminal-specific level would otherwise leave you with two shades of terminal
-until every window had been restarted. `browser` has the same limitation but only
-one window's worth of it.
+The compositor's `window` level, always — and `terminal` too, since 2026-08-19.
+kitty read `background_opacity` once at startup and ignored it forever after,
+which is why `terminal` used to be pinned equal to `window`: any difference left
+you with two shades of terminal until the last old window closed.
+`dynamic_background_opacity yes` in `kitty.conf` lifts that, and `noct-check
+kitty-live` measures a probe window actually following a change on `SIGUSR1`
+rather than taking it on trust.
+
+That is what lets `terminal` sit far below `window`, which is the point: the
+compositor cannot tell glyphs from background and fades both, kitty fades only
+the background. Glassiness bought through `terminal` costs no contrast at all.
+
+Zen still reads its stylesheet at startup, so `browser` needs the browser
+restarted — one window's worth of the same problem. `noct-check zen-page`
+measures the page area on screen and says so plainly when the running browser
+and the file disagree.
 
 `blur.ignore_opacity` is on. Without it Hyprland scales the blur by the
 window's own alpha, so a 0.9 window gets a tenth of the blur and the effect
 disappears — this is the setting that makes compositor-driven glass actually
 look frosted rather than merely faded.
 
-**The blur is also what makes the levels above mean anything.** `blur.xray` has
-every window sample the wallpaper behind itself, so at a small radius two windows
-at the same level come out as different shades depending on what they happen to be
-sitting over — measured at 4–6 levels of 255 on this wallpaper, which reads as
-"one is grey and one is black". `size 32 / passes 4` at `brightness 0.65` and
-`vibrancy 0.05` flattens that to 2 levels. See [design notes](design.md) for the
-numbers; the cost is that you see less of the wallpaper's shape through a window.
+**The blur is the other half of the effect, and it lives in the same file.**
+`blur_size`, `blur_passes`, `blur_brightness`, `blur_contrast` and
+`blur_vibrancy` are read from `glass.conf` alongside the levels and rendered into
+the same generated Lua, per scheme if you want them to be — so the whole of what
+a window looks like is described in one place.
+
+`blur.xray` has every window sample the wallpaper behind itself, so at a small
+radius two windows at the same level come out as different shades depending on
+what they are sitting over — measured at 4–6 levels of 255 here. A big blur
+(`size 32 / passes 4`, `brightness 0.65`) flattens that to 2, and flattens the
+wallpaper out of existence with it: lift 3, which is nothing. The setting is
+`size 8 / passes 2` at `brightness 1.0`, and it buys back the photo at the cost
+of that uniformity. See [design notes](design.md#why-the-blur-is-small).
 
 Set `window = 1.0` for app-translucency only, which is what `~/repos/dots`
 does today: nothing fades except surfaces an app draws translucent itself.

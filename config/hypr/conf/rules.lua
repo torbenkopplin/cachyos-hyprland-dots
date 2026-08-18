@@ -52,6 +52,43 @@ hl.window_rule({
     center = true,
 })
 
+------------------------------------------------------------------------------
+-- Floating windows stack the effect instead of sampling past it
+------------------------------------------------------------------------------
+--
+-- There is no rule here, and that is the point of the comment.
+--
+-- `xray` decides whether a window's blur samples the WALLPAPER or whatever is
+-- actually beneath it, and the obvious implementation was a window rule turning
+-- it off for `float = true`. Hyprland 0.56 accepts that rule, reports no config
+-- error, and ignores it: `xray` is a LAYER rule (HL.LayerRuleSpec in
+-- /usr/share/hypr/stubs/hl.meta.lua lists it; HL.WindowRuleSpec does not).
+-- Measured 2026-08-19, two probe windows with and without the rule saw
+-- backdrops of 87.0 and 86.2 -- the same wallpaper, twice.
+--
+-- So it is off globally instead, in glass.conf's `blur_xray`. Nothing is lost
+-- by that: tiled windows do not overlap, so what is beneath one of them IS the
+-- wallpaper, and only floating windows see a difference. `noct-check
+-- blur-stacks` measures that a floating window samples the window under it, and
+-- `noct-check glass-visible` measures that a tiled one still samples the
+-- wallpaper.
+
+-- bin/noct-check spawns throwaway windows to measure things that only exist on
+-- a real window: whether kitty picks up a new background_opacity on SIGUSR1,
+-- whether Zen's generated stylesheet is actually winning against the
+-- transparency mod. Floating and centred so running a check never rearranges
+-- the tape you were working in. Matched on class only: a title rule was tried
+-- first and never fired, because kitty sets its title after the window is
+-- mapped and the rule is evaluated at map time. Anything that needs to be
+-- caught here has to be launched under this class.
+hl.window_rule({
+    name  = "float-noct-probe",
+    match = { class = "^noct-probe$" },
+    float  = true,
+    size   = { 900, 600 },
+    center = true,
+})
+
 hl.window_rule({
     name  = "float-noctalia-settings",
     match = { class = "^dev\\.noctalia\\.Noctalia$" },

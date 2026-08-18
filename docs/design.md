@@ -95,22 +95,40 @@ The blur behind them is the layer rule in `conf/rules.lua`, and
 `ignore_alpha = 0.5` is what keeps the transparent part of the bar from being
 blurred along with the capsules.
 
-### Why the blur is so large
+### Why the blur is small
 
-Because it is what decides whether the desktop is **one material**. With
-`blur.xray` on, every translucent window samples the wallpaper behind *itself*, so
-a small blur preserves the photo's local brightness and two windows at the same
-opacity come out as different shades — one over a bright patch, one over a dark
-one. That is not a subtle effect: measured on this wallpaper at `size 8 / passes
-2`, the backdrops behind two kitty windows differed by 24–41 of 255, which landed
-as a 4–6 level difference in what you actually saw. Both windows measured an own
-alpha of 1.00; nothing about them was different.
+Because a blur large enough to make every window the same shade also makes every
+window look opaque, and that turned out to matter more.
 
-At `size 32 / passes 4`, dimmed to `brightness 0.65` and desaturated to `vibrancy
-0.05`, the same two backdrops differ by 5 and the windows land within 2 levels of
-each other, which is below what the eye picks up. The trade is that you see less
-of the wallpaper's *shape* through a window — the gaps between windows still show
-it unblurred, and that is where the image is meant to be looked at.
+With `blur.xray` on, every translucent window samples the wallpaper behind
+*itself*, so a small blur preserves the photo's local brightness and two windows
+at the same opacity come out as different shades — one over a bright patch, one
+over a dark one. Measured on this wallpaper at `size 8 / passes 2`, the backdrops
+behind two kitty windows differed by 24–41 of 255, landing as a 4–6 level
+difference in what you saw. Both windows measured an own alpha of 1.00; nothing
+about them was different.
+
+`size 32 / passes 4`, dimmed to `brightness 0.65` and desaturated to `vibrancy
+0.05`, fixes that: the same two backdrops differ by 5. It also averages the
+wallpaper away entirely. Measured 2026-08-18 with `noct-check glass-visible`,
+that combination at `window = 0.90` was worth a **lift of 3 levels of 255** — the
+difference between the window and an opaque one — with a backdrop varying by 2.
+Uniform, and uniformly grey. Nothing on the screen said the glass was on.
+
+The setting now is `size 8 / passes 2` at `brightness 1.0`, `vibrancy 0.15`, with
+`window = 0.60`: lift **17**, structure **8**. You can make out what the
+wallpaper is through a terminal, which is the point of having one behind the
+windows at all.
+
+There is no value that does both, and it is worth being plain about which was
+chosen. Two windows over different parts of the image now read as slightly
+different shades. That is the price of the photo being visible through either of
+them.
+
+`noct-check glass-visible` is how any of these numbers get settled — it drives a
+window to fully opaque, then to almost fully transparent, and reads both ends off
+a screenshot. Eyes are not reliable at 3 levels of 255, and neither is a config
+file that looks correct.
 
 ### Edges are read, not inferred from a failed dispatch
 
