@@ -112,7 +112,17 @@ BAR_FOLLOWS_PANELS = true
 GAPS_IN  = 4
 GAPS_OUT = 10
 BORDER   = 2
-ROUNDING = 8
+
+-- Nearly square, down from 8. A rounded card reads as a surface you are meant
+-- to admire; a 2px corner reads as a frame around a terminal, which is what
+-- these windows mostly are. It also stops fighting the border: the focused
+-- window's border is a two-colour gradient (conf/look.lua), and a gradient
+-- following a wide radius spends most of its length in the corners.
+--
+-- Not 0. A hard corner shows every stair-step of the border's diagonal, and at
+-- 2 the anti-aliasing has something to work with while the silhouette still
+-- reads as square.
+ROUNDING = 2
 
 -- The short, non-bouncy set defined in conf/look.lua: nothing longer than
 -- ~150ms, no overshoot, and no animation at all on anything that happens while

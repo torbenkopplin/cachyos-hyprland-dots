@@ -52,8 +52,21 @@ about:
 stay whatever `conf/look.lua` hardcodes. `templates/hyprland-colors.lua` renders
 a small Lua file to `~/.config/hypr/generated/colors.lua`, which `hyprland.lua`
 `dofile`s *last* (under `pcall`, since it does not exist until the first render)
-so it overrides the fallbacks. The focused border becomes `primary`; unfocused
-becomes `outline_variant` at 50%.
+so it overrides the fallbacks.
+
+The focused border is a **gradient** — `primary` to `tertiary` across the
+diagonal — and the unfocused one is `outline_variant` at 15%, a hairline. The
+split is deliberate: the focused window is the only thing on screen that should
+draw the eye, so it gets the palette's two most contrasting accents, and every
+other window gets just enough edge to say where a column ends. Corners are nearly
+square (`ROUNDING = 2`), which is the other half of that look: a wide radius
+spends most of a gradient's length in the corners.
+
+Note the syntax. A gradient in a Lua config is a **table** —
+`{ colors = { "rgb(a)", "rgb(b)" }, angle = 45 }`. The single-string form
+`"rgb(a) rgb(b) 45deg"` is `hyprland.conf` syntax and is not parsed here; it
+loads without complaint and you get a flat border. To go flat on purpose, make
+`active_border` one string — the template says where.
 
 **kitty colours.** The built-in `kitty` template is deliberately *not* enabled.
 It does not just write a colour file — it rewrites `kitty.conf` itself to include

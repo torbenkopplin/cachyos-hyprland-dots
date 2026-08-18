@@ -14,8 +14,21 @@ hl.config({
             -- hypr/generated/colors.lua from the palette, which hyprland.lua
             -- dofiles last and which therefore overrides these two lines.
             -- See config/noctalia/40-templates.toml.
-            active_border   = "rgba(7f9cc4ff)",
-            inactive_border = "rgba(2a2e36aa)",
+            --
+            -- The focused border is a two-colour gradient across the diagonal.
+            -- A flat accent tells you where focus is; a gradient tells you the
+            -- same thing while looking like something built rather than
+            -- defaulted, and it costs nothing -- the border is one quad the
+            -- compositor draws either way. The table form is the Lua one;
+            -- "rgb(a) rgb(b) 45deg" in a single string is hyprland.conf syntax
+            -- and is not parsed here.
+            active_border = { colors = { "rgba(7f9cc4ff)", "rgba(c4a37fff)" }, angle = 45 },
+
+            -- Unfocused borders are a hairline: enough to say where a column
+            -- ends, not enough to compete. 0x26 is ~15% alpha -- the old 0xaa
+            -- (67%) drew a visible frame around every window on screen, which
+            -- is exactly the noise the gradient is supposed to stand out from.
+            inactive_border = "rgba(2a2e3626)",
         },
 
         resize_on_border = true,

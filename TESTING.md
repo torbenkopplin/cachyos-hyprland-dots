@@ -304,6 +304,17 @@ Then through the launcher:
       values, not `{{ ... }}` placeholders.
 - [ ] **Window borders changed colour** — the focused window's border tracks
       the new palette. (This is the user template + `hyprctl reload`.)
+- [x] The focused border is a **gradient**, not a flat fill, and the unfocused
+      one is barely there. Read it back rather than squinting at the screen —
+      the string form of a gradient loads silently and draws flat:
+      ```sh
+      hyprctl getoption general:col.active_border    # two colours + an angle
+      hyprctl getoption general:col.inactive_border  # one colour, 0x26 alpha
+      ```
+      Verified 2026-08-18: `ffff0088 ffffffff 45deg` and `263b3b3b`, i.e. the
+      noirblaze pink into its white, and a 15% hairline.
+- [x] `hyprctl getoption decoration:rounding` says **2**. Corners are meant to be
+      nearly square; 0 would show every stair-step of the border's diagonal.
 - [ ] Terminals that were **already open** repainted immediately.
 - [ ] The shell prompt, `ls` colours and `git` output changed with them.
 - [ ] A full-screen TUI (`btop`, vim) survived the repaint without corruption.
@@ -594,6 +605,8 @@ something misbehaves:
 | ~~A workspace rule's `layout_opts` carries the band's `column_width`~~ | **Disproven 2026-08-18 on Hyprland 0.56.2.** The scrolling layout reads `direction` from a workspace rule but takes the width only from the global `scrolling:column_width`, so every band got a third. Measured: a new window on the 0.5 band came out at 0.333. `lib/colwidth.lua` sets the global as monitor focus moves instead | `lib/colwidth.lua`, `conf/workspaces.lua` |
 | ~~`monitor.focused` fires after the switch is recorded~~ | **Disproven 2026-08-18.** Inside the handler `hl.get_active_monitor()` still answers with the monitor you left; the event's own argument is the one being focused. Everything reading a monitor from an event takes the argument | `lib/colwidth.lua` |
 | ~~`hyprctl keyword` can set an option under a Lua config~~ | **Disproven 2026-08-18 on Hyprland 0.56.2.** It answers `keyword can't work with non-legacy parsers. Use eval.` — `hyprctl eval 'hl.config({...})'` is the live equivalent, and it is what the width change rides on | `lib/colwidth.lua` |
+| ~~A border gradient can be written as one string in a Lua config~~ | **Disproven 2026-08-18 on Hyprland 0.56.2.** `"rgb(a) rgb(b) 45deg"` is hyprland.conf syntax; a Lua config wants the table form `{ colors = {...}, angle = 45 }`. The string form loads silently and draws a flat border | `templates/hyprland-colors.lua`, `conf/look.lua` |
+| ~~`colors.tertiary` is available to a user template~~ | **Verified 2026-08-18 on noctalia v5.0.0-beta.8**: renders to real hex (`#ffffff` on noirblaze), so the border gradient has a second role to use | `templates/hyprland-colors.lua` |
 | Noctalia gives a dmenu provider ~2 seconds | **Measured 2026-08-18**: a provider that runs longer is SIGTERMed (exit 143) and the launcher shows "No results found". Undocumented, so it could change — re-measure with a `sleep 3` provider if lists start emptying | `bin/noct-common.sh` |
 | Hyprland pauses idle notifications while a client holds a Wayland idle inhibitor | Protocol behaviour, and the layer the windowed-browser-video case rests on. The two window rules are the belt and braces | `conf/rules.lua`, `70-idle.toml` |
 | `shelly install standard/aur --no-confirm` is non-interactive enough for a script | It authenticates through **polkit**, so it needs an agent; in a bare TTY it fails and the pacman path takes over. Both paths are exercised by `--dry-run` | `install.sh` |
