@@ -158,9 +158,17 @@ device ids visible**; the payloads go to a side map in `$XDG_RUNTIME_DIR`:
 - [ ] `noct-theme list` — and it marks the active scheme without asking the
       running shell for it (`grep -c 'noctalia msg' bin/noct-theme` counts only
       the `act` path; see the two-second rule below)
-- [ ] Every one of those returns in **well under two seconds**:
-      `for p in "noct-audio list sinks" "noct-bluetooth list" "noct-network list" \
-      "noct-power list" "noct-theme list"; do /usr/bin/time -f "%e $p" sh -c "$p" >/dev/null; done`
+- [ ] Every one of those returns in **well under two seconds** — measured, not
+      eyeballed (the GNU `time` binary is not installed by default, hence
+      `date`):
+      ```sh
+      for p in "noct-audio list sinks" "noct-bluetooth list" \
+               "noct-network list" "noct-power list" "noct-theme list"; do
+          s=$(date +%s%N); sh -c "$p" >/dev/null; e=$(date +%s%N)
+          printf '%-26s %4d ms\n' "$p" $(( (e - s) / 1000000 ))
+      done
+      ```
+      On this machine they land between 25 and 210 ms.
 - [ ] `cat "$XDG_RUNTIME_DIR"/noct-*.map` — one `title <TAB> payload` per result
 - [ ] Two devices with the *same* name both stay selectable (the second gets a
       ` (2)` suffix). Only testable if you have a duplicate; skip otherwise.
