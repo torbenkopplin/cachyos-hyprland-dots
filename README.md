@@ -8,7 +8,8 @@ A keyboard-first, distraction-free Hyprland setup for CachyOS, based on
   focus, and running out of windows continues into the next workspace
   (vertically) or the next monitor (horizontally) instead of stopping dead.
 - **A bar you summon** — hidden while you work, revealed when a shell panel
-  opens.
+  opens, and shaped like the rest of the desktop: three floating capsules rather
+  than a slab.
 - **One palette, everywhere** — wallpaper-derived, rendered into the terminal,
   GTK, Qt and the window borders, live.
 - **System control from the launcher** — audio devices, Bluetooth, networks,

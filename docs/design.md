@@ -59,6 +59,18 @@ empty. No polling, and no guessing how long you will spend in the launcher.
 Notifications and OSDs are deliberately excluded — a notification must not drag
 the bar on screen with it.
 
+It is also built from the same parts as everything else on screen. The bar
+surface is invisible — no fill, no border — and what you see are three
+**capsules**: navigation, time, status. Each is inset from the screen edge by the
+same 10px a window is, carries the same near-square radius, and shows the same
+amount of wallpaper through it as the frosted-glass level does. A full-width slab
+with concave corners was the one element built to a different rule, which is
+exactly what made it read as furniture rather than as another surface.
+
+The blur behind them is the layer rule in `conf/rules.lua`, and
+`ignore_alpha = 0.5` is what keeps the transparent part of the bar from being
+blurred along with the capsules.
+
 ### Edges are read, not inferred from a failed dispatch
 
 It is tempting to dispatch a focus move and check whether it returned

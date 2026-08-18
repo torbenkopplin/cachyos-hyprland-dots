@@ -146,6 +146,23 @@ to watch for is the launcher also opening after ordinary chords.
 - [ ] `SUPER+B` pins it on; `SUPER+B` again releases it back to following panels.
 - [ ] The bar renders **above** a fullscreen window (`layer = "overlay"`).
 
+The form is three floating capsules on an invisible bar, matching the windows
+rather than the screen edge:
+
+- [x] There is **no slab**: no fill and no border behind the capsules, so the
+      wallpaper runs unbroken between them. Verified 2026-08-18 from a screenshot
+      of all three ends of the bar.
+- [x] Three capsules — navigation (workspaces + title), time, status — each
+      inset 10px from the screen edge like a window, with the same near-square
+      corners.
+- [x] `noctalia config validate` passes. `capsule_group` entries are keyed by
+      `id`, and the lanes reference them as `"group:<id>"`; a `name` key is
+      accepted by the TOML but ignored, so the lane silently finds no group.
+- [ ] Capsules and windows show the **same** amount of wallpaper through them.
+      `capsule_opacity` is held at the glass level by hand (0.88) — `noct-glass`
+      deliberately does not write Noctalia config, so if you change the level in
+      `glass.conf` this is the one number that does not follow.
+
 > If the namespaces are wrong, list them while a panel is open:
 > `hyprctl layers | grep noctalia`
 > and reconcile with `PANEL_NAMESPACES` in `lib/bar.lua`.
@@ -607,6 +624,7 @@ something misbehaves:
 | ~~`hyprctl keyword` can set an option under a Lua config~~ | **Disproven 2026-08-18 on Hyprland 0.56.2.** It answers `keyword can't work with non-legacy parsers. Use eval.` — `hyprctl eval 'hl.config({...})'` is the live equivalent, and it is what the width change rides on | `lib/colwidth.lua` |
 | ~~A border gradient can be written as one string in a Lua config~~ | **Disproven 2026-08-18 on Hyprland 0.56.2.** `"rgb(a) rgb(b) 45deg"` is hyprland.conf syntax; a Lua config wants the table form `{ colors = {...}, angle = 45 }`. The string form loads silently and draws a flat border | `templates/hyprland-colors.lua`, `conf/look.lua` |
 | ~~`colors.tertiary` is available to a user template~~ | **Verified 2026-08-18 on noctalia v5.0.0-beta.8**: renders to real hex (`#ffffff` on noirblaze), so the border gradient has a second role to use | `templates/hyprland-colors.lua` |
+| ~~A bar capsule group is named with `name`~~ | **Disproven 2026-08-18 on noctalia v5.0.0-beta.8.** The key is `id`; `name` validates as an unknown setting and the lane's `group:<id>` then matches nothing. Probed with `noctalia config validate`, which names unknown keys | `10-bar.toml` |
 | Noctalia gives a dmenu provider ~2 seconds | **Measured 2026-08-18**: a provider that runs longer is SIGTERMed (exit 143) and the launcher shows "No results found". Undocumented, so it could change — re-measure with a `sleep 3` provider if lists start emptying | `bin/noct-common.sh` |
 | Hyprland pauses idle notifications while a client holds a Wayland idle inhibitor | Protocol behaviour, and the layer the windowed-browser-video case rests on. The two window rules are the belt and braces | `conf/rules.lua`, `70-idle.toml` |
 | `shelly install standard/aur --no-confirm` is non-interactive enough for a script | It authenticates through **polkit**, so it needs an agent; in a bare TTY it fails and the pacman path takes over. Both paths are exercised by `--dry-run` | `install.sh` |

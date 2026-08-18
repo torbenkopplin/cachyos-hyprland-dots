@@ -20,6 +20,24 @@
 ##
 ## Because it is summoned rather than lived with, it is worth putting real
 ## information on it -- this is a HUD, not decoration.
+##
+## Form: three floating islands
+## ---------------------------
+## The desktop is a set of separate translucent surfaces, each inset from the
+## screen edge by GAPS_OUT and framed by a hairline. A full-width slab welded to
+## the top edge with concave corners was the one thing on screen built to a
+## different rule -- so the bar is now made of the same parts as everything else:
+##
+##   * the bar surface itself is invisible (background_opacity = 0, no border);
+##   * its widgets live in three capsules -- navigation, time, status -- which
+##     are the surfaces you actually see;
+##   * those capsules are inset 10px like a window (GAPS_OUT), carry the same
+##     radius as a window (ROUNDING = 2, near-square) and the same opacity as
+##     the frosted-glass level.
+##
+## The blur comes from the layer rule in conf/hypr/conf/rules.lua, whose
+## ignore_alpha = 0.5 is what keeps the *transparent* part of the bar from being
+## blurred along with the capsules.
 
 [bar.default]
 position = "top"
@@ -36,30 +54,67 @@ layer                    = "overlay"  # visible even over a fullscreen window
 ## went.
 thickness          = 30
 
-## Frosted: the layer rule in conf/rules.lua blurs Noctalia's surfaces, and
-## this is what lets that blur show through. Held constant rather than managed
-## by bin/noct-glass -- that runs from the colors_changed hook, and having it
-## write a Noctalia .toml would risk a config-reload loop.
-background_opacity = 0.85
-padding            = 10
-widget_spacing     = 6
-margin_edge        = 0
-margin_ends        = 0
-concave_edge_corners = true
-radius_bottom_left   = 12
-radius_bottom_right  = 12
-radius_top_left      = 0
-radius_top_right     = 0
+## Inset like a window, on all three sides. margin_ends is the distance from the
+## left and right screen edges, margin_edge the distance from the top one.
+margin_edge  = 10
+margin_ends  = 10
+
+## The bar surface itself is not drawn: no fill, no border, no corners to speak
+## of. Everything visible is a capsule. (Setting a radius here would only round
+## something you cannot see -- it stays at the window radius so that turning the
+## fill back on gives you a sane single island rather than a slab.)
+background_opacity   = 0.0
+border_width         = 0
+concave_edge_corners = false
+radius_top_left      = 2
+radius_top_right     = 2
+radius_bottom_left   = 2
+radius_bottom_right  = 2
+
+## Capsules are the visible surfaces. 0.88 matches the wallpaper-palette glass
+## level in glass.conf, so a capsule and a window show the same amount of
+## wallpaper through them; radius 2 matches ROUNDING in conf/options.lua.
+##
+## capsule_thickness is a fraction of `thickness`, so the capsule sits inside the
+## bar's height with a little air around it rather than filling it edge to edge.
+capsule              = true
+capsule_fill         = "surface_variant"
+capsule_opacity      = 0.88
+capsule_padding      = 8
+capsule_radius       = 2
+capsule_thickness    = 0.8
+
+## padding is the bar's own inner inset, which the capsules would otherwise sit
+## inside twice over. Spacing between the three islands is widget_spacing.
+padding        = 0
+widget_spacing = 10
 
 shadow          = false
 hover_highlight = true
 font_weight     = 500
 
+## Lanes name capsule groups rather than widgets; a "group:<id>" entry with no
+## matching capsule_group below is dropped with a warning at load.
+##
 ## Widget ids are upstream's own spelling, which is inconsistent on purpose:
 ## most are snake_case, "control-center" is not.
-start  = ["workspaces", "gap", "active_window"]
-center = ["clock"]
-end    = ["media", "gap", "tray", "notifications", "network", "bluetooth", "volume", "battery", "control-center"]
+start  = ["group:navigation"]
+center = ["group:time"]
+end    = ["group:status"]
+
+## Where you are, and what you are looking at.
+[[bar.default.capsule_group]]
+id      = "navigation"
+members = ["workspaces", "gap", "active_window"]
+
+[[bar.default.capsule_group]]
+id      = "time"
+members = ["clock"]
+
+## Everything that is a state rather than a place.
+[[bar.default.capsule_group]]
+id      = "status"
+members = ["media", "tray", "notifications", "network", "bluetooth", "volume", "battery", "control-center"]
 
 [widget.gap]
 type   = "spacer"
