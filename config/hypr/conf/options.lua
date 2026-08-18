@@ -53,6 +53,24 @@ KB_OPTIONS = "caps:ctrl_modifier"
 WORKSPACE_BAND = 10
 
 ------------------------------------------------------------------------------
+-- Pointer
+------------------------------------------------------------------------------
+
+-- Two-finger scrolling that moves the *content* rather than the viewport, i.e.
+-- the phone/macOS direction. This is a touchpad-only setting -- libinput
+-- applies it to touchpad devices, never to a wheel -- so it is safe to leave
+-- on for every machine: a desktop simply has no device it applies to, and a
+-- laptop gets the direction that matches its trackpad gestures.
+TOUCHPAD_NATURAL_SCROLL = true
+
+-- Cursor theme. Bibata is what ~/repos/dots already installs and what is on
+-- this machine; anything under /usr/share/icons or ~/.icons with a
+-- cursors/ directory works. Set to "" to leave the theme alone and inherit
+-- whatever the system default is.
+CURSOR_THEME = "Bibata-Modern-Classic"
+CURSOR_SIZE  = 24
+
+------------------------------------------------------------------------------
 -- Behaviour toggles
 ------------------------------------------------------------------------------
 
@@ -76,14 +94,23 @@ BAR_FOLLOWS_PANELS = true
 -- Look
 ------------------------------------------------------------------------------
 
--- Carried over from ~/repos/dots. The generous outer gap earns its keep here:
--- it is what you see the blurred wallpaper through.
-GAPS_IN  = 5
-GAPS_OUT = 20
+-- Tightened from the 5/20 carried over from ~/repos/dots. The outer gap is
+-- what you see the blurred wallpaper through, so it has a job -- but 20px on
+-- every edge costs 40px of a column's width and reads as padding rather than
+-- as framing. 10 still shows the wallpaper between windows and the screen
+-- edge; the inner gap only has to keep two borders from touching.
+--
+-- Concretely, on the 3440px ultrawide: a third-width column goes from 1107px
+-- of usable space to 1127px, and three of them stop looking like a form.
+GAPS_IN  = 4
+GAPS_OUT = 10
 BORDER   = 2
-ROUNDING = 10
+ROUNDING = 8
 
--- Animations are off in ~/repos/dots. Kept off: it is the most consistent
--- choice for a setup whose whole point is not pulling your eye around. Set to
--- true for the short, non-bouncy set defined in conf/look.lua.
-ANIMATIONS = false
+-- The short, non-bouncy set defined in conf/look.lua: nothing longer than
+-- ~150ms, no overshoot, and no animation at all on anything that happens while
+-- you type. Motion here is telling you where the tape went -- with a scrolling
+-- layout, a column that teleports is genuinely harder to follow than one that
+-- slides. Blur is already on, so the incremental GPU cost of animating is
+-- small; set to false if you want the old instant behaviour back.
+ANIMATIONS = true

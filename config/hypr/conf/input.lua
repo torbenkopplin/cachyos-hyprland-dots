@@ -22,7 +22,10 @@ hl.config({
         repeat_delay = 250,
 
         touchpad = {
-            natural_scroll    = false,   -- as in ~/repos/dots
+            -- Touchpad only: libinput never applies this to a wheel, so the
+            -- desktop's mouse keeps scrolling the way it always did. See
+            -- TOUCHPAD_NATURAL_SCROLL in conf/options.lua.
+            natural_scroll    = TOUCHPAD_NATURAL_SCROLL,
             disable_while_typing = true,
             clickfinger_behavior = true,
             scroll_factor     = 0.6,

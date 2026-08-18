@@ -8,10 +8,11 @@ hl.config({
         border_size = BORDER,
 
         col = {
-            -- Fallbacks only. Noctalia ships no Hyprland template, so borders
-            -- are themed by our own user template instead: it renders
+            -- Fallbacks only. Noctalia's built-in hyprland template emits
+            -- hyprland.conf syntax, which is no use to a Lua config, so
+            -- borders are themed by our own user template instead: it renders
             -- hypr/generated/colors.lua from the palette, which hyprland.lua
-            -- requires last and which therefore overrides these two lines.
+            -- dofiles last and which therefore overrides these two lines.
             -- See config/noctalia/40-templates.toml.
             active_border   = "rgba(7f9cc4ff)",
             inactive_border = "rgba(2a2e36aa)",
@@ -61,20 +62,41 @@ hl.config({
 })
 
 ------------------------------------------------------------------------------
--- Animations: short, linear-ish, no bounce. Motion should tell you where the
--- tape went, then get out of the way.
+-- Animations: short, no bounce. Motion tells you where the tape went, then
+-- gets out of the way.
+--
+-- Hyprland's speed is a DURATION in deciseconds -- speed = 3 is 300ms -- so
+-- bigger is slower. The set below runs 100-250ms, which is roughly the range
+-- where movement reads as continuous without being something you wait for.
+-- The old values were 350-600ms: fine as decoration, too slow for a layout you
+-- drive at typing speed, and long enough that two quick keypresses queue up.
+--
+-- Cost is negligible against the blur that is already on. These animate the
+-- position and alpha of surfaces the compositor composites either way; nothing
+-- here adds a render pass.
 ------------------------------------------------------------------------------
 
+-- No overshoot in either curve: a window that springs past its target and
+-- comes back is exactly the kind of motion this config exists to avoid.
 hl.curve("snap",   { type = "bezier", points = { { 0.2, 1.0 }, { 0.3, 1.0 } } })
 hl.curve("linear", { type = "bezier", points = { { 0, 0 }, { 1, 1 } } })
 
-hl.animation({ leaf = "global",        enabled = true, speed = 4,   bezier = "snap" })
-hl.animation({ leaf = "windows",       enabled = true, speed = 3.5, bezier = "snap" })
-hl.animation({ leaf = "windowsIn",     enabled = true, speed = 3,   bezier = "snap",   style = "popin 92%" })
-hl.animation({ leaf = "windowsOut",    enabled = true, speed = 2.5, bezier = "linear", style = "popin 92%" })
-hl.animation({ leaf = "border",        enabled = true, speed = 6,   bezier = "linear" })
-hl.animation({ leaf = "fade",          enabled = true, speed = 3,   bezier = "linear" })
-hl.animation({ leaf = "workspaces",    enabled = true, speed = 3,   bezier = "snap",   style = "slidevert" })
-hl.animation({ leaf = "layers",        enabled = true, speed = 4,   bezier = "snap" })
-hl.animation({ leaf = "layersIn",      enabled = true, speed = 4,   bezier = "snap",   style = "fade" })
-hl.animation({ leaf = "layersOut",     enabled = true, speed = 3,   bezier = "linear", style = "fade" })
+hl.animation({ leaf = "global",        enabled = true, speed = 2.5, bezier = "snap" })
+hl.animation({ leaf = "windows",       enabled = true, speed = 2.5, bezier = "snap" })
+hl.animation({ leaf = "windowsIn",     enabled = true, speed = 2,   bezier = "snap",   style = "popin 92%" })
+hl.animation({ leaf = "windowsOut",    enabled = true, speed = 1.8, bezier = "linear", style = "popin 92%" })
+
+-- The border is the focus indicator, so it is the one thing that should feel
+-- instant: 100ms is enough to avoid a hard flicker and not enough to lag
+-- behind hjkl held down.
+hl.animation({ leaf = "border",        enabled = true, speed = 1,   bezier = "linear" })
+hl.animation({ leaf = "fade",          enabled = true, speed = 1.5, bezier = "linear" })
+
+-- Workspaces slide vertically because that is the direction they are stacked
+-- in (J/K walks them); a horizontal slide would fight the tape, which is what
+-- H/L moves along.
+hl.animation({ leaf = "workspaces",    enabled = true, speed = 2.5, bezier = "snap",   style = "slidevert" })
+
+hl.animation({ leaf = "layers",        enabled = true, speed = 2,   bezier = "snap" })
+hl.animation({ leaf = "layersIn",      enabled = true, speed = 2,   bezier = "snap",   style = "fade" })
+hl.animation({ leaf = "layersOut",     enabled = true, speed = 1.5, bezier = "linear", style = "fade" })
