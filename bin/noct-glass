@@ -209,10 +209,21 @@ write_zen() {
  * browsers/zen/user.js sets, and it does nothing at all unless the transparency
  * mod has made the browser transparent in the first place.
  *
- * The :root prefix is load-bearing. The mod writes the same element with
- * !important, and specificity is what settles two !important user rules. The
- * variable is defined here rather than through the mod's own preference, which
- * sets it further down the tree where inheritance cannot reach past it -- so
+ * WHY THE SELECTORS LOOK LIKE THAT
+ * The transparency mod paints the same element, with !important, from
+ *
+ *   :root:has([mod-sameerasw_zen_light_tint="1"]) .browserStack > browser
+ *
+ * which is specificity 0-3-1. Between two !important user rules, specificity is
+ * what decides -- and a plain \`:root .browserStack > browser\` is 0-2-1, so it
+ * loses and the page keeps the mod's 10% wash. Measured: the page area came out
+ * with an own alpha of 0, unchanged under two different compositor opacities.
+ * The id selector below is 1-1-1 and settles it; the tripled :root is 0-4-1 and
+ * covers the case where the window's id is not what we expect. Both are needed
+ * because an unknown selector in a comma list would invalidate the whole rule.
+ *
+ * The variable is set here rather than through the mod's own preference, which
+ * defines it further down the tree where inheritance cannot reach past it -- so
  * user.js leaves that preference off.
  */
 
@@ -223,7 +234,14 @@ write_zen() {
   ) !important;
 }
 
-:root .browserStack > browser {
+#main-window .browserStack > browser {
+  background-color: light-dark(
+    rgba(245, 245, 245, $factor),
+    rgba(18, 18, 18, $factor)
+  ) !important;
+}
+
+:root:root:root .browserStack > browser {
   background-color: light-dark(
     rgba(245, 245, 245, $factor),
     rgba(18, 18, 18, $factor)

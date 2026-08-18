@@ -606,6 +606,15 @@ it needs looking at rather than reading back — **restart Zen first**, since
       head -2 ~/.config/zen/*/chrome/userChrome.css
       noct-glass show          # window / terminal / browser
       ```
+- [ ] The page area is actually tinted, which is worth *measuring* rather than
+      eyeballing — the failure mode is silent. Capture a flat part of the page at
+      two compositor opacities (§8c has the arithmetic): if the page's own alpha
+      comes out at **0**, unchanged between the two, the stylesheet is not winning
+      and you are looking at the transparency mod's own 10% wash. That is what
+      happened first time round: the mod paints the same element with `!important`
+      from a `:has()`-wrapped selector at specificity 0-3-1, which beats a plain
+      `:root .browserStack > browser` at 0-2-1. The generated sheet uses an id
+      selector (1-1-1) and a tripled `:root` (0-4-1) for that reason.
 - [ ] A page and a **window in the same focus state** read as the same shade:
       reddit next to a focused terminal, then click into the terminal and compare
       again. `browser` sits 0.02 under `window`, deliberately inside the 0.06 the
@@ -733,6 +742,7 @@ something misbehaves:
 | ~~A capsule outline draws when `capsule_border` is set~~ | **Disproven 2026-08-18.** The colour applies to nothing on its own; the only width available is `border_width`, which outlines the *bar* — and with an invisible bar that draws a full-width line above and below the capsules. Left unset | `10-bar.toml` |
 | ~~Two windows at the same glass level look the same~~ | **Disproven 2026-08-18 by measurement.** With `blur.xray`, each window samples the wallpaper behind itself; at `size 8 / passes 2` the backdrops behind two kitty windows differed by 24-41 of 255 and the windows read 4-6 levels apart, at an identical measured own-alpha of 1.00. `size 32 / passes 4` with `brightness 0.65` and `vibrancy 0.05` brings that to 2 levels | `bin/noct-glass`, `conf/look.lua` |
 | ~~`capsule_fill` and `capsule_opacity` style a bar capsule group~~ | **Disproven 2026-08-18 on v5.0.0-beta.8.** Both are accepted, appear in `config export merged`, and are ignored for group capsules, which draw as opaque `surface_variant` — verified by setting the fill to `#ff0000` and watching nothing turn red. Radius, padding and thickness do apply. The keys are left out of `10-bar.toml` rather than left in lying | `10-bar.toml` |
+| ~~`:root .browserStack > browser` overrides the transparency mod~~ | **Disproven 2026-08-18 by measurement.** The mod paints that element `!important` from `:root:has([mod-sameerasw_zen_light_tint="1"]) …`, specificity 0-3-1 against 0-2-1 — so the page kept the mod's 10% wash and measured an own alpha of 0. The generated sheet now uses `#main-window …` (1-1-1) plus a tripled `:root` (0-4-1) | `bin/noct-glass` |
 | Noctalia gives a dmenu provider ~2 seconds | **Measured 2026-08-18**: a provider that runs longer is SIGTERMed (exit 143) and the launcher shows "No results found". Undocumented, so it could change — re-measure with a `sleep 3` provider if lists start emptying | `bin/noct-common.sh` |
 | Hyprland pauses idle notifications while a client holds a Wayland idle inhibitor | Protocol behaviour, and the layer the windowed-browser-video case rests on. The two window rules are the belt and braces | `conf/rules.lua`, `70-idle.toml` |
 | `shelly install standard/aur --no-confirm` is non-interactive enough for a script | It authenticates through **polkit**, so it needs an agent; in a bare TTY it fails and the pacman path takes over. Both paths are exercised by `--dry-run` | `install.sh` |
