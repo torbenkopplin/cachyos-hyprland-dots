@@ -1,0 +1,1224 @@
+#!/usr/bin/env bash
+# noct-check -- runnable checks for the parts of this setup that fail silently.
+#
+#   noct-check                 run every non-invasive check
+#   noct-check --all           also run the ones that disturb the screen
+#   noct-check --list          print the check names
+#   noct-check <name> [...]    run only these, invasive or not
+#
+# Why this exists
+# ---------------
+# TESTING.md is a checklist for things only a human can judge -- does the
+# animation feel right, did the prompt window appear. Everything in here is the
+# opposite: a fact about the running session that is easy to measure and easy
+# to be wrong about by eye. Every check below corresponds to something that was
+# actually broken and was NOT obvious from looking at the screen:
+#
+#   session-path      the launcher providers all returned "No results found",
+#                     which is also exactly what a working provider with
+#                     nothing to report looks like.
+#   provider-run      a provider that dies still shows an empty list.
+#   glass-live        the config on disk and the running session disagreed for
+#                     an entire session without anything saying so.
+#   glass-visible     the frosted glass was mathematically present and visually
+#                     absent -- 7 levels of 255. Nothing but a measurement
+#                     tells you which side of that line you are on.
+#   keyword-inert     `hyprctl keyword` is silently a no-op under the Lua
+#                     parser, so an A/B test written with it measures nothing
+#                     and reports success.
+#
+# Exit status is 0 only if every check that ran passed.
+
+set -uo pipefail
+export LC_ALL=C
+
+CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
+BIN_HOME=${BIN_HOME:-$HOME/.local/bin}
+REPO_BIN=$(dirname "$(readlink -f "$0")")
+
+NON_INVASIVE=(session-path uwsm-env provider-resolve provider-run
+              glass-config glass-live glass-legible zen-sheet keyword-inert)
+INVASIVE=(glass-visible kitty-live blur-stacks zen-page monitor-hop column-hop)
+
+# The thresholds glass-visible judges against. Both are in levels of 255, as
+# seen -- i.e. after the window's opacity has already been applied to them.
+#
+#   LIFT      how much brighter the window is than it would be if it were
+#             opaque. Below about 10 this is not a look, it is a rounding
+#             error: the 0.82/brightness-0.65 combination measured 7 and read
+#             as flat grey.
+#   STRUCTURE the spatial variation of the backdrop, which is what makes it
+#             read as a window onto something rather than as a tint. A flat
+#             wash scores near 0 whatever its lift.
+LIFT_MIN=${LIFT_MIN:-12}
+STRUCTURE_MIN=${STRUCTURE_MIN:-4}
+
+# glass-legible: the WCAG AA floor for body text. Not an aesthetic threshold --
+# 4.5:1 is where text stops being comfortable to read for people who need the
+# contrast, and a desktop-wide opacity is exactly the kind of change that walks
+# a terminal under it without anything looking obviously wrong.
+CONTRAST_MIN=${CONTRAST_MIN:-4.5}
+
+# The floor for glyph opacity. Contrast alone does not catch "the text looks
+# faded": the compositor lifts the background at the same time as it dims the
+# glyphs, so the ratio holds up while everything visibly greys out. At window
+# 0.60 the ink measured 78% of the foreground and read as washed out at a
+# perfectly legal 5.3:1.
+#
+# This is asserted against the CONFIGURED window level rather than against
+# pixels, and that is deliberate. The compositor applies `window` to glyphs and
+# background alike, so the window level IS the glyph opacity -- exactly, by
+# construction, with nothing to measure. Measuring it off the screen instead
+# makes the answer depend on how much bright text the terminal happens to be
+# showing: the same desktop scored 0.90 with a full screen of output and 0.77
+# ten minutes later when most of it was dim grey. The measured value is still
+# reported, as information; glass-live is what checks the session matches the
+# config it is being judged by.
+GLYPH_MIN=${GLYPH_MIN:-0.80}
+
+PASS=0; FAIL=0; SKIP=0
+GREEN=$'\e[32m'; RED=$'\e[31m'; YELLOW=$'\e[33m'; DIM=$'\e[2m'; RESET=$'\e[0m'
+[[ -t 1 ]] || { GREEN=; RED=; YELLOW=; DIM=; RESET=; }
+
+pass() { printf '%sPASS%s  %-16s %s\n' "$GREEN" "$RESET" "$1" "${2-}"; PASS=$((PASS+1)); }
+fail() { printf '%sFAIL%s  %-16s %s\n' "$RED"   "$RESET" "$1" "${2-}"; FAIL=$((FAIL+1)); }
+skip() { printf '%sSKIP%s  %-16s %s\n' "$YELLOW" "$RESET" "$1" "${2-}"; SKIP=$((SKIP+1)); }
+info() { printf '      %s%s%s\n' "$DIM" "$1" "$RESET"; }
+
+# ---------------------------------------------------------------------------
+# The session's environment
+#
+# Everything the shell spawns inherits it, and it is not the environment you
+# get in a terminal -- fish builds that per terminal, long after the compositor
+# started. Read it from the process rather than asking a shell.
+# ---------------------------------------------------------------------------
+
+session_path() {
+    local pid
+    pid=$(pgrep -x noctalia | head -1) || return 1
+    [[ -n $pid ]] || return 1
+    tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | sed -n 's/^PATH=//p' | head -1
+}
+
+check_session_path() {
+    local path
+    path=$(session_path) || { skip session-path "noctalia is not running"; return; }
+
+    if [[ ":$path:" == *":$BIN_HOME:"* ]]; then
+        pass session-path "$BIN_HOME is on the shell's PATH"
+    else
+        fail session-path "$BIN_HOME is missing from the running shell's PATH"
+        info "every /aout /ain /bt /net /power /theme entry will answer \"No results found\""
+        info "and SUPER+SHIFT+G will do nothing. Fix: ./install.sh, then log out and in."
+        info "got: $path"
+    fi
+}
+
+check_uwsm_env() {
+    local f=$CONFIG_HOME/uwsm/env
+    [[ -f $f ]] || { fail uwsm-env "$f does not exist -- run ./install.sh"; return; }
+
+    if ! sh -n "$f" 2>/dev/null; then
+        fail uwsm-env "$f is not valid POSIX sh (uwsm sources it with /bin/sh, not fish)"
+        return
+    fi
+
+    # Sourcing it from a deliberately bare PATH is the only check that means
+    # anything: the file is a no-op if the directory is already there.
+    local got
+    got=$(env -i HOME="$HOME" PATH=/usr/bin sh -c ". '$f'; printf '%s' \"\$PATH\"")
+    if [[ ":$got:" == *":$BIN_HOME:"* ]]; then
+        pass uwsm-env "puts $BIN_HOME on PATH from a bare environment"
+    else
+        fail uwsm-env "sourcing it does not add $BIN_HOME (got: $got)"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# The launcher providers
+#
+# Run them the way the launcher does -- through `sh -lc`, under the session's
+# PATH -- rather than the way a terminal would. That difference is the entire
+# bug this checks for.
+# ---------------------------------------------------------------------------
+
+launcher_toml() { printf '%s' "$CONFIG_HOME/noctalia/20-launcher.toml"; }
+
+# Every `command = "..."` in the launcher config, one per line.
+provider_commands() {
+    local toml; toml=$(launcher_toml)
+    [[ -f $toml ]] || return 1
+    sed -n 's/^[[:space:]]*command[[:space:]]*=[[:space:]]*"\(.*\)"[[:space:]]*$/\1/p' "$toml"
+}
+
+# Both `command` and `exec`, reduced to the binary each one invokes.
+provider_binaries() {
+    local toml; toml=$(launcher_toml)
+    [[ -f $toml ]] || return 1
+    sed -n 's/^[[:space:]]*\(command\|exec\)[[:space:]]*=[[:space:]]*"\(.*\)"[[:space:]]*$/\2/p' "$toml" \
+        | awk '{print $1}' | sort -u
+}
+
+# The PATH the providers are tried under. NOCT_CHECK_PATH overrides it, which
+# is how you confirm the providers themselves are healthy while the session is
+# still running the old environment -- run
+#
+#   NOCT_CHECK_PATH=$PATH noct-check provider-resolve provider-run
+#
+# from a terminal that has ~/.local/bin, and a pass there plus a session-path
+# failure localises the problem to the session environment and nothing else.
+provider_path() {
+    [[ -n ${NOCT_CHECK_PATH-} ]] && { printf '%s' "$NOCT_CHECK_PATH"; return 0; }
+    session_path
+}
+
+check_provider_resolve() {
+    local path bins missing=() b
+    path=$(provider_path) || path=$PATH
+    bins=$(provider_binaries) || { skip provider-resolve "no 20-launcher.toml"; return; }
+
+    while IFS= read -r b; do
+        [[ -n $b ]] || continue
+        env -i HOME="$HOME" PATH="$path" sh -lc "command -v $b" >/dev/null 2>&1 || missing+=("$b")
+    done <<<"$bins"
+
+    if (( ${#missing[@]} == 0 )); then
+        pass provider-resolve "every provider binary resolves under the session PATH"
+    else
+        fail provider-resolve "not found by the launcher: ${missing[*]}"
+        info "the launcher runs these through 'sh -lc'; /etc/profile does not add $BIN_HOME"
+    fi
+}
+
+check_provider_run() {
+    local path cmds problems=()
+    path=$(provider_path) || path=$PATH
+    cmds=$(provider_commands) || { skip provider-run "no 20-launcher.toml"; return; }
+
+    local cmd out lines start elapsed status
+    while IFS= read -r cmd; do
+        [[ -n $cmd ]] || continue
+        start=$(date +%s%N)
+        out=$(timeout 3 env -i HOME="$HOME" PATH="$path" \
+                  XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}" \
+                  sh -lc "$cmd" 2>/dev/null)
+        status=$?
+        elapsed=$(( ($(date +%s%N) - start) / 1000000 ))
+        lines=$(printf '%s' "$out" | grep -c . || true)
+
+        if (( status != 0 )); then
+            problems+=("\`$cmd\` exited $status$( ((status == 127)) && printf ' (not found on the session PATH)')")
+            continue
+        fi
+        if (( lines == 0 )); then
+            problems+=("\`$cmd\` printed nothing -- the launcher shows this as \"No results found\"")
+            continue
+        fi
+        # A payload reaching the visible line is the bug bin/noct-common.sh's
+        # side map exists to prevent: MAC addresses and base64 blobs are what
+        # it would leak if the map were bypassed.
+        if printf '%s' "$out" | grep -qE '([0-9A-Fa-f]{2}[:_]){5}[0-9A-Fa-f]{2}|[A-Za-z0-9+/]{24,}={0,2}'; then
+            problems+=("\`$cmd\` leaks a device id or base64 payload into the visible line")
+            continue
+        fi
+        if (( elapsed > 2000 )); then
+            problems+=("\`$cmd\` took ${elapsed}ms -- the launcher feels broken above ~2s")
+            continue
+        fi
+        info "$(printf '%-28s %3d lines  %4dms' "$cmd" "$lines" "$elapsed")"
+    done <<<"$cmds"
+
+    if (( ${#problems[@]} == 0 )); then
+        pass provider-run "every provider answers under the session PATH"
+    else
+        fail provider-run "${#problems[@]} provider(s) unusable from the launcher"
+        local p; for p in "${problems[@]}"; do info "$p"; done
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# The glass
+# ---------------------------------------------------------------------------
+
+HYPR_GLASS=$CONFIG_HOME/hypr/generated/glass.lua
+KITTY_GLASS=$CONFIG_HOME/kitty/generated-glass.conf
+
+# lua_num <key> -- a numeric field out of the generated Lua.
+lua_num() { sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*\([0-9.]*\).*/\1/p" "$HYPR_GLASS" | head -1; }
+
+# live_num <hyprland option> -- the value the compositor is actually using.
+live_num() { hyprctl getoption "$1" 2>/dev/null | sed -n 's/^\(float\|int\): //p' | head -1; }
+
+# Equal to two decimals, which is the precision everything here is written at.
+num_eq() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a - b < 0.005 && b - a < 0.005) }'; }
+
+check_glass_config() {
+    [[ -f $HYPR_GLASS ]]  || { fail glass-config "$HYPR_GLASS missing -- run 'noct-glass apply'"; return; }
+    [[ -f $KITTY_GLASS ]] || { fail glass-config "$KITTY_GLASS missing -- run 'noct-glass apply'"; return; }
+
+    local levels win term
+    levels=$("$REPO_BIN/noct-glass" show 2>/dev/null) || { fail glass-config "noct-glass show failed"; return; }
+    win=$(awk '{print $2}' <<<"$levels")
+    term=$(awk '{print $4}' <<<"$levels")
+
+    local lua_win kitty_factor want_factor
+    lua_win=$(lua_num active_opacity)
+    kitty_factor=$(sed -n 's/^background_opacity[[:space:]]*//p' "$KITTY_GLASS" | head -1)
+    want_factor=$(awk -v t="$term" -v w="$win" 'BEGIN { f = t / w; if (f > 1) f = 1; printf "%.2f", f }')
+
+    if ! num_eq "$lua_win" "$win"; then
+        fail glass-config "glass.lua says active_opacity $lua_win, noct-glass says window $win"
+        return
+    fi
+    if ! num_eq "$kitty_factor" "$want_factor"; then
+        fail glass-config "kitty background_opacity is $kitty_factor, should be $want_factor for terminal $term / window $win"
+        return
+    fi
+    pass glass-config "generated files agree with glass.conf ($levels)"
+}
+
+check_glass_live() {
+    command -v hyprctl >/dev/null 2>&1 || { skip glass-live "no hyprctl"; return; }
+    [[ -f $HYPR_GLASS ]] || { skip glass-live "nothing generated yet"; return; }
+
+    # Pairs of "generated Lua key" -> "hyprctl option". A mismatch here means
+    # the session is running something other than what is on disk, which is
+    # what happens when a reload is skipped or a `keyword` is believed.
+    local -a keys=(active_opacity   decoration:active_opacity
+                   inactive_opacity decoration:inactive_opacity
+                   size             decoration:blur:size
+                   passes           decoration:blur:passes
+                   brightness       decoration:blur:brightness
+                   vibrancy         decoration:blur:vibrancy)
+    local i want got bad=()
+    for ((i = 0; i < ${#keys[@]}; i += 2)); do
+        want=$(lua_num "${keys[i]}")
+        got=$(live_num "${keys[i+1]}")
+        [[ -n $want && -n $got ]] || continue
+        num_eq "$want" "$got" || bad+=("${keys[i+1]}: session $got, file $want")
+    done
+
+    if (( ${#bad[@]} == 0 )); then
+        pass glass-live "the session matches generated/glass.lua"
+    else
+        fail glass-live "the session and the generated config disagree"
+        local b; for b in "${bad[@]}"; do info "$b"; done
+        info "fix: noct-glass apply (which reloads); 'hyprctl keyword' cannot do it -- see keyword-inert"
+    fi
+}
+
+check_keyword_inert() {
+    command -v hyprctl >/dev/null 2>&1 || { skip keyword-inert "no hyprctl"; return; }
+
+    # Deliberately a no-op value: whatever is already in force.
+    local cur reply
+    cur=$(live_num decoration:active_opacity)
+    [[ -n $cur ]] || { skip keyword-inert "could not read the current opacity"; return; }
+    reply=$(hyprctl keyword decoration:active_opacity "$cur" 2>&1)
+
+    if [[ $reply == *"non-legacy parsers"* ]]; then
+        pass keyword-inert "hyprctl keyword is refused, as expected under the Lua config"
+        info "so any A/B test must go through noct-glass, which writes the file and reloads"
+    elif [[ $reply == ok ]]; then
+        fail keyword-inert "hyprctl keyword now works -- glass-visible could use it, and this check is obsolete"
+    else
+        skip keyword-inert "unrecognised reply: $reply"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# glass-legible -- what the opacity costs the text
+#
+# The compositor cannot tell a window's glyphs from its background, so
+# active_opacity fades both. Usefully, the backdrop cancels:
+#
+#   seen_text = text x a + backdrop x (1 - a)
+#   seen_bg   = bg   x a + backdrop x (1 - a)
+#   -------------------------------------------
+#   difference = (text - bg) x a
+#
+# Text contrast is therefore the window's own contrast multiplied by the window
+# level, with the wallpaper playing no part at all. That is why this is a
+# separate check from glass-visible and why the two pull against each other:
+# every step of opacity spent on seeing the wallpaper is taken directly out of
+# the text.
+#
+# Cheap enough to be non-invasive -- one screenshot, no settings touched.
+# ---------------------------------------------------------------------------
+
+# background_level <png> <geometry> -- the median grey of a patch.
+#
+# The median, and only the median. A terminal's background is the overwhelming
+# majority of its pixels, so p50 lands on it whatever is being displayed --
+# which makes it the one thing here that can be read off an arbitrary screen and
+# trusted. Everything else is derived; see check_glass_legible.
+background_level() {
+    magick "$1" -crop "$2" +repage -colorspace Gray -depth 8 gray:- 2>/dev/null \
+        | od -An -v -tu1 | tr -s ' ' '\n' | sed '/^$/d' | sort -n \
+        | awk '{ v[NR] = $1 } END { if (NR < 10000) exit 1; printf "%d", v[int(NR*0.50)+1] }'
+}
+
+# kitty_colour <foreground|background> -- that palette entry as a grey level.
+kitty_colour() {
+    local hex
+    hex=$(sed -n "s/^$1[[:space:]]*#\([0-9A-Fa-f]\{6\}\).*/\1/p" \
+              "$CONFIG_HOME/kitty/generated-colors.conf" 2>/dev/null | head -1)
+    [[ -n $hex ]] || return 1
+    printf '%d' "$(( (0x${hex:0:2} * 299 + 0x${hex:2:2} * 587 + 0x${hex:4:2} * 114) / 1000 ))"
+}
+
+# ---------------------------------------------------------------------------
+# glass-legible -- what the opacity costs the text
+#
+# The compositor cannot tell a window's glyphs from its background, so `window`
+# fades both. Two things follow, and they are checked differently.
+#
+# GLYPH OPACITY is exactly `window`, by construction. Nothing to measure.
+#
+# CONTRAST is derived rather than sampled, and that is the whole trick here.
+# Sampling it means finding "the text" in a screenshot, and there is no reliable
+# way to do that: a terminal's glyphs are about 1% of its pixels and most of
+# them are not the scheme's foreground -- dim greys, comment colours, whatever
+# is on screen. A percentile therefore measures the content, not the desktop.
+# The same session scored 9.4:1 and 4.1:1 twenty minutes apart with nothing
+# changed but the scrollback.
+#
+# So: measure the background, which IS robust, and compute the rest from numbers
+# that are already known exactly.
+#
+#   seen_bg = K x ko x a + B x (1 - ko x a)        -> solve for the backdrop B
+#   seen_fg = F x a + B x (1 - a)
+#
+# with K and F the scheme's background and foreground, ko kitty's own
+# background_opacity and a the window level. Only the first is measured.
+# ---------------------------------------------------------------------------
+
+check_glass_legible() {
+    command -v grim   >/dev/null 2>&1 || { skip glass-legible "grim is not installed"; return; }
+    command -v magick >/dev/null 2>&1 || { skip glass-legible "imagemagick is not installed"; return; }
+    command -v jq     >/dev/null 2>&1 || { skip glass-legible "jq is not installed"; return; }
+
+    local fg bg_colour ko level
+    fg=$(kitty_colour foreground)       || { skip glass-legible "no generated-colors.conf to read the scheme from"; return; }
+    bg_colour=$(kitty_colour background) || { skip glass-legible "no generated-colors.conf to read the scheme from"; return; }
+    ko=$(sed -n 's/^background_opacity[[:space:]]*//p' "$KITTY_GLASS" 2>/dev/null | head -1)
+    [[ -n $ko ]] || { skip glass-legible "nothing generated yet -- run 'noct-glass apply'"; return; }
+    level=$("$REPO_BIN/noct-glass" show 2>/dev/null | awk '{print $2}')
+
+    local pick mon geom cls
+    pick=$(hyprctl -j clients 2>/dev/null | hyprctl_pick_window kitty) || pick=
+    [[ -n $pick ]] || { skip glass-legible "no kitty window open to measure"; return; }
+    read -r mon geom cls <<<"$pick"
+
+    local tmp; tmp=$(mktemp -d)
+    grim -o "$mon" "$tmp/legible.png" 2>/dev/null || { rm -rf "$tmp"; skip glass-legible "grim failed"; return; }
+    local seen_bg
+    seen_bg=$(background_level "$tmp/legible.png" "$geom") || { rm -rf "$tmp"; skip glass-legible "patch too small"; return; }
+    rm -rf "$tmp"
+
+    local report
+    report=$(awk -v sbg="$seen_bg" -v K="$bg_colour" -v F="$fg" -v ko="$ko" -v a="$level" \
+                 -v want="$CONTRAST_MIN" -v gmin="$GLYPH_MIN" '
+        function lin(v,  c) { c = v / 255; return (c <= 0.03928) ? c / 12.92 : ((c + 0.055) / 1.055) ^ 2.4 }
+        BEGIN {
+            own = ko * a                      # how much of the terminal survives
+            b   = (own < 0.999) ? (sbg - K * own) / (1 - own) : 0
+            sfg = F * a + b * (1 - a)
+            ratio = (lin(sfg) + 0.05) / (lin(sbg) + 0.05)
+            printf "%.1f %.0f %.2f %d %d", b, sfg, ratio, (ratio >= want), (a >= gmin)
+        }')
+    local backdrop sfg ratio ok_ratio ok_glyph
+    read -r backdrop sfg ratio ok_ratio ok_glyph <<<"$report"
+
+    info "$(printf '%s: background %s on a backdrop of %s, text lands at %s of a foreground of %s' \
+                   "$cls" "$seen_bg" "$backdrop" "$sfg" "$fg")"
+    info "$(printf 'contrast %s:1 (want >= %s), glyph opacity %s (want >= %s)' \
+                   "$ratio" "$CONTRAST_MIN" "$level" "$GLYPH_MIN")"
+
+    if (( ok_ratio && ok_glyph )); then
+        pass glass-legible "text is bright and readable at the configured levels"
+        return
+    fi
+
+    if (( ! ok_glyph )); then
+        fail glass-legible "the compositor is fading glyphs to ${level}, below the ${GLYPH_MIN} floor"
+    else
+        fail glass-legible "text contrast works out at ${ratio}:1, below the ${CONTRAST_MIN}:1 floor"
+    fi
+    info "Glyph opacity is exactly 'window' -- the compositor applies it to text and"
+    info "background alike. The fix is to raise 'window' and take the glassiness out"
+    info "of 'terminal' instead, which kitty applies to the background only and"
+    info "costs nothing in ink."
+}
+
+# ---------------------------------------------------------------------------
+# kitty-live -- does a terminal pick up a new opacity without being restarted?
+#
+# The whole shape of glass.conf depends on the answer. If it does, `terminal`
+# can sit well below `window` and a terminal gets its translucency from kitty,
+# which fades the background and leaves the glyphs alone -- the only way to be
+# glassy and readable at the same time. If it does not, every change to
+# `terminal` leaves you with two shades of terminal until the last old window
+# is closed, and the levels have to be kept equal to avoid it.
+#
+# It was FALSE before 2026-08-19 and is true now, because kitty.conf gained
+# `dynamic_background_opacity yes`. That is a one-line difference with a large
+# consequence, which is exactly the kind of thing to have a test for.
+#
+# Measured on a throwaway window rather than yours: a probe kitty under the
+# noct-probe class, which conf/rules.lua floats and centres.
+# ---------------------------------------------------------------------------
+
+PROBE_CLASS=noct-probe
+
+# probe_geometry <class> -- wait for the probe's window and print
+# "<monitor> <cropgeom>", inset so borders and rounding stay out of the patch.
+probe_geometry() {
+    local want=$1 i out
+    for i in $(seq 1 40); do
+        out=$(hyprctl -j clients 2>/dev/null | jq -r --argjson mons "$(hyprctl -j monitors 2>/dev/null)" --arg want "$want" '
+            [ .[] | select(.class == $want) ] | .[0] as $w
+            | if $w == null or $w.size[0] < 100 then empty else
+                ($mons[] | select(.id == $w.monitor)) as $m
+                | ($w.size[0] * 0.2 | floor) as $ix
+                | ($w.size[1] * 0.2 | floor) as $iy
+                | "\($m.name) \($w.size[0] - 2*$ix)x\($w.size[1] - 2*$iy)+\($w.at[0] - $m.x + $ix)+\($w.at[1] - $m.y + $iy)"
+              end' 2>/dev/null)
+        [[ -n $out ]] && { printf '%s' "$out"; return 0; }
+        sleep 0.25
+    done
+    return 1
+}
+
+# mean_grey <png> <geom>
+mean_grey() {
+    magick "$1" -crop "$2" +repage -colorspace Gray -format '%[fx:mean*255]' info: 2>/dev/null
+}
+
+check_kitty_live() {
+    command -v kitty  >/dev/null 2>&1 || { skip kitty-live "kitty is not installed"; return; }
+    command -v grim   >/dev/null 2>&1 || { skip kitty-live "grim is not installed"; return; }
+    command -v magick >/dev/null 2>&1 || { skip kitty-live "imagemagick is not installed"; return; }
+    command -v jq     >/dev/null 2>&1 || { skip kitty-live "jq is not installed"; return; }
+    [[ -f $KITTY_GLASS ]] || { skip kitty-live "nothing generated yet -- run 'noct-glass apply'"; return; }
+
+    local saved probe_pid=0 tmp
+    saved=$(cat "$KITTY_GLASS")
+    tmp=$(mktemp -d)
+
+    # Put the file back and let every terminal re-read it BEFORE the probe is
+    # killed: signalling a process that is already shutting down is how the
+    # first version of this ended up reporting the probe as dying of SIGUSR1,
+    # which is alarming and wrong -- kitty handles it perfectly well.
+    cleanup_kitty_probe() {
+        printf '%s\n' "$saved" >"$KITTY_GLASS"
+        pkill -USR1 -x kitty >/dev/null 2>&1
+        (( probe_pid )) && { kill "$probe_pid" 2>/dev/null; wait "$probe_pid" 2>/dev/null; }
+        rm -rf "$tmp"
+    }
+    trap cleanup_kitty_probe EXIT INT TERM
+
+    # White, and blank. Blank because text would average into the measurement;
+    # white because what is being measured is the window moving between its own
+    # colour and its backdrop, and a near-black probe over a near-black terminal
+    # has almost nowhere to move -- that measured 5 levels and was worthless.
+    kitty --class "$PROBE_CLASS" --title "$PROBE_CLASS" -o background=#ffffff \
+          sh -c 'clear; sleep 60' >/dev/null 2>&1 &
+    probe_pid=$!
+
+    local geom mon crop
+    geom=$(probe_geometry "$PROBE_CLASS") || {
+        cleanup_kitty_probe; trap - EXIT INT TERM
+        skip kitty-live "the probe window never appeared"; return
+    }
+    read -r mon crop <<<"$geom"
+    sleep 1
+
+    local before after
+    grim -o "$mon" "$tmp/a.png" 2>/dev/null
+    before=$(mean_grey "$tmp/a.png" "$crop")
+
+    # Move only kitty's half. The compositor level is untouched, so anything
+    # that changes on screen came from the terminal re-reading its config.
+    local other
+    other=$(awk -v cur="$(sed -n 's/^background_opacity[[:space:]]*//p' "$KITTY_GLASS" | head -1)" \
+                'BEGIN { print (cur > 0.6) ? "0.30" : "1.00" }')
+    printf '# noct-check kitty-live probe\nbackground_opacity %s\n' "$other" >"$KITTY_GLASS"
+    pkill -USR1 -x kitty >/dev/null 2>&1
+    sleep 1
+
+    # The probe has to still be there. A window that vanished between the two
+    # captures would leave the second one measuring the wallpaper, which moves
+    # a long way and would read as a triumphant pass.
+    local geom2 mon2 crop2
+    geom2=$(probe_geometry "$PROBE_CLASS") || {
+        cleanup_kitty_probe; trap - EXIT INT TERM
+        skip kitty-live "the probe window disappeared mid-measurement"; return
+    }
+    read -r mon2 crop2 <<<"$geom2"
+    if [[ $mon2 != "$mon" || $crop2 != "$crop" ]]; then
+        cleanup_kitty_probe; trap - EXIT INT TERM
+        skip kitty-live "the probe window moved mid-measurement"; return
+    fi
+
+    grim -o "$mon" "$tmp/b.png" 2>/dev/null
+    after=$(mean_grey "$tmp/b.png" "$crop")
+
+    cleanup_kitty_probe; trap - EXIT INT TERM
+
+    local delta
+    delta=$(awk -v a="$before" -v b="$after" 'BEGIN { d = a - b; printf "%.1f", (d < 0) ? -d : d }')
+    info "$(printf 'probe background %.1f -> %.1f on SIGUSR1 (opacity moved to %s)' "$before" "$after" "$other")"
+
+    if awk -v d="$delta" 'BEGIN { exit !(d > 5) }'; then
+        pass kitty-live "kitty re-reads background_opacity on SIGUSR1"
+    else
+        fail kitty-live "kitty ignored the new background_opacity (moved $delta levels)"
+        info "without this, 'terminal' below 'window' leaves two shades of terminal until"
+        info "every old window is closed. Check dynamic_background_opacity in kitty.conf."
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# column-hop -- SUPER+CTRL+<hl> runs off the tape onto the next monitor
+#
+# The keymap has one rule and this is where it used to be broken: h/l is the
+# horizontal axis, j/k is the workspace axis. Focus and windows both run out of
+# columns and hand off to the monitor that way; the COLUMN used to hand off to
+# the next workspace instead, which put a workspace move on the horizontal keys
+# and made the whole chord feel arbitrary.
+#
+# Driven on a tiled probe, because a column is a thing only a tiled window has.
+# The probe deliberately does NOT use the noct-probe class: that one is floated
+# by conf/rules.lua, and a floating window has no column to push.
+# ---------------------------------------------------------------------------
+
+TAPE_CLASS=noct-probe-tape
+
+# tape_probe_monitor -- the monitor id the tiled probe is on, or empty.
+tape_probe_monitor() {
+    hyprctl -j clients 2>/dev/null | jq -r --arg c "$TAPE_CLASS" '.[]|select(.class==$c)|.monitor' | head -1
+}
+
+check_column_hop() {
+    command -v hyprctl >/dev/null 2>&1 || { skip column-hop "no hyprctl"; return; }
+    command -v kitty   >/dev/null 2>&1 || { skip column-hop "kitty is not installed"; return; }
+    command -v jq      >/dev/null 2>&1 || { skip column-hop "jq is not installed"; return; }
+
+    local count
+    count=$(hyprctl -j monitors 2>/dev/null | jq -r 'length')
+    (( count >= 2 )) || { skip column-hop "only one monitor -- nothing to hand off to"; return; }
+
+    local pid addr i
+    kitty --class "$TAPE_CLASS" --title "$TAPE_CLASS" sh -c 'sleep 60' >/dev/null 2>&1 &
+    pid=$!
+    for i in $(seq 1 40); do
+        addr=$(hyprctl -j clients 2>/dev/null | jq -r --arg c "$TAPE_CLASS" '.[]|select(.class==$c)|.address' | head -1)
+        [[ -n $addr ]] && break
+        sleep 0.25
+    done
+    [[ -n $addr ]] || {
+        kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+        skip column-hop "the probe window never appeared"; return
+    }
+
+    # A floating probe would have no column at all and the check would be
+    # measuring nothing.
+    if [[ $(hyprctl -j clients | jq -r --arg a "$addr" '.[]|select(.address==$a)|.floating') == true ]]; then
+        kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+        skip column-hop "the probe landed floating -- a window rule is catching $TAPE_CLASS"
+        return
+    fi
+
+    local dir start now crossed stuck=()
+    for dir in r l; do
+        start=$(tape_probe_monitor)
+        crossed=0
+        # Enough pushes to walk off any reasonable tape. Each one either swaps
+        # the column along or, at the end, hands it to the next monitor.
+        for i in 1 2 3 4 5 6; do
+            hyprctl dispatch "hl.dsp.window.focus({ address = \"$addr\" })" >/dev/null 2>&1
+            sleep 0.25
+            hyprctl eval "require(\"lib.nav\").column_horizontal(\"$dir\")" >/dev/null 2>&1
+            sleep 0.6
+            now=$(tape_probe_monitor)
+            [[ -n $now && $now != "$start" ]] && { crossed=1; break; }
+        done
+        (( crossed )) || stuck+=("$dir")
+    done
+
+    kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+
+    if (( ${#stuck[@]} == 0 )); then
+        pass column-hop "a column pushed off the tape lands on the next monitor"
+    else
+        fail column-hop "pushing the column never left the monitor: ${stuck[*]}"
+        info "nav.column_horizontal should call monitor_in_direction at the tape edge and"
+        info "move the whole column to that monitor's active workspace. If it is calling"
+        info "bands.neighbour instead, it is doing the old thing -- moving to the next"
+        info "workspace, which is what SUPER+CTRL+J/K is for."
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Zen
+#
+# The most fragile thing in this repo, because none of it is under our control:
+# the profile directory is named randomly, the stylesheet is read once at
+# startup, and the rule it has to win against belongs to somebody else's
+# extension. Two checks, and they cover different failures.
+#
+#   zen-sheet   static. Every managed profile has our sheet, at the alpha the
+#               levels imply, with selectors that still out-specify the
+#               transparency mod's. That last one is the regression that cost
+#               the most to find: the mod paints the same element !important
+#               from a 0-3-1 selector, so a plain `:root .browserStack > browser`
+#               at 0-2-1 loses silently and the page keeps the mod's wash.
+#
+#   zen-page    live. Measures the page area of a running Zen the same way
+#               glass-visible measures a window, and checks the answer is the
+#               `browser` level rather than nothing. This is the check that
+#               would have caught the specificity bug from the outside -- when
+#               the sheet was losing, the page's own alpha measured 0 and did
+#               not move between two compositor opacities.
+# ---------------------------------------------------------------------------
+
+# Profiles this repo manages: install.sh drops a user.js into each one, which is
+# also how noct-glass decides where to write.
+zen_profiles() {
+    local root
+    for root in "$CONFIG_HOME/zen" "$HOME/.zen"; do
+        [[ -d $root ]] || continue
+        find "$root" -mindepth 2 -maxdepth 2 -name user.js -printf '%h\n' 2>/dev/null
+    done
+}
+
+check_zen_sheet() {
+    local profiles
+    profiles=$(zen_profiles)
+    [[ -n $profiles ]] || { skip zen-sheet "no Zen profile carries this repo's user.js"; return; }
+
+    local levels win browser want problems=()
+    read -r win browser <<<"$("$REPO_BIN/noct-glass" show 2>/dev/null | awk '{print $2, $6}')"
+    want=$(awk -v b="$browser" -v w="$win" 'BEGIN { f = b / w; if (f > 1) f = 1; printf "%.2f", f }')
+
+    local prof sheet alpha
+    while IFS= read -r prof; do
+        [[ -n $prof ]] || continue
+        sheet=$prof/chrome/userChrome.css
+
+        if [[ ! -f $sheet ]]; then
+            problems+=("${prof##*/}: no chrome/userChrome.css -- run 'noct-glass apply'")
+            continue
+        fi
+        if ! grep -q "Generated by noct-glass" "$sheet"; then
+            problems+=("${prof##*/}: userChrome.css is not ours and was left alone")
+            continue
+        fi
+        if ! grep -q 'toolkit.legacyUserProfileCustomizations.stylesheets", *true' "$prof/user.js"; then
+            problems+=("${prof##*/}: user.js does not enable legacy stylesheets, so the sheet is never read")
+        fi
+
+        alpha=$(sed -n 's/.*rgba([0-9]*, *[0-9]*, *[0-9]*, *\([0-9.]*\)).*/\1/p' "$sheet" | head -1)
+        if ! num_eq "${alpha:-0}" "$want"; then
+            problems+=("${prof##*/}: sheet is at alpha ${alpha:-none}, should be $want for browser $browser / window $win")
+        fi
+
+        # Specificity, for every rule that paints the page area. The mod's is
+        # 0-3-1; a tie goes to whoever is later in the cascade, which is not
+        # something we control, so this wants a strict win.
+        local weak
+        weak=$(awk '
+            # Selector lines only. The file explains the specificity problem in
+            # its own header, so a naive grep for the selector finds the prose
+            # describing the bug and reports it as the bug.
+            /^[[:space:]]*[^*\/[:space:]]/ && /\.browserStack *> *browser/ && /\{[[:space:]]*$/ {
+                sel = $0
+                sub(/\{.*/, "", sel)
+                ids = gsub(/#/, "#", sel)
+                cls = gsub(/\./, ".", sel) + gsub(/\[/, "[", sel) + gsub(/:/, ":", sel)
+                if (ids == 0 && cls <= 3) print "  " sel
+            }' "$sheet")
+        [[ -n $weak ]] && problems+=("${prof##*/}: a page-area selector does not beat the transparency mod's 0-3-1:$weak")
+    done <<<"$profiles"
+
+    if (( ${#problems[@]} == 0 )); then
+        pass zen-sheet "every managed profile has our sheet at alpha $want, out-specifying the mod"
+    else
+        fail zen-sheet "${#problems[@]} problem(s) with the generated Zen stylesheet"
+        local pr; for pr in "${problems[@]}"; do info "$pr"; done
+    fi
+}
+
+check_zen_page() {
+    command -v grim   >/dev/null 2>&1 || { skip zen-page "grim is not installed"; return; }
+    command -v magick >/dev/null 2>&1 || { skip zen-page "imagemagick is not installed"; return; }
+    command -v jq     >/dev/null 2>&1 || { skip zen-page "jq is not installed"; return; }
+
+    # The page area, not the window: Zen puts its tabs down the left and its
+    # toolbar across the top, and neither is painted by the rule under test.
+    local pick mon geom
+    pick=$(hyprctl -j clients 2>/dev/null | jq -r --argjson mons "$(hyprctl -j monitors 2>/dev/null)" '
+        [ .[] | select(.class == "zen" and .size[0] > 400 and .size[1] > 400) ] | .[0] as $w
+        | if $w == null then empty else
+            ($mons[] | select(.id == $w.monitor)) as $m
+            | "\($m.name) \(($w.size[0]*0.45|floor))x\(($w.size[1]*0.45|floor))+\($w.at[0] - $m.x + ($w.size[0]*0.45|floor))+\($w.at[1] - $m.y + ($w.size[1]*0.45|floor))"
+          end')
+    [[ -n $pick ]] || { skip zen-page "no Zen window open -- start the browser and rerun"; return; }
+    read -r mon geom <<<"$pick"
+
+    [[ -f $OVERRIDE_FILE ]] && { HAD_OVERRIDE=1; SAVED_OVERRIDE=$(cat "$OVERRIDE_FILE"); }
+    trap restore_glass EXIT INT TERM
+
+    local tmp seen own back rc
+    tmp=$(mktemp -d)
+    zen_unstable() {
+        restore_glass; trap - EXIT INT TERM; rm -rf "$tmp"
+        skip zen-page "the page changed mid-measurement -- rerun on a page that is not animating"
+    }
+
+    seen=$(capture_stable "$mon" "$geom" "$tmp/seen"); rc=$?
+    (( rc == 2 )) && { zen_unstable; return; }
+    "$REPO_BIN/noct-glass" set 1.00 >/dev/null 2>&1; sleep 1
+    own=$(capture_stable "$mon" "$geom" "$tmp/own"); rc=$?
+    (( rc == 2 )) && { zen_unstable; return; }
+    "$REPO_BIN/noct-glass" set 0.02 >/dev/null 2>&1; sleep 1
+    back=$(capture_stable "$mon" "$geom" "$tmp/back"); rc=$?
+    restore_glass; trap - EXIT INT TERM
+    (( rc == 2 )) && { rm -rf "$tmp"; skip zen-page "the page changed mid-measurement"; return; }
+    rm -rf "$tmp"
+
+    local seen_mean own_mean back_mean
+    read -r seen_mean _ <<<"$seen"
+    read -r own_mean  _ <<<"$own"
+    read -r back_mean _ <<<"$back"
+
+    local win browser want
+    read -r win browser <<<"$("$REPO_BIN/noct-glass" show 2>/dev/null | awk '{print $2, $6}')"
+
+    local report
+    report=$(awk -v sm="$seen_mean" -v k="$own_mean" -v bm="$back_mean" -v want="$browser" 'BEGIN {
+        b = (bm - 0.02 * k) / 0.98
+        span = k - b
+        a = (span > 1 || span < -1) ? (sm - b) / span : 1
+        if (a < 0) a = 0
+        if (a > 1) a = 1
+        d = a - want; if (d < 0) d = -d
+        printf "%.2f %.2f %d %d", a, b, (a > 0.05), (d < 0.12)
+    }')
+    local eff b alive close
+    read -r eff b alive close <<<"$report"
+
+    info "$(printf 'zen page: effective opacity %s against a configured browser level of %s (backdrop %s)' "$eff" "$browser" "$b")"
+
+    if (( ! alive )); then
+        fail zen-page "the page area has no opacity of its own -- the stylesheet is not winning"
+        info "an own alpha of 0 that does not move between two compositor levels is the"
+        info "signature of the transparency mod's rule beating ours. Check zen-sheet, and"
+        info "remember Zen reads userChrome.css once at startup."
+    elif (( ! close )); then
+        fail zen-page "the page is at $eff, not the configured $browser"
+        info "most likely the browser has not been restarted since the level changed."
+    else
+        pass zen-page "the page area composites at the browser level"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# monitor-hop -- SUPER+CTRL+SHIFT+<hjkl> actually lands on another monitor
+#
+# The bind was directional only, and a directional monitor selector resolves to
+# nothing when no monitor lies that way. On a desk whose second screen is to the
+# LEFT, "send it right" therefore did nothing at all -- and a keybind that
+# silently does nothing is indistinguishable from one that is not bound.
+#
+# It is worth a test rather than a look, because the obvious fix does not work
+# either: the dispatcher fails INSIDE Hyprland without raising a Lua error, so
+# a pcall around it returns true and any fallback behind that pcall never runs.
+# The version that looked right and did nothing passed every check but this one.
+#
+# Driven through `hyprctl eval`, which runs Lua in the compositor and is the
+# only way to reach a keybind's implementation without pressing the key. Note
+# that `hyprctl dispatch` is also Lua here -- the old shell syntax
+# (`dispatch movewindow mon:r`) is a parse error, not a move.
+# ---------------------------------------------------------------------------
+
+check_monitor_hop() {
+    command -v hyprctl >/dev/null 2>&1 || { skip monitor-hop "no hyprctl"; return; }
+    command -v kitty   >/dev/null 2>&1 || { skip monitor-hop "kitty is not installed"; return; }
+    command -v jq      >/dev/null 2>&1 || { skip monitor-hop "jq is not installed"; return; }
+
+    local count
+    count=$(hyprctl -j monitors 2>/dev/null | jq -r 'length')
+    (( count >= 2 )) || { skip monitor-hop "only one monitor -- nothing to hop to"; return; }
+    if (( count > 2 )); then
+        skip monitor-hop "$count monitors: the hop is strictly directional above two, so there is no all-directions guarantee to assert"
+        return
+    fi
+
+    local pid addr
+    kitty --class "$PROBE_CLASS" --title noct-probe-hop sh -c 'sleep 60' >/dev/null 2>&1 &
+    pid=$!
+    probe_geometry "$PROBE_CLASS" >/dev/null || {
+        kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+        skip monitor-hop "the probe window never appeared"; return
+    }
+    addr=$(hyprctl -j clients 2>/dev/null | jq -r --arg c "$PROBE_CLASS" '.[]|select(.class==$c)|.address' | head -1)
+
+    probe_monitor() { hyprctl -j clients 2>/dev/null | jq -r --arg a "$addr" '.[]|select(.address==$a)|.monitor'; }
+
+    local dir before after stuck=()
+    for dir in l r u d; do
+        hyprctl dispatch "hl.dsp.window.focus({ address = \"$addr\" })" >/dev/null 2>&1
+        sleep 0.3
+        before=$(probe_monitor)
+        hyprctl eval "require(\"lib.nav\").monitor_hop(\"$dir\")" >/dev/null 2>&1
+        sleep 0.6
+        after=$(probe_monitor)
+        [[ $before == "$after" ]] && stuck+=("$dir")
+    done
+
+    kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+
+    if (( ${#stuck[@]} == 0 )); then
+        pass monitor-hop "every direction moves the window to the other monitor"
+    else
+        fail monitor-hop "these directions did nothing: ${stuck[*]}"
+        info "with exactly two monitors nav.monitor_hop is meant to fall back to \"the"
+        info "other one\" when nothing lies in the direction asked for. Check that the"
+        info "fallback reads the monitor back rather than relying on pcall -- the"
+        info "dispatcher fails without raising."
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# blur-stacks -- do floating windows sample what is under them?
+#
+# `blur.xray` on means every window blurs the WALLPAPER rather than whatever is
+# beneath it. For the tape that is right -- tiled windows do not overlap. For a
+# floating window it is wrong: something is deliberately underneath, and the
+# translucency should compound with it.
+#
+# conf/rules.lua turns xray off for floating windows to get that. Whether
+# Hyprland actually honours an `xray` window rule is not something a config file
+# reports on -- an unknown rule key parses fine and does nothing, which is how
+# this repo has been bitten before. So: two probe windows, identical but for
+# their class, one of which conf/rules.lua deliberately keeps xray on for. If
+# the rule works, the stacking one is much darker, because a terminal is much
+# darker than a blurred photo.
+# ---------------------------------------------------------------------------
+
+# probe_background <background colour> <title> <own opacity> -- spawn a
+# throwaway kitty painted that colour at that opacity, wait for it, measure its
+# background, kill it, print the mean.
+#
+# Both the colour and the opacity go on the command line rather than through the
+# generated config: they then apply to this window and no other, so nobody's
+# terminal flickers to make a measurement.
+#
+# The colour matters. What every one of these checks measures is the window
+# moving between its own colour and its backdrop, and the size of that signal is
+# the distance between the two. A probe left at the scheme's near-black
+# background sitting over a near-black terminal has almost no distance to move:
+# with xray off that measured 5 levels, close enough to noise to be worthless.
+# White has somewhere to move from whatever is behind it.
+probe_background() {
+    local colour=$1 title=$2 opacity=$3 pid geom mon crop tmp mean
+
+    kitty --class "$PROBE_CLASS" --title "$title" \
+          -o "background_opacity=$opacity" -o "background=$colour" \
+          sh -c 'clear; sleep 60' >/dev/null 2>&1 &
+    pid=$!
+
+    geom=$(probe_geometry "$PROBE_CLASS") || { kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; return 1; }
+    read -r mon crop <<<"$geom"
+    sleep 1
+
+    tmp=$(mktemp -d)
+    grim -o "$mon" "$tmp/p.png" 2>/dev/null
+    mean=$(mean_grey "$tmp/p.png" "$crop")
+    rm -rf "$tmp"
+
+    kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+    printf '%s' "$mean"
+}
+
+# probe_rect <title> -- where a floating probe lands, as "<monitor> <cropgeom>".
+# Spawned and killed just to ask; conf/rules.lua decides the size and position,
+# so asking is more reliable than recomputing its arithmetic here.
+probe_rect() {
+    local title=$1 pid geom
+    kitty --class "$PROBE_CLASS" --title "$title" sh -c 'sleep 30' >/dev/null 2>&1 &
+    pid=$!
+    geom=$(probe_geometry "$PROBE_CLASS")
+    kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+    [[ -n $geom ]] || return 1
+    printf '%s' "$geom"
+}
+
+check_blur_stacks() {
+    command -v kitty  >/dev/null 2>&1 || { skip blur-stacks "kitty is not installed"; return; }
+    command -v grim   >/dev/null 2>&1 || { skip blur-stacks "grim is not installed"; return; }
+    command -v magick >/dev/null 2>&1 || { skip blur-stacks "imagemagick is not installed"; return; }
+    command -v jq     >/dev/null 2>&1 || { skip blur-stacks "jq is not installed"; return; }
+
+    # Without something tiled under where the probe lands there is nothing to
+    # stack against and the comparison is vacuous.
+    local tiled
+    tiled=$(hyprctl -j clients 2>/dev/null \
+            | jq -r '[ .[] | select(.floating == false and .size[0] > 400 and .size[1] > 400) ] | length')
+    (( tiled > 0 )) || { skip blur-stacks "no tiled window for a floating probe to sit on"; return; }
+
+    local rect mon crop
+    rect=$(probe_rect noct-probe-stack) || { skip blur-stacks "the probe window never appeared"; return; }
+    read -r mon crop <<<"$rect"
+
+    # What is on screen under that rectangle, before anything covers it. This is
+    # what a stacking window should end up sampling.
+    local tmp under
+    tmp=$(mktemp -d)
+    sleep 0.5
+    grim -o "$mon" "$tmp/under.png" 2>/dev/null
+    under=$(mean_grey "$tmp/under.png" "$crop")
+    rm -rf "$tmp"
+
+    # Nearly transparent, so what it shows is almost entirely its backdrop.
+    local probe
+    probe=$(probe_background "#ffffff" noct-probe-stack 0.02) \
+        || { skip blur-stacks "the probe window never appeared"; return; }
+
+    info "$(printf 'under the probe: %.1f; seen through the probe: %.1f' "$under" "$probe")"
+
+    # With xray on the probe would show the blurred wallpaper instead, which on
+    # a dark desktop is a long way from the window it is covering.
+    if awk -v u="$under" -v p="$probe" 'BEGIN { d = u - p; if (d < 0) d = -d; exit !(d < 20) }'; then
+        pass blur-stacks "a floating window samples the window beneath it"
+    else
+        fail blur-stacks "a floating window is not sampling what is under it"
+        info "blur_xray in glass.conf must be false for the effect to stack. Note that"
+        info "the per-window form does not work: Hyprland accepts \`xray\` as a window"
+        info "rule and ignores it -- it is a layer rule. See conf/rules.lua."
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# glass-visible -- the only check that measures what you actually see
+#
+# The arithmetic behind it, for a window over the wallpaper:
+#
+#   seen = own x opacity + backdrop x (1 - opacity)
+#
+# so what the frosted effect is *worth* is the distance between the window's
+# own colour and the backdrop, scaled by how much of the backdrop shows:
+#
+#   lift = (backdrop - own) x (1 - opacity)
+#
+# Both ends are measured rather than assumed: the window at opacity 1.00 is its
+# own colour, and the window at 0.02 is very nearly the backdrop. Everything in
+# between is linear, so two captures fix the whole line.
+#
+# This disturbs the screen for a few seconds and puts it back. If it is
+# interrupted, the trap restores the level it found.
+# ---------------------------------------------------------------------------
+
+STATE_HOME=${XDG_STATE_HOME:-$HOME/.local/state}
+OVERRIDE_FILE=$STATE_HOME/noctalia/glass-override
+SAVED_OVERRIDE=
+HAD_OVERRIDE=0
+
+# Put back exactly what was in force, which is not the same as re-applying:
+# `noct-glass apply` CLEARS the override before it applies, so writing the file
+# and then calling apply loses the very thing it was restoring. `set` is the
+# command that means "this level, and remember it".
+restore_glass() {
+    if (( HAD_OVERRIDE )); then
+        "$REPO_BIN/noct-glass" set "$SAVED_OVERRIDE" >/dev/null 2>&1 || true
+    else
+        "$REPO_BIN/noct-glass" apply >/dev/null 2>&1 || true
+    fi
+}
+
+# patch_mean <png> <geometry> -- mean and standard deviation in levels of 255.
+patch_stats() {
+    magick "$1" -crop "$2" +repage -colorspace Gray \
+        -format '%[fx:mean*255] %[fx:standard_deviation*255]' info: 2>/dev/null
+}
+
+# Capture twice and insist the two agree: a terminal scrolling mid-measurement
+# is the difference between a number and a guess.
+capture_stable() {
+    local mon=$1 geom=$2 out=$3 a b i
+    # Retried, because a browser is never perfectly still -- a cursor blink or a
+    # lazily-loaded image moves the mean a little. Three attempts turns "this
+    # page is busy" into a skip only when it really is.
+    for i in 1 2 3; do
+        grim -o "$mon" "$out.1.png" 2>/dev/null || return 1
+        grim -o "$mon" "$out.2.png" 2>/dev/null || return 1
+        a=$(patch_stats "$out.1.png" "$geom")
+        b=$(patch_stats "$out.2.png" "$geom")
+        if awk -v x="${a%% *}" -v y="${b%% *}" 'BEGIN { d = x - y; if (d < 0) d = -d; exit !(d < 1.0) }'; then
+            printf '%s' "$a"
+            return 0
+        fi
+        sleep 0.5
+    done
+    return 2
+}
+
+check_glass_visible() {
+    command -v grim   >/dev/null 2>&1 || { skip glass-visible "grim is not installed"; return; }
+    command -v magick >/dev/null 2>&1 || { skip glass-visible "imagemagick is not installed"; return; }
+    command -v hyprctl >/dev/null 2>&1 || { skip glass-visible "no hyprctl"; return; }
+    command -v jq     >/dev/null 2>&1 || { skip glass-visible "jq is not installed"; return; }
+
+    # The biggest tiled window on the focused monitor, and the monitor it is on.
+    local pick
+    pick=$(hyprctl -j clients 2>/dev/null | hyprctl_pick_window) || pick=
+    [[ -n $pick ]] || { skip glass-visible "no tiled window to measure"; return; }
+
+    local mon geom cls
+    read -r mon geom cls <<<"$pick"
+
+    [[ -f $OVERRIDE_FILE ]] && { HAD_OVERRIDE=1; SAVED_OVERRIDE=$(cat "$OVERRIDE_FILE"); }
+    trap restore_glass EXIT INT TERM
+
+    local tmp; tmp=$(mktemp -d)
+    local seen own back rc seen_mean own_mean back_mean back_sd
+
+    unstable() {
+        restore_glass; trap - EXIT INT TERM; rm -rf "$tmp"
+        skip glass-visible "the window's content changed mid-measurement -- rerun over something static"
+    }
+
+    # The configured state first, before anything is disturbed. This is the one
+    # that answers the question; the other two only calibrate it.
+    seen=$(capture_stable "$mon" "$geom" "$tmp/seen"); rc=$?
+    (( rc == 2 )) && { unstable; return; }
+
+    "$REPO_BIN/noct-glass" set 1.00 >/dev/null 2>&1
+    sleep 1
+    own=$(capture_stable "$mon" "$geom" "$tmp/own"); rc=$?
+    (( rc == 2 )) && { unstable; return; }
+
+    "$REPO_BIN/noct-glass" set 0.02 >/dev/null 2>&1
+    sleep 1
+    back=$(capture_stable "$mon" "$geom" "$tmp/back"); rc=$?
+    restore_glass; trap - EXIT INT TERM
+    (( rc == 2 )) && { rm -rf "$tmp"; skip glass-visible "the window's content changed mid-measurement"; return; }
+    rm -rf "$tmp"
+
+    read -r seen_mean _       <<<"$seen"
+    read -r own_mean  _       <<<"$own"
+    read -r back_mean back_sd <<<"$back"
+
+    local report
+    report=$(awk -v sm="$seen_mean" -v k="$own_mean" -v bm="$back_mean" -v bsd="$back_sd" \
+                 -v lmin="$LIFT_MIN" -v smin="$STRUCTURE_MIN" 'BEGIN {
+        # The 0.02 capture still carries 2% of the window; take that back out.
+        b = (bm - 0.02 * k) / 0.98
+
+        # Measured, not derived: whatever the window is doing -- compositor
+        # opacity, kitty background_opacity, a stylesheet, all three at once --
+        # this is how much brighter it is than the same window opaque.
+        lift = sm - k
+
+        # Effective opacity, whoever supplies it. Degenerate when a window and
+        # its backdrop are the same colour, and the ratio then says nothing.
+        span = k - b
+        a = (span > 1 || span < -1) ? (sm - b) / span : 1
+        if (a < 0) a = 0
+        if (a > 1) a = 1
+
+        str = bsd * (1 - a)
+        printf "%.1f %.1f %.1f %.2f %.1f %d", k, b, lift, a, str, (lift >= lmin && str >= smin)
+    }')
+    local k b lift a str ok
+    read -r k b lift a str ok <<<"$report"
+
+    info "$(printf '%s: own colour %s, backdrop %s of 255, effective opacity %s' "$cls" "$k" "$b" "$a")"
+    info "$(printf 'lift %s (want >= %s), structure %s (want >= %s)' "$lift" "$LIFT_MIN" "$str" "$STRUCTURE_MIN")"
+
+    # A terminal that is sitting at the COMPOSITOR's level rather than its own
+    # is one that has not re-read background_opacity -- either it predates
+    # dynamic_background_opacity in kitty.conf, or the reload never reached it.
+    # Worth naming, because the numbers below then describe a window that is not
+    # configured the way the file says it is, and no amount of retuning fixes it.
+    local cfg_win cfg_term
+    read -r cfg_win cfg_term _ <<<"$("$REPO_BIN/noct-glass" show 2>/dev/null | awk '{print $2, $4, $6}')"
+    if [[ $cls == kitty ]] && awk -v a="$a" -v w="$cfg_win" -v t="$cfg_term" \
+            'BEGIN { d = a - w; if (d < 0) d = -d; g = w - t; if (g < 0) g = -g; exit !(d < 0.04 && g > 0.04) }'; then
+        info "this terminal is at the compositor's $cfg_win, not its configured $cfg_term --"
+        info "it was started before the current kitty.conf. Open a new one; 'noct-check"
+        info "kitty-live' confirms new terminals follow the setting without a restart."
+    fi
+
+    if (( ok )); then
+        pass glass-visible "the wallpaper reads through the window"
+    else
+        fail glass-visible "the frosted effect is below what the eye picks up"
+        info "lift is (backdrop - own) x (1 - opacity): lower 'window' in glass.conf, or"
+        info "raise blur_brightness; structure needs a smaller blur_size, not a brighter one."
+    fi
+}
+
+# Reads `hyprctl -j clients` and prints "<monitor> <cropgeom> <class>" for the
+# largest tiled window, inset 15% so borders and rounded corners stay out of
+# the patch. Kept as a filter so the JSON is parsed exactly once.
+hyprctl_pick_window() {
+    local mons want=${1-}
+    mons=$(hyprctl -j monitors 2>/dev/null)
+    jq -r --argjson mons "$mons" --arg want "$want" '
+        [ .[] | select(.floating == false and .hidden != true and .size[0] > 200 and .size[1] > 200)
+              | select($want == "" or .class == $want) ]
+        | sort_by(-(.size[0] * .size[1])) | .[0] as $w
+        | if $w == null then empty else
+            ($mons[] | select(.id == $w.monitor)) as $m
+            | ($w.size[0] * 0.15 | floor) as $ix
+            | ($w.size[1] * 0.15 | floor) as $iy
+            | "\($m.name) \($w.size[0] - 2*$ix)x\($w.size[1] - 2*$iy)+\($w.at[0] - $m.x + $ix)+\($w.at[1] - $m.y + $iy) \($w.class)"
+          end'
+}
+
+# ---------------------------------------------------------------------------
+
+usage() { sed -n '4,7p' "$0" | sed 's/^# \?//'; exit 2; }
+
+run_check() {
+    case $1 in
+        session-path)     check_session_path ;;
+        uwsm-env)         check_uwsm_env ;;
+        provider-resolve) check_provider_resolve ;;
+        provider-run)     check_provider_run ;;
+        glass-config)     check_glass_config ;;
+        glass-live)       check_glass_live ;;
+        glass-legible)    check_glass_legible ;;
+        zen-sheet)        check_zen_sheet ;;
+        zen-page)         check_zen_page ;;
+        monitor-hop)      check_monitor_hop ;;
+        column-hop)       check_column_hop ;;
+        keyword-inert)    check_keyword_inert ;;
+        glass-visible)    check_glass_visible ;;
+        kitty-live)       check_kitty_live ;;
+        blur-stacks)      check_blur_stacks ;;
+        *) printf 'unknown check: %s\n' "$1" >&2; return 1 ;;
+    esac
+}
+
+main() {
+    local -a to_run=()
+    case ${1-} in
+        --list) printf '%s\n' "${NON_INVASIVE[@]}" "${INVASIVE[@]}"; exit 0 ;;
+        --all)  to_run=("${NON_INVASIVE[@]}" "${INVASIVE[@]}") ;;
+        -h|--help) usage ;;
+        "")     to_run=("${NON_INVASIVE[@]}") ;;
+        *)      to_run=("$@") ;;
+    esac
+
+    local c
+    for c in "${to_run[@]}"; do run_check "$c" || FAIL=$((FAIL+1)); done
+
+    printf '\n%d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIP"
+    (( FAIL == 0 ))
+}
+
+main "$@"

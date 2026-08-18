@@ -18,6 +18,45 @@ right-hand column.
 
 ---
 
+## Run `noct-check` first
+
+Everything in this file needs a human. `bin/noct-check` is the part that does
+not: one command, and it fails loudly for each thing that used to fail silently.
+
+```sh
+noct-check          # the checks that do not touch the screen
+noct-check --all    # plus glass-visible, which flickers the display and restores it
+noct-check --list   # the names, so you can run just one
+```
+
+| check | what it caught |
+|---|---|
+| `session-path` | the launcher providers all answering "No results found" — which is also what a healthy provider with nothing to report looks like |
+| `uwsm-env` | the fix for the above, verified by sourcing it from a deliberately bare PATH |
+| `provider-resolve`, `provider-run` | a provider that cannot be found, dies, is slow, or leaks a MAC address into the visible line |
+| `glass-config`, `glass-live` | the config on disk and the running session disagreeing, unnoticed, for a whole session |
+| `glass-legible` | text quietly going grey. Contrast alone does not catch it — the compositor lifts the background while it dims the glyphs, so the *ratio* survives while everything visibly fades. This measures the ink too |
+| `zen-sheet` | the generated stylesheet losing a specificity fight to the transparency mod, silently, so the page keeps somebody else's wash |
+| `keyword-inert` | `hyprctl keyword` being a silent no-op under the Lua parser, so an A/B test written with it measures nothing and passes |
+| `glass-visible` | the frosted glass being present in the config and absent on the screen — 3 levels of 255 |
+| `kitty-live` | a terminal that ignores a new opacity until it is restarted, which decides whether `terminal` may differ from `window` at all |
+| `blur-stacks` | a floating window sampling past the window it sits on. Also caught `xray` being accepted as a window rule and ignored — it is a layer rule |
+| `zen-page` | end to end: the browser's page area measured on screen, against the level it was configured with |
+| `column-hop` | `SUPER+CTRL+H/L` handing a column off to the next *workspace* instead of the next *monitor*, which put a workspace move on the horizontal keys |
+| `monitor-hop` | `SUPER+CTRL+SHIFT+<hjkl>` silently doing nothing, because no monitor lay in the direction asked for — and then the obvious fix silently doing nothing too, because the dispatcher fails without raising and a `pcall` around it returns true |
+
+The last four are the `--all` set: they drive the display to two extremes and put
+it back, and three of them open a throwaway window (floated and centred by the
+`noct-probe` rule in `conf/rules.lua`, so nothing you were working in moves).
+
+A red `session-path` with green `provider-*` means the providers are fine and
+the session environment is not. To prove that before logging out, run them under
+a PATH you know is good:
+
+```sh
+NOCT_CHECK_PATH=$PATH noct-check provider-resolve provider-run
+```
+
 ## 0. It loads at all
 
 - [ ] `hyprctl version` reports **0.55 or newer**. Below that, Lua configs and
@@ -253,6 +292,18 @@ N*10+1 … N*10+10, and each band carries its own scroll direction.
 
 ## 6. Launcher providers — `bin/noct-*` + `20-launcher.toml`
 
+`noct-check provider-resolve provider-run` covers everything mechanical here —
+that each provider is findable the way the *launcher* finds it, answers, answers
+quickly, and keeps device ids out of the visible line. Run that first; what
+follows is what it cannot judge.
+
+The one thing worth understanding rather than just running: these are looked up
+by bare name under the **session's** PATH, not your terminal's. uwsm starts the
+compositor as a systemd user unit, so Hyprland and Noctalia inherit the user
+manager's PATH, and fish never gets a chance to fix it. `config/uwsm/env` is what
+puts `~/.local/bin` there, and it is read at login only — so the fix for a red
+`session-path` is `./install.sh`, then log out and back in.
+
 First, straight from a terminal — this is where parsing bugs show up plainly.
 Each should print readable `title <TAB> description` lines with **no base64 or
 device ids visible**; the payloads go to a side map in `$XDG_RUNTIME_DIR`:
@@ -422,14 +473,21 @@ Then through the launcher:
       `~/.config/zen/*/chrome/userChrome.css` all exist after the first scheme
       change, and contain real numbers.
 - [ ] A new kitty window is translucent, with the wallpaper blurred behind it.
-- [x] **Two windows of the same app, side by side, are the same shade** — this is
-      what the large blur is for, not decoration. Put two terminals over different
-      parts of the wallpaper (a bright patch and a dark one) and look at their
-      backgrounds. Measured 2026-08-18: at the old `size 8 / passes 2` they came
-      out 4-6 levels of 255 apart at an identical own-alpha; at `size 32 / passes
-      4`, `brightness 0.65`, `vibrancy 0.05` they are within 2, which the eye does
-      not separate. The measurement in the next check is how to confirm it rather
-      than argue about it.
+- [ ] **You can make out the wallpaper through a window.** `noct-check
+      glass-visible` is the check; the eye is not, because the failure mode here
+      is an effect that is real in the config and worth 3 levels of 255 on the
+      screen. It reports two numbers, both after opacity has been applied:
+      *lift*, how much brighter the window is than an opaque one, and
+      *structure*, how much the backdrop varies across it. Wants 12 and 4.
+- [ ] **Two windows of the same app, side by side, are NOT quite the same
+      shade** — and that is now the deliberate choice, reversed on 2026-08-18.
+      `size 32 / passes 4` at `brightness 0.65` held two terminals within 2
+      levels of each other and made every one of them read as flat grey: lift
+      measured **3**. `size 8 / passes 2` at `brightness 1.0` measures lift
+      **17**, structure **8**, and lets the photo's shape through — which is
+      also, unavoidably, what makes two windows over different parts of the
+      image differ. There is no setting that gives both; this repo now buys the
+      wallpaper and pays in uniformity.
 - [ ] **A terminal and a browser side by side show the same amount of
       wallpaper**, in the *same* focus state. They used to compound — kitty
       applied its level, the compositor applied another on top — so the value
@@ -448,20 +506,18 @@ Then through the launcher:
       applies to windows already open: kitty re-reads colours on SIGUSR1 but not
       `background_opacity` (measured — see the table), and Zen reads its
       stylesheet at startup. Both catch up on their next window.
-- [ ] Any of the three levels can be measured rather than eyeballed, which is how
-      the numbers above were set. Capture a flat region of a window at two
-      different compositor opacities and solve for the window's own alpha:
-      ```sh
-      grim -g "<x>,<y> 600x400" /tmp/a.png
-      hyprctl eval 'hl.config({ decoration = { active_opacity = 0.60 } })'
-      grim -g "<x>,<y> 600x400" /tmp/b.png
-      hyprctl reload
-      ```
-      With medians `La`/`Lb` at factors `fa`/`fb` and the window's own surface
-      colour `C`: `u = (La-Lb)/(fa-fb)`, the blurred background is `W = La-fa*u`,
-      and the window's own alpha is `u/(C-W)`. A terminal at
-      `background_opacity 1.00` must come out at 1.00 — that is the check that
-      says the method is sound before you trust it on a browser.
+- [ ] Any of this can be measured rather than eyeballed, and `noct-check
+      glass-visible` is that measurement wrapped up: it drives the window to
+      1.00 (its own colour), then to 0.02 (very nearly the backdrop), and reads
+      both off a screenshot. Everything between those two is linear, so
+      `lift = (backdrop − own) × (1 − opacity)` describes the whole range.
+      Note what it does **not** use: `hyprctl keyword` is a silent no-op under
+      the Lua parser — it answers `keyword can't work with non-legacy parsers`
+      and changes nothing — so an A/B written with it compares two identical
+      frames and concludes the effect is off. `noct-check keyword-inert` exists
+      to keep that from being rediscovered. Anything that has to change a
+      setting live must go through `noct-glass`, which writes the file and
+      reloads.
 - [ ] Stepping to `1.00` leaves nothing translucent, terminals included.
 - [ ] At level `1.00`, `glass.lua` has `enabled = false` for blur.
 - [ ] Changing scheme afterwards clears the manual override.

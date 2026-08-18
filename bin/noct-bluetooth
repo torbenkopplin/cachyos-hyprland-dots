@@ -34,14 +34,23 @@ list() {
     connected=$(bluetoothctl devices Connected 2>/dev/null | awk '{print $2}')
 
     # `bluetoothctl devices` prints: Device <MAC> <name with spaces>
+    #
+    # The subtitle says what the device IS to you, not what it is to the
+    # adapter: the MAC used to go here, and it is both unreadable and the one
+    # thing the side map exists to keep out of the visible line. A device with
+    # no name falls back to it, because then there is nothing else to show.
+    # Two devices with the same name stay distinct through item()'s " (2)".
     while read -r _ mac name; do
         [[ -z ${mac:-} ]] && continue
-        [[ -z ${name:-} ]] && name=$mac
+
+        if [[ -z ${name:-} ]]; then
+            name=$mac
+        fi
 
         if grep -qxF "$mac" <<<"$connected"; then
-            item "● Disconnect  $name" "$mac" "disconnect:$mac"
+            item "● Disconnect  $name" "connected" "disconnect:$mac"
         else
-            item "Connect  $name" "$mac" "connect:$mac"
+            item "Connect  $name" "paired" "connect:$mac"
         fi
     done < <(bluetoothctl devices 2>/dev/null)
 
