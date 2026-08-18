@@ -30,15 +30,19 @@ show_on_workspace_switch = false   # workspace changes must not flash the bar
 reserve_space            = false   # no exclusive zone: full-height windows
 layer                    = "overlay"  # visible even over a fullscreen window
 
-thickness          = 34
+## 30 rather than 34: the bar is summoned, not lived with, so it should read
+## as an overlay rather than as a piece of furniture. At this height the clock
+## and the widget glyphs are still full size -- the padding around them is what
+## went.
+thickness          = 30
 
 ## Frosted: the layer rule in conf/rules.lua blurs Noctalia's surfaces, and
 ## this is what lets that blur show through. Held constant rather than managed
 ## by bin/noct-glass -- that runs from the colors_changed hook, and having it
 ## write a Noctalia .toml would risk a config-reload loop.
 background_opacity = 0.85
-padding            = 14
-widget_spacing     = 8
+padding            = 10
+widget_spacing     = 6
 margin_edge        = 0
 margin_ends        = 0
 concave_edge_corners = true

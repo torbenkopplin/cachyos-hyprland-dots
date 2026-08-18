@@ -8,7 +8,13 @@
 ## there first.
 
 [shell]
-font_family           = "sans-serif"
+## "sans-serif" is whatever fontconfig happens to resolve first, which on a
+## fresh CachyOS install is a serviceable but anonymous face. Adwaita Sans is
+## the GNOME 48 UI typeface (an Inter derivative): designed for exactly this --
+## small sizes, dense labels, a bar you read at a glance -- and it ships in the
+## adwaita-fonts package, which install.sh now names explicitly rather than
+## relying on a GNOME dependency having pulled it in.
+font_family           = "Adwaita Sans"
 corner_radius_scale   = 1.0
 settings_show_advanced = true
 
