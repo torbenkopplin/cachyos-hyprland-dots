@@ -1,8 +1,10 @@
 -- conf/env.lua -- environment variables set for the Hyprland session.
 --
--- NOTE: if you boot via uwsm, prefer ~/.config/uwsm/env for anything that also
--- needs to be visible to systemd user units. Variables set here are inherited
--- by apps Hyprland spawns, which covers the normal case.
+-- NOTE: this file sets variables for apps Hyprland spawns, which covers the
+-- normal case. It cannot set anything Hyprland itself needs at startup, and it
+-- is invisible to systemd user units. This session boots via uwsm, so those go
+-- in config/uwsm/env instead -- PATH in particular, which is what the launcher
+-- providers and the noct-glass binds are found through.
 
 -- Cursor. XCURSOR_* is what GTK, Qt and XWayland read; HYPRCURSOR_* is
 -- Hyprland's own vector cursor format, which falls back to the XCursor theme

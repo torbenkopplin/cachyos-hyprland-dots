@@ -187,6 +187,11 @@ do_link() {
     link_tree "$REPO/config/fish"     "$CONFIG_HOME/fish"
     link      "$REPO/config/starship/starship.toml" "$CONFIG_HOME/starship.toml"
 
+    # Read by uwsm before the compositor starts, and the only place the session
+    # gets ~/.local/bin on PATH -- which is what the launcher providers and the
+    # noct-glass binds are found through. See config/uwsm/env.
+    link_tree "$REPO/config/uwsm"     "$CONFIG_HOME/uwsm"
+
     heading "Scripts"
     local script
     for script in "$REPO"/bin/*; do
@@ -258,6 +263,12 @@ PKGS_DESKTOP=(
     kitty qt6ct
     hyprpicker hyprlock
     wl-clipboard brightnessctl playerctl
+
+    # grim is what bin/noct-check measures the frosted glass with -- the only
+    # way to tell a 3-level effect from a 17-level one is to photograph the
+    # screen and do the arithmetic. imagemagick, which does that arithmetic,
+    # comes in with PKGS_YAZI.
+    grim
 
     # Fonts, all three named because something reads each of them:
     #   ttf-jetbrains-mono-nerd  kitty's font_family, and the glyphs starship
@@ -1082,16 +1093,25 @@ fi
 
 heading "Next"
 if [[ ":$PATH:" != *":$BIN_HOME:"* ]]; then
-    say "Put $BIN_HOME on your PATH -- the launcher runs provider commands"
-    say "through 'sh -lc' and will not find them otherwise."
+    say "Put $BIN_HOME on your PATH for this shell -- the noct-* commands are"
+    say "there. The Hyprland session gets it from ~/.config/uwsm/env, which"
+    say "this script just linked, and which is read at login: until you log in"
+    say "again the launcher's /aout /ain /bt /net /power /theme entries answer"
+    say "\"No results found\" and SUPER+SHIFT+G does nothing."
 fi
 cat <<'EOF'
   1. Log into the Hyprland session.
-  2. Work through TESTING.md -- the checklist for everything in here that
+  2. Run 'noct-check'. It is the part of TESTING.md that does not need you:
+     one command, and it fails loudly for each thing that otherwise fails
+     silently -- providers the launcher cannot find, a session running
+     something other than what is on disk, frosted glass that is present in
+     the config and invisible on the screen. 'noct-check --all' adds the
+     measurement that flickers the display for a few seconds.
+  3. Work through TESTING.md -- the checklist for everything left that
      could not be verified without a live session.
-  3. Sign into browser sync for bookmarks and extensions; nothing in this
+  4. Sign into browser sync for bookmarks and extensions; nothing in this
      repo carries them.
-  4. Pick a wallpaper per monitor from the shell's picker. The colour palette
+  5. Pick a wallpaper per monitor from the shell's picker. The colour palette
      is derived from the active one, so this is what finishes the theming.
 EOF
 

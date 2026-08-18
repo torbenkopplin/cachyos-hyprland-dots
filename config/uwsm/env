@@ -1,0 +1,49 @@
+# ~/.config/uwsm/env -- sourced by uwsm before Hyprland starts.
+#
+# POSIX sh, not fish: uwsm sources this with /bin/sh from
+# /usr/lib/uwsm/prepare-env.sh, in a shell that has no fish config in sight.
+#
+# Why this file exists
+# --------------------
+# uwsm runs the compositor as a systemd user unit (wayland-wm@hyprland.service),
+# so the session starts with the user manager's PATH -- /usr/bin and friends,
+# and nothing else. The PATH you see in a terminal never reaches it: fish builds
+# that per terminal, long after Hyprland and Noctalia are running. Measured
+# 2026-08-18 off the running session, /proc/<hyprland>/environ and
+# /proc/<noctalia>/environ both read:
+#
+#   PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/lib/jvm/default/bin:...
+#
+# ~/.local/bin is where install.sh puts the noct-* scripts, and three things
+# look them up by bare name:
+#
+#   launcher providers  20-launcher.toml runs `noct-audio list sinks` and its
+#                       siblings through `sh -lc`. A login shell does not
+#                       rescue this -- /etc/profile only appends the system
+#                       directories, it does not add ~/.local/bin -- so every
+#                       /aout /ain /bt /net /power /theme entry comes back
+#                       "No results found", which is also exactly what a
+#                       provider with nothing to report looks like.
+#
+#   exec binds          SUPER+SHIFT+G runs `noct-glass cycle`; Hyprland spawns
+#                       it with its own environment, so it fails silently and
+#                       the glass level simply stops changing.
+#
+#   the colors_changed  50-glass.toml runs `noct-glass apply` when the palette
+#   hook               changes, so without this the glass stops following the
+#                       colour scheme too.
+#
+# PATH is in uwsm's always_export set (Varnames in uwsm's main.py), so what is
+# set here is pushed to the systemd user manager and inherited by every unit
+# under it, the compositor included.
+#
+# This is startup-only. Changing it needs a new session, not a reload: Hyprland
+# and Noctalia keep the environment they were spawned with.
+
+# Idempotent because the file is cheap to source twice and a doubled PATH entry
+# is the kind of thing nobody notices until they are debugging something else.
+case ":$PATH:" in
+    *":$HOME/.local/bin:"*) ;;
+    *) PATH="$HOME/.local/bin:$PATH" ;;
+esac
+export PATH
