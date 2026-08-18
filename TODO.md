@@ -28,8 +28,14 @@ desktop, then delete:
 - [x] the bar is styled rather than assembled: one accent (`primary`, on the
       workspace you are on and the control-centre button), two text levels, and
       no widget stating in words what its icon says — `enp4s0` and a stray
-      percentage are gone, media has its own capsule so the status row stops
-      shuffling
+      percentage are gone
+- [x] the bar is one centred cluster made of Noctalia's own popup material —
+      `surface_variant` cards at radius 12, sampled off the running control
+      centre. The title has a fixed width so the cluster never slides
+- [x] every translucent surface lands on the **same shade**: with `blur.xray` each
+      window samples the wallpaper behind itself, so at the old blur two terminals
+      over different parts of the photo read 4–6 levels apart at an identical
+      opacity. `size 32 / passes 4`, dimmed and desaturated, brings that to 2
 - [x] `SUPER+CTRL+hjkl` moves whole columns, and at the end of the tape the
       column goes to the next workspace
 - [x] the Wi-Fi passphrase prompt opens at all — `$TERMINAL` is a command line,
@@ -82,9 +88,10 @@ desktop, then delete:
       focus step apart, which is what you were looking at before. There is no
       value that does both; `noct-glass apply` plus a Zen restart switches.
 - [ ] Say which of these numbers to move, if any: `ROUNDING = 2`
-      (`conf/options.lua`), `capsule_opacity = 0.90` (`10-bar.toml`) and
-      `browser` above. Each governs a different surface, which is why they are in
-      separate files.
+      (`conf/options.lua`), `capsule_radius = 12` (`10-bar.toml`), `browser`
+      above, and `blur.brightness = 0.65` (`bin/noct-glass`) — the last one is
+      the dial between "one uniform shade" and "you can see the wallpaper's
+      shape through a window".
 - [ ] The last unticked Wi-Fi check in `TESTING.md` §6 needs a **secured network
       this machine has not joined before** — everything up to the passphrase
       prompt is verified, the no-echo half cannot be faked.

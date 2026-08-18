@@ -59,13 +59,21 @@ empty. No polling, and no guessing how long you will spend in the launcher.
 Notifications and OSDs are deliberately excluded — a notification must not drag
 the bar on screen with it.
 
-It is also built from the same parts as everything else on screen. The bar
-surface is invisible — no fill, no border — and what you see are **capsules**:
-navigation, time, media, status. Each is inset from the screen edge by the same
-10px a window is, carries the same near-square radius, and shows the same amount
-of wallpaper through it as the frosted-glass level does. A full-width slab with
-concave corners was the one element built to a different rule, which is exactly
-what made it read as furniture rather than as another surface.
+It is also made of the same material as the panels it opens. The bar surface
+itself is invisible — no fill, no border, no slab welded to the screen edge — and
+what you see are four **capsules** in the *centre* of the screen: navigation,
+time, media, status. A summoned HUD should be one thing you look at, not three
+things in the far corners of an ultrawide.
+
+Those capsules are Noctalia's own card material, and not by coincidence: sampled
+off the running control centre, a popup is `#101010` with `#323232` cards at a
+corner radius of 12, and a group capsule is drawn as opaque `surface_variant`
+(`#323232`) at whatever radius you ask for. So matching the shell meant setting
+one number — the radius — and deleting two that turned out to do nothing.
+
+The window title is given a **fixed** width. Centred content grows in both
+directions, so a variable-width title would slide the clock and the status icons
+sideways every time you changed window.
 
 Inside them the styling is three rules, and they are what separate a bar that
 was *designed* from a bar that merely *works*:
@@ -86,6 +94,23 @@ a shared capsule that shuffled the whole status row sideways every few minutes.
 The blur behind them is the layer rule in `conf/rules.lua`, and
 `ignore_alpha = 0.5` is what keeps the transparent part of the bar from being
 blurred along with the capsules.
+
+### Why the blur is so large
+
+Because it is what decides whether the desktop is **one material**. With
+`blur.xray` on, every translucent window samples the wallpaper behind *itself*, so
+a small blur preserves the photo's local brightness and two windows at the same
+opacity come out as different shades — one over a bright patch, one over a dark
+one. That is not a subtle effect: measured on this wallpaper at `size 8 / passes
+2`, the backdrops behind two kitty windows differed by 24–41 of 255, which landed
+as a 4–6 level difference in what you actually saw. Both windows measured an own
+alpha of 1.00; nothing about them was different.
+
+At `size 32 / passes 4`, dimmed to `brightness 0.65` and desaturated to `vibrancy
+0.05`, the same two backdrops differ by 5 and the windows land within 2 levels of
+each other, which is below what the eye picks up. The trade is that you see less
+of the wallpaper's *shape* through a window — the gaps between windows still show
+it unblurred, and that is where the image is meant to be looked at.
 
 ### Edges are read, not inferred from a failed dispatch
 

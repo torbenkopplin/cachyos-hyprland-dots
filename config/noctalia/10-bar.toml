@@ -21,19 +21,20 @@
 ## Because it is summoned rather than lived with, it is worth putting real
 ## information on it -- this is a HUD, not decoration.
 ##
-## Form: three floating islands
-## ---------------------------
-## The desktop is a set of separate translucent surfaces, each inset from the
-## screen edge by GAPS_OUT and framed by a hairline. A full-width slab welded to
-## the top edge with concave corners was the one thing on screen built to a
-## different rule -- so the bar is now made of the same parts as everything else:
+## Form: one centred cluster, built like a Noctalia popup
+## ------------------------------------------------------
+## The bar surface itself is invisible -- no fill, no border, no slab welded to
+## the screen edge. What you see are capsules, and they are deliberately the same
+## material as the panels this shell opens: measured off the live control centre,
+## a Noctalia popup is `surface` at essentially full opacity with a radius of 12
+## and `surface_variant` cards inside it. So the capsules take those numbers
+## rather than the window geometry, and the bar reads as part of the shell it
+## belongs to rather than as part of the tape underneath it.
 ##
-##   * the bar surface itself is invisible (background_opacity = 0, no border);
-##   * its widgets live in three capsules -- navigation, time, status -- which
-##     are the surfaces you actually see;
-##   * those capsules are inset 10px like a window (GAPS_OUT), carry the same
-##     radius as a window (ROUNDING = 2, near-square) and the same opacity as
-##     the frosted-glass level.
+## Everything sits in the CENTRE lane. start and end are empty on purpose: a
+## summoned HUD wants to be one thing you look at, not three things at the far
+## corners of an ultrawide. The window title is given a fixed width so the cluster
+## does not slide sideways as you change windows.
 ##
 ## The blur comes from the layer rule in conf/hypr/conf/rules.lua, whose
 ## ignore_alpha = 0.5 is what keeps the *transparent* part of the bar from being
@@ -60,32 +61,36 @@ margin_edge  = 10
 margin_ends  = 10
 
 ## The bar surface itself is not drawn: no fill, no border, no corners to speak
-## of. Everything visible is a capsule. (Setting a radius here would only round
-## something you cannot see -- it stays at the window radius so that turning the
-## fill back on gives you a sane single island rather than a slab.)
+## of. Everything visible is a capsule. (The radius is set anyway, to the popup
+## radius, so that turning the fill back on gives you one panel-shaped island
+## rather than a slab.)
 background_opacity   = 0.0
 border_width         = 0
 concave_edge_corners = false
-radius_top_left      = 2
-radius_top_right     = 2
-radius_bottom_left   = 2
-radius_bottom_right  = 2
+radius_top_left      = 12
+radius_top_right     = 12
+radius_bottom_left   = 12
+radius_bottom_right  = 12
 
-## Capsules are the visible surfaces. 0.90 is the default `window` level in
-## glass.conf -- what `noct-glass show` reports -- so a capsule and a window show
-## the same amount of wallpaper through them; radius 2 matches ROUNDING in
-## conf/options.lua. This is the one number that does not follow glass.conf on
-## its own: noct-glass deliberately writes no Noctalia config (that hook fires on
-## config-driven palette changes, so generating a .toml from it risks a reload
-## loop), so a per-scheme override there means editing this by hand.
+## Capsules are the visible surfaces, and a GROUP capsule is drawn as opaque
+## `surface_variant` no matter what you ask for: `capsule_fill` and
+## `capsule_opacity` are read, reported by `config export merged`, and then
+## ignored for groups -- verified by setting the fill to #ff0000 and watching
+## nothing turn red. They are left out here rather than left in lying.
 ##
-## capsule_thickness is a fraction of `thickness`, so the capsule sits inside the
-## bar's height with a little air around it rather than filling it edge to edge.
+## That is not a compromise, as it happens. #323232 opaque is exactly what a
+## Noctalia popup's cards are made of -- sampled off the running control centre,
+## whose body is #101010 with #323232 cards at a corner radius of 12 -- so the
+## bar's capsules and the panels it opens are the same material by construction.
+## A popup reads solid rather than glassy: the frosted glass belongs to the
+## windows behind, not to the shell's own furniture.
+##
+## What does apply to a group capsule is the geometry: radius, padding, and
+## thickness as a fraction of the bar's own height, so the capsule sits inside it
+## with air around rather than filling it edge to edge.
 capsule              = true
-capsule_fill         = "surface"
-capsule_opacity      = 0.90
-capsule_padding      = 8
-capsule_radius       = 2
+capsule_padding      = 10
+capsule_radius       = 12
 capsule_thickness    = 0.8
 
 ## padding is the bar's own inner inset, which the capsules would otherwise sit
@@ -100,16 +105,17 @@ font_weight     = 500
 ## Lanes name capsule groups rather than widgets; a "group:<id>" entry with no
 ## matching capsule_group below is dropped with a warning at load.
 ##
-## Four islands, not three: media has its own because its width changes with the
-## track, and inside a shared capsule that made the whole status block shuffle
-## sideways every few minutes. It is absent entirely when nothing is playing.
+## Four capsules rather than one long pill: each groups a concern, and media is
+## separate because it comes and goes with playback rather than being state you
+## always have. They sit next to each other in the centre lane, so the whole thing
+## reads as one cluster with seams where the meaning changes.
 ##
 ## Widget ids are arbitrary -- `type` is what names the widget -- which is how
 ## `date` below can be a second clock. Upstream's own type spelling is
 ## inconsistent on purpose: most are snake_case, "control-center" is not.
-start  = ["group:navigation"]
-center = ["group:time"]
-end    = ["group:media", "group:status"]
+start  = []
+center = ["group:navigation", "group:time", "group:media", "group:status"]
+end    = []
 
 ## Where you are, and what you are looking at -- in that order of importance,
 ## which the colours below reinforce.
@@ -177,9 +183,13 @@ length = 12
 ## either way -- that one is not optional -- so asking for the app icon as well
 ## gets you two icons for one window. The title is the context; the glyph in front
 ## of it is enough of a marker.
+## min_length = max_length is what keeps the cluster still. Centred content grows
+## in both directions, so a variable-width title would slide the clock and the
+## status icons sideways every time you changed window. A fixed box does not.
 [widget.active_window]
 display      = "text_only"
-max_length   = 420
+min_length   = 260
+max_length   = 260
 title_scroll = "on_hover"
 color        = "on_surface_variant"
 

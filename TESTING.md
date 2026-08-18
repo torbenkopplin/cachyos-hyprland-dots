@@ -156,24 +156,26 @@ to watch for is the launcher also opening after ordinary chords.
 - [ ] `SUPER+B` pins it on; `SUPER+B` again releases it back to following panels.
 - [ ] The bar renders **above** a fullscreen window (`layer = "overlay"`).
 
-The form is floating capsules on an invisible bar, matching the windows rather
-than the screen edge:
+The form is one centred cluster of capsules on an invisible bar, made of the same
+material as the panels this shell opens:
 
 - [x] There is **no slab**: no fill and no border behind the capsules, so the
-      wallpaper runs unbroken between them. Verified 2026-08-18 from a screenshot
-      of all three ends of the bar.
+      wallpaper runs unbroken around them.
+- [x] Everything is in the **centre**. `start` and `end` are empty; a summoned HUD
+      should be one thing you look at rather than three things in the corners of
+      an ultrawide.
 - [x] Four capsules — navigation (workspaces + title), time, media, status —
-      each inset 10px from the screen edge like a window, with the same
-      near-square corners. Media is separate because its width moves with the
-      track; inside the status capsule that shuffled the whole row sideways every
-      few minutes. It is gone entirely when nothing is playing.
+      adjacent, so the cluster has seams where the meaning changes. Media is
+      separate because it comes and goes with playback, and is absent entirely
+      when nothing is playing.
+- [x] A capsule is the same material as a **popup card**: open the control centre
+      next to the bar and compare. Both are `surface_variant` at radius 12. That
+      is not configurable — see the table — it is what a group capsule draws.
+- [x] The cluster does not **slide** when you change windows: `active_window` has
+      `min_length` = `max_length`, so its box is a fixed width whatever the title.
 - [x] `noctalia config validate` passes. `capsule_group` entries are keyed by
       `id`, and the lanes reference them as `"group:<id>"`; a `name` key is
       accepted by the TOML but ignored, so the lane silently finds no group.
-- [ ] Capsules and windows show the **same** amount of wallpaper through them.
-      `capsule_opacity` is held at the glass level by hand (0.90) — `noct-glass`
-      deliberately does not write Noctalia config, so if you change the level in
-      `glass.conf` this is the one number that does not follow.
 
 The styling is three rules, and each is visible in one glance at the bar:
 
@@ -420,6 +422,14 @@ Then through the launcher:
       `~/.config/zen/*/chrome/userChrome.css` all exist after the first scheme
       change, and contain real numbers.
 - [ ] A new kitty window is translucent, with the wallpaper blurred behind it.
+- [x] **Two windows of the same app, side by side, are the same shade** — this is
+      what the large blur is for, not decoration. Put two terminals over different
+      parts of the wallpaper (a bright patch and a dark one) and look at their
+      backgrounds. Measured 2026-08-18: at the old `size 8 / passes 2` they came
+      out 4-6 levels of 255 apart at an identical own-alpha; at `size 32 / passes
+      4`, `brightness 0.65`, `vibrancy 0.05` they are within 2, which the eye does
+      not separate. The measurement in the next check is how to confirm it rather
+      than argue about it.
 - [ ] **A terminal and a browser side by side show the same amount of
       wallpaper**, in the *same* focus state. They used to compound — kitty
       applied its level, the compositor applied another on top — so the value
@@ -721,6 +731,8 @@ something misbehaves:
 | ~~`hyprctl eval` prints what the snippet returns~~ | **Disproven 2026-08-18 on Hyprland 0.56.2.** It prints `ok` or an error, never the value — so every `return ...` check in this file was reading its own hope. Assert instead, or write to a file with `io` (which the sandbox does provide) | this file, throughout |
 | ~~`noctalia config validate` does not check widget keys~~ | **Disproven 2026-08-18 on v5.0.0-beta.8.** It names unknown widget settings and rejects values outside a key's allowed set, which makes it the fastest way to discover both — the widget schema in this repo was derived that way rather than guessed | `10-bar.toml` |
 | ~~A capsule outline draws when `capsule_border` is set~~ | **Disproven 2026-08-18.** The colour applies to nothing on its own; the only width available is `border_width`, which outlines the *bar* — and with an invisible bar that draws a full-width line above and below the capsules. Left unset | `10-bar.toml` |
+| ~~Two windows at the same glass level look the same~~ | **Disproven 2026-08-18 by measurement.** With `blur.xray`, each window samples the wallpaper behind itself; at `size 8 / passes 2` the backdrops behind two kitty windows differed by 24-41 of 255 and the windows read 4-6 levels apart, at an identical measured own-alpha of 1.00. `size 32 / passes 4` with `brightness 0.65` and `vibrancy 0.05` brings that to 2 levels | `bin/noct-glass`, `conf/look.lua` |
+| ~~`capsule_fill` and `capsule_opacity` style a bar capsule group~~ | **Disproven 2026-08-18 on v5.0.0-beta.8.** Both are accepted, appear in `config export merged`, and are ignored for group capsules, which draw as opaque `surface_variant` — verified by setting the fill to `#ff0000` and watching nothing turn red. Radius, padding and thickness do apply. The keys are left out of `10-bar.toml` rather than left in lying | `10-bar.toml` |
 | Noctalia gives a dmenu provider ~2 seconds | **Measured 2026-08-18**: a provider that runs longer is SIGTERMed (exit 143) and the launcher shows "No results found". Undocumented, so it could change — re-measure with a `sleep 3` provider if lists start emptying | `bin/noct-common.sh` |
 | Hyprland pauses idle notifications while a client holds a Wayland idle inhibitor | Protocol behaviour, and the layer the windowed-browser-video case rests on. The two window rules are the belt and braces | `conf/rules.lua`, `70-idle.toml` |
 | `shelly install standard/aur --no-confirm` is non-interactive enough for a script | It authenticates through **polkit**, so it needs an agent; in a bare TTY it fails and the pacman path takes over. Both paths are exercised by `--dry-run` | `install.sh` |
