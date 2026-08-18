@@ -102,7 +102,7 @@ for i, class in ipairs(OPAQUE_WINDOWS) do
     hl.window_rule({
         name    = "opaque-" .. i,
         match   = { class = class },
-        opacity = { 1.0, 1.0 }, -- active, inactive
+        opacity = "1.0 1.0", -- active, inactive; a table is rejected at parse time
     })
 end
 

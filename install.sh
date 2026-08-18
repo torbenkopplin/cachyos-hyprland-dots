@@ -9,7 +9,13 @@
 #   ./install.sh --all           all of the above, in the right order
 #
 #   ./install.sh --dry-run       show what any of the above would do
-#   ./install.sh --unlink        remove only the links this script created
+#   ./install.sh --status        show which setup currently owns each path
+#   ./install.sh --unlink        remove this script's links and put back
+#                                whatever they replaced
+#
+# --unlink is a full reverse of the linking step, so this setup and the
+# copy-based one in ~/repos/dots can be swapped back and forth: run ./install.sh
+# to take over the shared paths, --unlink to hand them back.
 #
 # Symlinks are safe for everything here:
 #
@@ -31,19 +37,20 @@ CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
 BIN_HOME=$HOME/.local/bin
 STAMP=$(date +%Y%m%d-%H%M%S)
 
-DRY_RUN=0 UNLINK=0
+DRY_RUN=0 UNLINK=0 STATUS=0
 DO_LINK=0 DO_PACKAGES=0 DO_BROWSERS=0 DO_NVIM=0 DO_WALLPAPERS=0
 
 for arg in "$@"; do
     case "$arg" in
         --dry-run)  DRY_RUN=1 ;;
+        --status)   STATUS=1; DO_LINK=1 ;;
         --unlink)   UNLINK=1; DO_LINK=1 ;;
         --packages) DO_PACKAGES=1 ;;
         --browsers) DO_BROWSERS=1 ;;
         --nvim)     DO_NVIM=1 ;;
         --wallpapers) DO_WALLPAPERS=1 ;;
         --all)      DO_LINK=1; DO_PACKAGES=1; DO_BROWSERS=1; DO_NVIM=1 ;;
-        -h|--help)  sed -n '2,18p' "$0" | sed 's/^# \?//'; exit 0 ;;
+        -h|--help)  sed -n '2,24p' "$0" | sed 's/^# \?//'; exit 0 ;;
         *) echo "unknown option: $arg" >&2; exit 2 ;;
     esac
 done
@@ -70,15 +77,63 @@ warn() { WARNINGS+=("$1"); printf '  !! %s\n' "$1"; }
 # Linking
 # ---------------------------------------------------------------------------
 
+# restore_backup <path> -- move the most recent <path>.bak-* back into place.
+#
+# This is what makes --unlink a real reverse of the install rather than just a
+# delink: whatever was at the path before (typically the copy-based ~/repos/dots
+# deployment) is put back, so switching between the two setups is one command in
+# each direction and leaves no residue to accumulate.
+restore_backup() {
+    local dst=$1 dir base bak
+    dir=$(dirname "$dst"); base=$(basename "$dst")
+
+    local -a baks=()
+    while IFS= read -r -d '' bak; do baks+=("$bak"); done \
+        < <(find "$dir" -maxdepth 1 -name "$base.bak-*" -print0 2>/dev/null | sort -z)
+    (( ${#baks[@]} )) || return 0
+
+    # Stamps are fixed-width, so lexical order is chronological.
+    bak=${baks[-1]}
+
+    # In a dry run the link was never actually removed, so the destination still
+    # being occupied says nothing.
+    if (( ! DRY_RUN )) && [[ -e $dst || -L $dst ]]; then
+        warn "not restoring ${bak##*/} -- something is already at ${dst/#$HOME/\~}"
+        return 0
+    fi
+
+    say "restore ${dst/#$HOME/\~}  (from ${bak##*/})"
+    run mv "$bak" "$dst"
+    (( ${#baks[@]} > 1 )) && note "$(( ${#baks[@]} - 1 )) older backup(s) of this file left alone"
+    return 0
+}
+
+# --status buckets: which setup owns each managed path right now.
+STAT_LINKED=() STAT_FOREIGN=() STAT_ABSENT=()
+
 link() {
     local src=$1 dst=$2 dir
     dir=$(dirname "$dst")
 
+    if (( STATUS )); then
+        if [[ -L $dst && $(readlink -f "$dst") == "$src" ]]; then
+            STAT_LINKED+=("$dst")
+        elif [[ -e $dst || -L $dst ]]; then
+            STAT_FOREIGN+=("$dst")
+        else
+            STAT_ABSENT+=("$dst")
+        fi
+        return 0
+    fi
+
     if (( UNLINK )); then
         if [[ -L $dst && $(readlink -f "$dst") == "$src" ]]; then
-            say "unlink $dst"
+            say "unlink ${dst/#$HOME/\~}"
             run rm -f "$dst"
         fi
+        # Attempted even when there was no link of ours to remove, so a
+        # half-finished switch still gets its originals back.
+        restore_backup "$dst"
         return 0
     fi
 
@@ -121,9 +176,44 @@ do_link() {
     local script
     for script in "$REPO"/bin/*; do
         [[ -f $script ]] || continue
-        (( UNLINK )) || run chmod +x "$script"
+        (( UNLINK || STATUS )) || run chmod +x "$script"
         link "$script" "$BIN_HOME/$(basename "$script")"
     done
+}
+
+# Reported instead of the link/backup lines when --status is given.
+do_status() {
+    heading "Status"
+    say "linked to this repo:  ${#STAT_LINKED[@]}"
+    say "owned by something else: ${#STAT_FOREIGN[@]}"
+    say "not present:          ${#STAT_ABSENT[@]}"
+
+    if (( ${#STAT_FOREIGN[@]} )); then
+        heading "Paths another setup owns (${#STAT_FOREIGN[@]})"
+        note "./install.sh would back these up before linking over them"
+        local f
+        for f in "${STAT_FOREIGN[@]}"; do say "${f/#$HOME/\~}"; done
+    fi
+
+    # Backups mean a previous run took these over; --unlink puts them back.
+    local -a baks=()
+    local b
+    while IFS= read -r -d '' b; do baks+=("$b"); done \
+        < <(find "$CONFIG_HOME" "$BIN_HOME" -name '*.bak-*' -print0 2>/dev/null)
+    if (( ${#baks[@]} )); then
+        heading "Restorable backups (${#baks[@]})"
+        note "--unlink moves the newest of these back for each path"
+        for b in "${baks[@]}"; do say "${b/#$HOME/\~}"; done
+    fi
+
+    heading "Verdict"
+    if (( ${#STAT_LINKED[@]} == 0 )); then
+        say "this setup is NOT deployed"
+    elif (( ${#STAT_FOREIGN[@]} == 0 )); then
+        say "this setup is deployed"
+    else
+        say "partially deployed -- ${#STAT_LINKED[@]} linked, ${#STAT_FOREIGN[@]} still owned elsewhere"
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -178,7 +268,7 @@ PKGS_SHELL=( fish fisher fastfetch )
 
 # yazi and its preview pipeline.
 PKGS_YAZI=(
-    yazi ffmpeg p7zip jq poppler imagemagick chafa
+    yazi ffmpeg 7zip jq poppler imagemagick chafa
 )
 
 PKGS_BROWSERS=( chromium firefox brave-bin zen-browser-bin )
@@ -293,6 +383,36 @@ do_packages() {
     do_services
 }
 
+# npm_install <packages...>
+#
+# Same shape as pacman_install: one batch first, then one at a time so a single
+# bad name cannot block the rest. Nothing falls through to another source, so
+# failures are warned about here rather than collected.
+npm_install() {
+    local -a pkgs=("$@")
+    (( ${#pkgs[@]} )) || return 0
+
+    if (( DRY_RUN )); then
+        say "would: npm install -g ${pkgs[*]}"
+        return 0
+    fi
+
+    if npm install -g "${pkgs[@]}" >/dev/null 2>&1; then
+        say "npm: ${pkgs[*]}"
+        return 0
+    fi
+
+    note "batch failed, resolving individually"
+    local pkg
+    for pkg in "${pkgs[@]}"; do
+        if npm install -g "$pkg" >/dev/null 2>&1; then
+            say "npm: $pkg"
+        else
+            warn "could not install: $pkg"
+        fi
+    done
+}
+
 do_npm_globals() {
     command -v npm >/dev/null 2>&1 || { warn "npm missing, skipped: ${NPM_GLOBALS[*]}"; return 0; }
 
@@ -301,7 +421,7 @@ do_npm_globals() {
     # write to /usr/lib/node_modules.
     say "npm globals (prefix ~/.local)"
     run npm config set prefix "$HOME/.local"
-    install_with npm install -g -- "${NPM_GLOBALS[@]}"
+    npm_install "${NPM_GLOBALS[@]}"
 }
 
 # ---------------------------------------------------------------------------
@@ -547,9 +667,20 @@ printf '%shyprland + noctalia dotfiles%s\n' "$BOLD" "$RESET"
 (( DO_BROWSERS ))   && do_browsers
 (( DO_WALLPAPERS )) && do_wallpapers
 
+if (( STATUS )); then
+    do_status
+    exit 0
+fi
+
 if (( UNLINK )); then
     heading "Done"
-    say "Unlinked. Backups named *.bak-* were left alone."
+    say "Links removed and originals restored where a backup existed."
+    note "the copy-based setup in ~/repos/dots owns these paths again;"
+    note "nothing there needs to be re-run unless you want it to re-deploy."
+    if (( ${#WARNINGS[@]} )); then
+        heading "Warnings (${#WARNINGS[@]})"
+        printf '  - %s\n' "${WARNINGS[@]}"
+    fi
     exit 0
 fi
 

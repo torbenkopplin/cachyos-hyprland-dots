@@ -408,7 +408,8 @@ cd ~/repos/cachyos-hyprland-dots
 | `--wallpapers` | Download wallpapers. **Not** in `--all` — it is a few hundred MB |
 | `--all` | All of the above, in dependency order |
 | `--dry-run` | Print what any of the above would do |
-| `--unlink` | Remove only the links this script created |
+| `--status` | Show which setup currently owns each managed path |
+| `--unlink` | Remove this script's links and restore whatever they replaced |
 
 Run `--browsers` again after launching Firefox and Zen once — their profile
 directories have generated names and do not exist until first launch, so
@@ -416,8 +417,45 @@ directories have generated names and do not exist until first launch, so
 
 Files are symlinked, so edits in the repo are live immediately and `git diff`
 shows your real config. Anything already in the way is moved to
-`*.bak-<timestamp>` rather than deleted. `./install.sh --unlink` removes only
-the links it created.
+`*.bak-<timestamp>` rather than deleted, and `--unlink` moves it back.
+
+### Switching with `~/repos/dots`
+
+`~/repos/dots` is the older, copy-based setup (it *copies* files into `$HOME`;
+this repo symlinks them). Both manage eight of the same paths:
+
+```
+~/.config/hypr/hyprland.lua                    ~/.config/fish/config.fish
+~/.config/kitty/kitty.conf                     ~/.config/fish/auto-Hypr.fish
+~/.config/kitty/scroll_mark.py                 ~/.config/fish/conf.d/fish_frozen_theme.fish
+~/.config/kitty/search.py                      ~/.config/starship.toml
+```
+
+Switching is one command in each direction, and a round trip is byte-exact:
+
+```sh
+./install.sh            # take the shared paths over (the dots copies are backed up)
+./install.sh --status    # see who owns what right now
+./install.sh --unlink    # hand them back (the dots copies are restored)
+```
+
+`--unlink` is a full reverse, so nothing needs to be re-run in `~/repos/dots`
+afterwards and no `*.bak-*` residue accumulates across switches.
+
+Two things that are deliberately *not* switched:
+
+- **`~/.config/hypr/host.lua`** — both configs read it the same way
+  (`hl.monitor`, `hl.env`, and a `WSBANDS` table), so the machine's monitor
+  layout is shared rather than duplicated. This repo's `host.lua.example`
+  documents the same schema `dots/hosts/<host>/` already ships.
+- **Files only `dots` manages** — `hypridle.conf`, `hyprlock.conf`,
+  `hypr/scripts/`, and the extra `fish/conf.d` entries stay in place. This repo
+  installs hypridle and hyprlock but ships no config for them, so those keep
+  working.
+
+While this setup is deployed, `dots/update.sh` will *not* re-import the shared
+paths — it skips symlinked targets and says so. Without that it would copy this
+repo's configs into the dots tree and commit them.
 
 Symlinking is safe for both programs: Hyprland only ever reads its config, and
 Noctalia only ever reads `~/.config/noctalia` — it writes GUI changes to

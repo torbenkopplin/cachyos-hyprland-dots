@@ -8,6 +8,16 @@
 
 require("conf.options")   -- must be first: defines the globals everything else reads
 
+-- Where the untracked, machine-local files live.
+--
+-- This has to be an absolute path, and it has to be resolved from the
+-- environment rather than from this file's location. Hyprland resolves
+-- require() against the *realpath* of the config, which is the repo checkout
+-- when installed as a symlink -- so nothing written next to the symlink is
+-- reachable through require(). XDG_CONFIG_HOME is honoured because that is what
+-- Noctalia expands when it renders into this directory (40-templates.toml).
+local CONFIG_HOME = os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")
+
 -- Machine-specific settings: monitors, GPU/host environment, and the WSBANDS
 -- table conf/workspaces.lua builds workspaces from. Pattern adopted from
 -- ~/repos/dots, where hosts/<hostname>/ supplies the file.
@@ -15,7 +25,7 @@ require("conf.options")   -- must be first: defines the globals everything else 
 -- dofile rather than require so `hyprctl reload` always re-reads it, and pcall
 -- so a machine without one still gets a working session (Hyprland then
 -- auto-configures monitors and workspaces.lua falls back to a single band).
-pcall(dofile, os.getenv("HOME") .. "/.config/hypr/host.lua")
+pcall(dofile, CONFIG_HOME .. "/hypr/host.lua")
 require("conf.env")
 require("conf.look")
 require("conf.input")
@@ -29,13 +39,15 @@ require("conf.binds")
 -- user template in config/noctalia/40-templates.toml. Loaded LAST so it
 -- overrides the fallback colours in conf/look.lua.
 --
--- pcall is not optional here: a bare require() of a missing module throws a
--- real error in the calling file, which would kill the rest of this config.
--- The file legitimately does not exist until Noctalia has rendered a palette
--- once, i.e. on a fresh install.
-pcall(require, "generated.colors")
+-- dofile with an absolute path, not require("generated.colors"): these files are
+-- written into the real config directory, which is not where require() looks
+-- when this config is a symlink into the repo (see CONFIG_HOME above). pcall is
+-- not optional either -- the file legitimately does not exist until Noctalia has
+-- rendered a palette once, i.e. on a fresh install, and an uncaught error here
+-- would kill the rest of this config.
+pcall(dofile, CONFIG_HOME .. "/hypr/generated/colors.lua")
 
 -- Frosted glass level for the active scheme, written by bin/noct-glass from
--- Noctalia's colors_changed hook. Same pcall reasoning: absent until the first
--- render, and a bare require() of a missing module would kill this file.
-pcall(require, "generated.glass")
+-- Noctalia's colors_changed hook. Same reasoning as above: absolute path so it
+-- is found at all, pcall because it is absent until the first render.
+pcall(dofile, CONFIG_HOME .. "/hypr/generated/glass.lua")
