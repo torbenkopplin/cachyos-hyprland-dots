@@ -31,8 +31,14 @@ right-hand column.
       `require()` did not hand back the module table, `SUPER+H` would pop an
       error notification instead of moving focus. Check with:
       ```sh
-      hyprctl eval 'return type(require("lib.nav").focus_horizontal)'   -- expect: function
+      hyprctl eval 'assert(type(require("lib.nav").focus_horizontal) == "function")'
+      hyprctl eval 'assert(type(require("lib.ws").neighbour) == "function")'
+      hyprctl eval 'assert(type(require("lib.colwidth").apply) == "function")'
       ```
+      **`ok` is the pass.** `hyprctl eval` prints `ok` or an error and never the
+      value you returned — so `return type(...)` looks like it answers and does
+      not, which is why these assert instead. Anything that needs a value out has
+      to write it somewhere, as the dump below does.
 
 ## 1. Layout — `conf/layout.lua`
 
@@ -108,12 +114,16 @@ the difference:
 > `row`. Two different `col` values means the re-stack did not happen and the
 > column arrived as N separate columns.
 
-> If edge detection misfires, dump what the layout actually reports:
+> If edge detection misfires, dump what the layout actually reports. It has to go
+> to a file: `hyprctl eval` answers `ok` and discards whatever you return.
 > ```sh
 > hyprctl eval 'local w = hl.get_active_window()
 >   local l = w.layout
->   return string.format("col=%s row=%s in_col=%s",
->     tostring(l.column.index), tostring(l.index_in_column), tostring(#l.column.windows))'
+>   local f = io.open("/tmp/layout.txt", "w")
+>   f:write(string.format("col=%s row=%s in_col=%s\n",
+>     tostring(l.column.index), tostring(l.index_in_column), tostring(#l.column.windows)))
+>   f:close()'
+> cat /tmp/layout.txt
 > ```
 > The assumption in `lib/nav.lua` is that both indices are **0-based**.
 
@@ -648,6 +658,7 @@ something misbehaves:
 | ~~A border gradient can be written as one string in a Lua config~~ | **Disproven 2026-08-18 on Hyprland 0.56.2.** `"rgb(a) rgb(b) 45deg"` is hyprland.conf syntax; a Lua config wants the table form `{ colors = {...}, angle = 45 }`. The string form loads silently and draws a flat border | `templates/hyprland-colors.lua`, `conf/look.lua` |
 | ~~`colors.tertiary` is available to a user template~~ | **Verified 2026-08-18 on noctalia v5.0.0-beta.8**: renders to real hex (`#ffffff` on noirblaze), so the border gradient has a second role to use | `templates/hyprland-colors.lua` |
 | ~~A bar capsule group is named with `name`~~ | **Disproven 2026-08-18 on noctalia v5.0.0-beta.8.** The key is `id`; `name` validates as an unknown setting and the lane's `group:<id>` then matches nothing. Probed with `noctalia config validate`, which names unknown keys | `10-bar.toml` |
+| ~~`hyprctl eval` prints what the snippet returns~~ | **Disproven 2026-08-18 on Hyprland 0.56.2.** It prints `ok` or an error, never the value — so every `return ...` check in this file was reading its own hope. Assert instead, or write to a file with `io` (which the sandbox does provide) | this file, throughout |
 | Noctalia gives a dmenu provider ~2 seconds | **Measured 2026-08-18**: a provider that runs longer is SIGTERMed (exit 143) and the launcher shows "No results found". Undocumented, so it could change — re-measure with a `sleep 3` provider if lists start emptying | `bin/noct-common.sh` |
 | Hyprland pauses idle notifications while a client holds a Wayland idle inhibitor | Protocol behaviour, and the layer the windowed-browser-video case rests on. The two window rules are the belt and braces | `conf/rules.lua`, `70-idle.toml` |
 | `shelly install standard/aur --no-confirm` is non-interactive enough for a script | It authenticates through **polkit**, so it needs an agent; in a bare TTY it fails and the pacman path takes over. Both paths are exercised by `--dry-run` | `install.sh` |
