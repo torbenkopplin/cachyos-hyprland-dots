@@ -615,6 +615,15 @@ it needs looking at rather than reading back — **restart Zen first**, since
       from a `:has()`-wrapped selector at specificity 0-3-1, which beats a plain
       `:root .browserStack > browser` at 0-2-1. The generated sheet uses an id
       selector (1-1-1) and a tripled `:root` (0-4-1) for that reason.
+- [ ] No **lighter frame** around the window. Zen leaves an 8px margin around its
+      browser container unpainted, and the blurred wallpaper arrives there at full
+      strength -- measured on all four edges at (61,56,57) against an interior of
+      (31,29,30). The generated sheet paints the chrome root as well as the page
+      for that reason. Scan an edge if it comes back:
+      ```sh
+      grim -g "<window x>,<window y> 140x500" /tmp/edge.png   # then read the
+      # first 10 pixels of a row: they should match the interior, not the wallpaper
+      ```
 - [ ] A page and a **window in the same focus state** read as the same shade:
       reddit next to a focused terminal, then click into the terminal and compare
       again. `browser` sits 0.02 under `window`, deliberately inside the 0.06 the

@@ -234,6 +234,18 @@ write_zen() {
   ) !important;
 }
 
+/* Zen leaves an 8px margin around its browser container, unpainted -- so the
+ * blurred wallpaper arrived there at full strength and drew a lighter frame
+ * around every window. Measured on all four edges. Painting the chrome root
+ * fills it with the same tint as everything else, whatever the gap is made of. */
+:root,
+#main-window {
+  background-color: light-dark(
+    rgba(245, 245, 245, $factor),
+    rgba(18, 18, 18, $factor)
+  ) !important;
+}
+
 #main-window .browserStack > browser {
   background-color: light-dark(
     rgba(245, 245, 245, $factor),
