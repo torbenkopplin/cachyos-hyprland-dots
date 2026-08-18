@@ -192,6 +192,10 @@ do_link() {
     # noct-glass binds are found through. See config/uwsm/env.
     link_tree "$REPO/config/uwsm"     "$CONFIG_HOME/uwsm"
 
+    # The same PATH, through the systemd user manager instead, for the case
+    # where the session was started without uwsm. See config/environment.d.
+    link_tree "$REPO/config/environment.d" "$CONFIG_HOME/environment.d"
+
     heading "Scripts"
     local script
     for script in "$REPO"/bin/*; do

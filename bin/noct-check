@@ -36,7 +36,7 @@ CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
 BIN_HOME=${BIN_HOME:-$HOME/.local/bin}
 REPO_BIN=$(dirname "$(readlink -f "$0")")
 
-NON_INVASIVE=(session-path uwsm-env provider-resolve provider-run
+NON_INVASIVE=(session-path session-env provider-resolve provider-run
               glass-config glass-live glass-legible zen-sheet keyword-inert)
 INVASIVE=(glass-visible kitty-live blur-stacks zen-page monitor-hop column-hop)
 
@@ -114,23 +114,55 @@ check_session_path() {
     fi
 }
 
-check_uwsm_env() {
-    local f=$CONFIG_HOME/uwsm/env
-    [[ -f $f ]] || { fail uwsm-env "$f does not exist -- run ./install.sh"; return; }
+# Both doors onto the session's PATH, because which one is used depends on how
+# the session was started and that is a choice made at the login screen:
+#
+#   ~/.config/uwsm/env             read by uwsm, the intended route
+#   ~/.config/environment.d/*.conf read by the systemd user manager, which
+#                                  covers any user-unit session however it
+#                                  started -- including a plain
+#                                  hyprland.desktop picked at the greeter
+#
+# Each is exercised the way its reader would, and both from a deliberately bare
+# environment. That last part is not a detail: the generator EXPANDS $PATH
+# against what it inherits, so running it from an ordinary shell hands it a
+# PATH that already contains the directory and it passes however the file is
+# written. The environment.d file was first written with %h, which is a UNIT
+# file specifier that environment.d does not expand -- it parsed fine, prepended
+# a literal "%h/.local/bin", and this check said it was fine.
+check_session_env() {
+    local problems=()
 
-    if ! sh -n "$f" 2>/dev/null; then
-        fail uwsm-env "$f is not valid POSIX sh (uwsm sources it with /bin/sh, not fish)"
-        return
+    local f=$CONFIG_HOME/uwsm/env
+    if [[ ! -f $f ]]; then
+        problems+=("$f does not exist -- run ./install.sh")
+    elif ! sh -n "$f" 2>/dev/null; then
+        problems+=("$f is not valid POSIX sh (uwsm sources it with /bin/sh, not fish)")
+    else
+        local got
+        got=$(env -i HOME="$HOME" PATH=/usr/bin sh -c ". '$f'; printf '%s' \"\$PATH\"")
+        [[ ":$got:" == *":$BIN_HOME:"* ]] || problems+=("sourcing $f does not add $BIN_HOME (got: $got)")
     fi
 
-    # Sourcing it from a deliberately bare PATH is the only check that means
-    # anything: the file is a no-op if the directory is already there.
-    local got
-    got=$(env -i HOME="$HOME" PATH=/usr/bin sh -c ". '$f'; printf '%s' \"\$PATH\"")
-    if [[ ":$got:" == *":$BIN_HOME:"* ]]; then
-        pass uwsm-env "puts $BIN_HOME on PATH from a bare environment"
+    local gen=/usr/lib/systemd/user-environment-generators/30-systemd-environment-d-generator
+    if [[ ! -d $CONFIG_HOME/environment.d ]]; then
+        problems+=("$CONFIG_HOME/environment.d does not exist -- run ./install.sh")
+    elif [[ -x $gen ]]; then
+        local envd
+        envd=$(env -i HOME="$HOME" PATH=/usr/bin XDG_CONFIG_HOME="$CONFIG_HOME" \
+                   "$gen" 2>/dev/null | sed -n 's/^PATH=//p' | head -1)
+        if [[ -z $envd ]]; then
+            problems+=("environment.d sets no PATH at all")
+        elif [[ ":$envd:" != *":$BIN_HOME:"* ]]; then
+            problems+=("environment.d expands to a PATH without $BIN_HOME (got: $envd)")
+        fi
+    fi
+
+    if (( ${#problems[@]} == 0 )); then
+        pass session-env "both PATH files put $BIN_HOME on the session's PATH"
     else
-        fail uwsm-env "sourcing it does not add $BIN_HOME (got: $got)"
+        fail session-env "${#problems[@]} problem(s) with the session PATH files"
+        local pr; for pr in "${problems[@]}"; do info "$pr"; done
     fi
 }
 
@@ -602,6 +634,7 @@ tape_probe_monitor() {
 
 check_column_hop() {
     command -v hyprctl >/dev/null 2>&1 || { skip column-hop "no hyprctl"; return; }
+    have_eval || { skip column-hop "this Hyprland has no 'hyprctl eval' to drive the bind with"; return; }
     command -v kitty   >/dev/null 2>&1 || { skip column-hop "kitty is not installed"; return; }
     command -v jq      >/dev/null 2>&1 || { skip column-hop "jq is not installed"; return; }
 
@@ -750,50 +783,87 @@ check_zen_sheet() {
     fi
 }
 
+# The page zen-page measures. Transparent on purpose: the generated stylesheet
+# only ever shows where the page paints nothing, so measuring an ordinary web
+# page measures that page's own background as much as our tint -- and reports a
+# perfectly healthy setup as broken the moment a light-themed site is open.
+# That is not hypothetical; it is what this check did before.
+ZEN_PROBE_TITLE=noct-probe
+
+zen_probe_page() {
+    cat >"$1" <<'HTML'
+<!doctype html>
+<meta charset="utf-8">
+<title>noct-probe</title>
+<style>html, body { background: transparent; margin: 0; height: 100%; }</style>
+HTML
+}
+
 check_zen_page() {
-    command -v grim   >/dev/null 2>&1 || { skip zen-page "grim is not installed"; return; }
-    command -v magick >/dev/null 2>&1 || { skip zen-page "imagemagick is not installed"; return; }
-    command -v jq     >/dev/null 2>&1 || { skip zen-page "jq is not installed"; return; }
+    command -v grim        >/dev/null 2>&1 || { skip zen-page "grim is not installed"; return; }
+    command -v magick      >/dev/null 2>&1 || { skip zen-page "imagemagick is not installed"; return; }
+    command -v jq          >/dev/null 2>&1 || { skip zen-page "jq is not installed"; return; }
+    command -v zen-browser >/dev/null 2>&1 || { skip zen-page "zen-browser is not installed"; return; }
 
-    # The page area, not the window: Zen puts its tabs down the left and its
-    # toolbar across the top, and neither is painted by the rule under test.
-    local pick mon geom
-    pick=$(hyprctl -j clients 2>/dev/null | jq -r --argjson mons "$(hyprctl -j monitors 2>/dev/null)" '
-        [ .[] | select(.class == "zen" and .size[0] > 400 and .size[1] > 400) ] | .[0] as $w
-        | if $w == null then empty else
-            ($mons[] | select(.id == $w.monitor)) as $m
-            | "\($m.name) \(($w.size[0]*0.45|floor))x\(($w.size[1]*0.45|floor))+\($w.at[0] - $m.x + ($w.size[0]*0.45|floor))+\($w.at[1] - $m.y + ($w.size[1]*0.45|floor))"
-          end')
-    [[ -n $pick ]] || { skip zen-page "no Zen window open -- start the browser and rerun"; return; }
-    read -r mon geom <<<"$pick"
+    # An already-running browser: --new-window on a cold start would leave a
+    # browser behind that nobody asked for, and the measurement is about the
+    # real profile with its real extensions anyway.
+    local running
+    running=$(hyprctl -j clients 2>/dev/null | jq -r '[ .[] | select(.class == "zen") ] | length')
+    (( running > 0 )) || { skip zen-page "no Zen window open -- start the browser and rerun"; return; }
 
-    [[ -f $OVERRIDE_FILE ]] && { HAD_OVERRIDE=1; SAVED_OVERRIDE=$(cat "$OVERRIDE_FILE"); }
-    trap restore_glass EXIT INT TERM
+    local tmp; tmp=$(mktemp -d)
+    zen_probe_page "$tmp/probe.html"
 
-    local tmp seen own back rc
-    tmp=$(mktemp -d)
-    zen_unstable() {
-        restore_glass; trap - EXIT INT TERM; rm -rf "$tmp"
-        skip zen-page "the page changed mid-measurement -- rerun on a page that is not animating"
+    local addr i
+    zen-browser --new-window "file://$tmp/probe.html" >/dev/null 2>&1 &
+    for i in $(seq 1 60); do
+        addr=$(hyprctl -j clients 2>/dev/null | jq -r --arg t "$ZEN_PROBE_TITLE" \
+                   '.[] | select(.class == "zen" and (.title | startswith($t))) | .address' | head -1)
+        [[ -n $addr ]] && break
+        sleep 0.25
+    done
+
+    close_zen_probe() {
+        [[ -n ${addr:-} ]] && hyprctl dispatch "hl.dsp.window.close({ window = \"address:$addr\" })" >/dev/null 2>&1
+        rm -rf "$tmp"
     }
 
-    seen=$(capture_stable "$mon" "$geom" "$tmp/seen"); rc=$?
-    (( rc == 2 )) && { zen_unstable; return; }
+    [[ -n $addr ]] || { close_zen_probe; skip zen-page "the probe window never appeared"; return; }
+
+    local geom mon crop
+    geom=$(hyprctl -j clients 2>/dev/null | jq -r --arg a "$addr" --argjson mons "$(hyprctl -j monitors 2>/dev/null)" '
+        .[] | select(.address == $a) as $w
+        | ($mons[] | select(.id == $w.monitor)) as $m
+        | "\($m.name) \(($w.size[0]*0.5|floor))x\(($w.size[1]*0.4|floor))+\($w.at[0] - $m.x + ($w.size[0]*0.4|floor))+\($w.at[1] - $m.y + ($w.size[1]*0.5|floor))"')
+    [[ -n $geom ]] || { close_zen_probe; skip zen-page "could not locate the probe window"; return; }
+    read -r mon crop <<<"$geom"
+    sleep 1.5
+
+    [[ -f $OVERRIDE_FILE ]] && { HAD_OVERRIDE=1; SAVED_OVERRIDE=$(cat "$OVERRIDE_FILE"); }
+    trap 'restore_glass; close_zen_probe' EXIT INT TERM
+
+    local seen own back rc
+    seen=$(capture_stable "$mon" "$crop" "$tmp/seen"); rc=$?
+    (( rc == 2 )) && { restore_glass; close_zen_probe; trap - EXIT INT TERM
+                       skip zen-page "the probe page would not hold still"; return; }
     "$REPO_BIN/noct-glass" set 1.00 >/dev/null 2>&1; sleep 1
-    own=$(capture_stable "$mon" "$geom" "$tmp/own"); rc=$?
-    (( rc == 2 )) && { zen_unstable; return; }
+    own=$(capture_stable "$mon" "$crop" "$tmp/own"); rc=$?
+    (( rc == 2 )) && { restore_glass; close_zen_probe; trap - EXIT INT TERM
+                       skip zen-page "the probe page would not hold still"; return; }
     "$REPO_BIN/noct-glass" set 0.02 >/dev/null 2>&1; sleep 1
-    back=$(capture_stable "$mon" "$geom" "$tmp/back"); rc=$?
-    restore_glass; trap - EXIT INT TERM
-    (( rc == 2 )) && { rm -rf "$tmp"; skip zen-page "the page changed mid-measurement"; return; }
-    rm -rf "$tmp"
+    back=$(capture_stable "$mon" "$crop" "$tmp/back"); rc=$?
+    restore_glass
+    close_zen_probe
+    trap - EXIT INT TERM
+    (( rc == 2 )) && { skip zen-page "the probe page would not hold still"; return; }
 
     local seen_mean own_mean back_mean
     read -r seen_mean _ <<<"$seen"
     read -r own_mean  _ <<<"$own"
     read -r back_mean _ <<<"$back"
 
-    local win browser want
+    local win browser
     read -r win browser <<<"$("$REPO_BIN/noct-glass" show 2>/dev/null | awk '{print $2, $6}')"
 
     local report
@@ -814,11 +884,26 @@ check_zen_page() {
     if (( ! alive )); then
         fail zen-page "the page area has no opacity of its own -- the stylesheet is not winning"
         info "an own alpha of 0 that does not move between two compositor levels is the"
-        info "signature of the transparency mod's rule beating ours. Check zen-sheet, and"
-        info "remember Zen reads userChrome.css once at startup."
+        info "signature of the transparency mod's rule beating ours. Check zen-sheet."
     elif (( ! close )); then
         fail zen-page "the page is at $eff, not the configured $browser"
-        info "most likely the browser has not been restarted since the level changed."
+        # Guessing at the cause is what the rest of this file exists not to do,
+        # and this one is checkable: /proc/<pid> is stamped with the process
+        # start time, so a browser older than the stylesheet is running one that
+        # no longer exists. Locale-free, unlike parsing `ps -o lstart=`.
+        local sheet zpid
+        sheet=$(zen_profiles | head -1)
+        sheet=${sheet:+$sheet/chrome/userChrome.css}
+        zpid=$(pgrep -f zen-browser 2>/dev/null | head -1)
+        if [[ -n $zpid && -f ${sheet:-} ]] \
+           && (( $(stat -c %Y "/proc/$zpid" 2>/dev/null || echo 0) < $(stat -c %Y "$sheet") )); then
+            info "this browser started before the stylesheet was written, so it is running"
+            info "an older one -- Zen reads userChrome.css once, at startup. Restart it."
+        else
+            info "the sheet is doing something, but not the right amount, and the browser"
+            info "is NOT older than the sheet -- so a restart is not the explanation."
+            info "Check zen-sheet, and whether the transparency mod is still enabled."
+        fi
     else
         pass zen-page "the page area composites at the browser level"
     fi
@@ -843,8 +928,15 @@ check_zen_page() {
 # (`dispatch movewindow mon:r`) is a parse error, not a move.
 # ---------------------------------------------------------------------------
 
+# `hyprctl eval` is how a keybind's implementation gets reached without pressing
+# the key. It arrived with the Lua config; on an older Hyprland these checks
+# cannot run at all, and saying so is better than failing as though the binds
+# were broken.
+have_eval() { hyprctl eval 'return true' 2>&1 | grep -qv "^error"; }
+
 check_monitor_hop() {
     command -v hyprctl >/dev/null 2>&1 || { skip monitor-hop "no hyprctl"; return; }
+    have_eval || { skip monitor-hop "this Hyprland has no 'hyprctl eval' to drive the bind with"; return; }
     command -v kitty   >/dev/null 2>&1 || { skip monitor-hop "kitty is not installed"; return; }
     command -v jq      >/dev/null 2>&1 || { skip monitor-hop "jq is not installed"; return; }
 
@@ -1072,9 +1164,13 @@ check_glass_visible() {
     command -v jq     >/dev/null 2>&1 || { skip glass-visible "jq is not installed"; return; }
 
     # The biggest tiled window on the focused monitor, and the monitor it is on.
+    # A terminal, specifically. Any window would do for the arithmetic, but the
+    # answer is only comparable between runs if it is always the same KIND of
+    # window: a browser painting its own page background scores far lower than a
+    # terminal at the same settings, and both are correct. Zen has its own check.
     local pick
-    pick=$(hyprctl -j clients 2>/dev/null | hyprctl_pick_window) || pick=
-    [[ -n $pick ]] || { skip glass-visible "no tiled window to measure"; return; }
+    pick=$(hyprctl -j clients 2>/dev/null | hyprctl_pick_window kitty) || pick=
+    [[ -n $pick ]] || { skip glass-visible "no tiled terminal to measure"; return; }
 
     local mon geom cls
     read -r mon geom cls <<<"$pick"
@@ -1170,7 +1266,10 @@ hyprctl_pick_window() {
     jq -r --argjson mons "$mons" --arg want "$want" '
         [ .[] | select(.floating == false and .hidden != true and .size[0] > 200 and .size[1] > 200)
               | select($want == "" or .class == $want) ]
-        | sort_by(-(.size[0] * .size[1])) | .[0] as $w
+        # Address is the tie-break, and it is not decoration: two windows of the
+        # same size made this pick whichever jq happened to order first, so the
+        # same desktop measured a terminal on one run and a browser on the next.
+        | sort_by([-(.size[0] * .size[1]), .address]) | .[0] as $w
         | if $w == null then empty else
             ($mons[] | select(.id == $w.monitor)) as $m
             | ($w.size[0] * 0.15 | floor) as $ix
@@ -1186,7 +1285,7 @@ usage() { sed -n '4,7p' "$0" | sed 's/^# \?//'; exit 2; }
 run_check() {
     case $1 in
         session-path)     check_session_path ;;
-        uwsm-env)         check_uwsm_env ;;
+        session-env)      check_session_env ;;
         provider-resolve) check_provider_resolve ;;
         provider-run)     check_provider_run ;;
         glass-config)     check_glass_config ;;

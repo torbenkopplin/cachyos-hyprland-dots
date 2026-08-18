@@ -32,7 +32,7 @@ noct-check --list   # the names, so you can run just one
 | check | what it caught |
 |---|---|
 | `session-path` | the launcher providers all answering "No results found" — which is also what a healthy provider with nothing to report looks like |
-| `uwsm-env` | the fix for the above, verified by sourcing it from a deliberately bare PATH |
+| `session-env` | the fix for the above — **both** doors onto the session PATH, each exercised the way its reader would. `~/.config/uwsm/env` is sourced with `/bin/sh`; `~/.config/environment.d/` is run through systemd's own generator. Both from a deliberately bare environment, because running the generator from an ordinary shell hands it a PATH that already contains the directory and it passes however the file is written |
 | `provider-resolve`, `provider-run` | a provider that cannot be found, dies, is slow, or leaks a MAC address into the visible line |
 | `glass-config`, `glass-live` | the config on disk and the running session disagreeing, unnoticed, for a whole session |
 | `glass-legible` | text quietly going grey. Contrast alone does not catch it — the compositor lifts the background while it dims the glyphs, so the *ratio* survives while everything visibly fades. This measures the ink too |
@@ -48,6 +48,13 @@ noct-check --list   # the names, so you can run just one
 The last four are the `--all` set: they drive the display to two extremes and put
 it back, and three of them open a throwaway window (floated and centred by the
 `noct-probe` rule in `conf/rules.lua`, so nothing you were working in moves).
+
+Two files set that PATH, and which one is read depends on how the session
+started: `config/uwsm/env` when uwsm starts the compositor (the intended route,
+and what `install.sh --login` points greetd at), `config/environment.d/` for any
+session started as a systemd user unit however it got there. Picking the plain
+`hyprland.desktop` session instead of `hyprland-uwsm.desktop` at the login
+screen is enough to bypass the first, which is why there are two.
 
 A red `session-path` with green `provider-*` means the providers are fine and
 the session environment is not. To prove that before logging out, run them under
