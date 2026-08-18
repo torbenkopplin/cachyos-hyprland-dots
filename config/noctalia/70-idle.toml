@@ -1,0 +1,51 @@
+## Noctalia -- what happens when you stop typing.
+##
+## This file exists because something has to own idle, and until now two things
+## did. Noctalia has an idle service (disabled by default, which is why it was
+## invisible), and a CachyOS/Hyprland install also ships hypridle as a separate
+## daemon -- on a machine upgraded from ~/repos/dots that daemon was still
+## enabled, still running its old five-minute lock, and still calling scripts
+## from a config directory this repo does not manage. Two countdowns, one
+## screen: whichever fired first won, and neither knew what the other was
+## doing.
+##
+## Noctalia wins the tie-break because it already owns the lock screen, the
+## session menu and the caffeine toggle. install.sh disables the stray
+## hypridle.service; `systemctl --user status hypridle` is how you check.
+##
+## Inhibitors are respected without any setting for it. Hyprland stops issuing
+## idle notifications entirely while a client holds a Wayland idle inhibitor,
+## so a video playing in mpv or in a browser tab pauses every timeout below --
+## see the idle_inhibit rules in config/hypr/conf/rules.lua for the two layers
+## underneath that.
+
+[idle]
+## The order the behaviours below fire in. Names are ours; `action` is what
+## Noctalia does.
+behavior_order = [ "lock", "screen-off", "lock-and-suspend" ]
+
+## A short fade before each one, so the screen going dark is something you can
+## catch and cancel rather than something that just happens.
+pre_action_fade_seconds = 2.0
+
+## Ten minutes, not the five the old hypridle config used. Five is right for a
+## laptop in a cafe and wrong for a desktop at home, where it mostly means
+## typing your password after reading a long page.
+[idle.behavior.lock]
+enabled = true
+action  = "lock"
+timeout = 600
+
+## Backlight off five minutes after the lock. Separate from the lock so the
+## screen is not still lit for ten minutes after you walk away.
+[idle.behavior.screen-off]
+enabled = true
+action  = "screen_off"
+timeout = 900
+
+## Half an hour: long enough that it never interrupts, short enough to matter
+## on a bill. Locks first, so waking up asks for the password.
+[idle.behavior.lock-and-suspend]
+enabled = true
+action  = "lock_and_suspend"
+timeout = 1800

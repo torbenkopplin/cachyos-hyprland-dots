@@ -108,15 +108,39 @@ end
 
 ------------------------------------------------------------------------------
 -- Don't idle-lock during meetings or playback
+--
+-- Three layers, because no single one of them covers the whole case:
+--
+--   1. Apps that ask. mpv, VLC and the browsers hold a Wayland idle inhibitor
+--      while something is actually playing, and Hyprland stops sending idle
+--      notifications for as long as one is held -- so whatever is counting
+--      down (Noctalia, here; see config/noctalia/70-idle.toml) never gets to
+--      the timeout. This is the layer that handles video in a browser tab,
+--      and it needs no rule at all.
+--   2. Anything fullscreen. A fullscreen window is being watched or presented
+--      almost by definition, and "fullscreen" mode costs nothing the rest of
+--      the time.
+--   3. A focused media player, even windowed. A player that is paused and
+--      focused will hold the screen awake under this rule, which is the
+--      trade worth making: the alternative is the screen locking while you
+--      are looking straight at it.
+--
+-- If something still locks under you, SUPER+CTRL+P -> Caffeine is the manual
+-- override, and it is also the thing to reach for when what is playing is
+-- audio in a terminal.
 ------------------------------------------------------------------------------
 
--- "fullscreen" mode inhibits idle only while the window is actually
--- fullscreen, so this is safe to apply everywhere: video calls and playback
--- hold the screen awake, ordinary windows don't.
 hl.window_rule({
     name  = "inhibit-idle-when-fullscreen",
     match = { class = ".*" },
     idle_inhibit = "fullscreen",
+})
+
+-- Matched after the rule above, so for these classes it is what applies.
+hl.window_rule({
+    name  = "inhibit-idle-media-players",
+    match = { class = "^(mpv|vlc|io\\.github\\.celluloid\\.Celluloid|org\\.kde\\.haruna)$" },
+    idle_inhibit = "focus",
 })
 
 ------------------------------------------------------------------------------
