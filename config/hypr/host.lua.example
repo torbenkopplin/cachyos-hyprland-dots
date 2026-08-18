@@ -30,7 +30,10 @@
 --
 -- `column_width` is the default fraction of the monitor a new column takes.
 -- A portrait monitor wants 1.0 (one column fills the width); a wide landscape
--- one wants a third.
+-- one wants a third. Hyprland has no per-monitor form of this option, so
+-- lib/colwidth.lua applies it as focus moves between monitors -- which is why
+-- this is a real per-band setting and not decoration. A band that omits it gets
+-- COLUMN_WIDTH from conf/options.lua.
 
 -- WSBANDS = {
 --     { base =  0, monitor = "DP-3",     direction = "right", column_width = 0.333 },

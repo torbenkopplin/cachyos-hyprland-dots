@@ -38,10 +38,20 @@ right-hand column.
 
 - [ ] `hyprctl getoption general:layout` says `scrolling`.
 - [ ] Opening one window gives it a **third** of the screen, not the whole
-      screen — `fullscreen_on_one_column` is off and `column_width` is 0.333,
+      screen — `fullscreen_on_one_column` is off and `COLUMN_WIDTH` is 0.333,
       both carried over from `~/repos/dots`.
 - [ ] Opening several windows scrolls the tape rightwards.
 - [ ] `SUPER + +` / `-` cycles the six width presets.
+- [x] A new column takes the **focused monitor's band** width, not the global
+      one. Measured 2026-08-18 on the HDMI band (`column_width = 0.5`): before
+      `lib/colwidth.lua` a new window there came out at 0.333, since the layout
+      only ever read the global option; now it is 0.5 and DP-3 stays at 0.33.
+      ```sh
+      hyprctl getoption scrolling:column_width      # follows the focused monitor
+      ```
+      Cross the monitors and read it again — it must change *with* the focus, not
+      one step behind it. (`monitor.focused` fires before the switch is recorded,
+      so a handler that asks for the active monitor gets the old one.)
 
 ## 2. Navigation — `lib/nav.lua`
 
@@ -161,6 +171,13 @@ N*10+1 … N*10+10, and each band carries its own scroll direction.
       `SUPER+K` past the first does nothing. The clamp is what keeps a
       workspace step from landing on another monitor's numbers.
 - [x] A workspace never migrates to a monitor outside its band.
+- [x] Each band's `direction` is in force: on a band set to `down`, columns
+      stack **vertically** and new ones appear below. Verified 2026-08-18 from
+      the geometry (`hyprctl clients`: two windows full-width, one under the
+      other), which is the only way to see it — `hyprctl workspacerules` does
+      not print layout options at all.
+- [x] Each band's `column_width` is in force, which needs `lib/colwidth.lua`
+      (see §1). Setting it in the workspace rule is what does *not* work.
 
 > Both of the workspace selectors that *look* like they would do this are
 > traps: `m~n` is not valid syntax in 0.56 (the dispatcher answers `ok` and
@@ -574,6 +591,9 @@ something misbehaves:
 | ~~A dispatcher's `window` selector accepts a bare address~~ | **Disproven 2026-08-18 on Hyprland 0.56.2.** `window = "0x…"` answers `hl.focus: window not found`; the hyprctl form `"address:0x…"` is what matches. Everything in `lib/nav.lua` that names a window uses the prefixed form | `lib/nav.lua` |
 | ~~Moving a column's windows to another workspace keeps them in one column~~ | **Disproven 2026-08-18 on Hyprland 0.56.2.** Each arriving window starts a column of its own, so a two-window column arrives as two columns. `move_column()` moves them with `follow = false` and then re-consumes them, which also restores the row order | `lib/nav.lua` |
 | ~~`m~n` selects the n-th workspace of the focused monitor~~ | **Disproven 2026-08-18 on Hyprland 0.56.2.** Not valid syntax; the dispatcher answers `ok` and nothing happens, which is why every number key was dead. `lib/ws.lua` does band arithmetic instead | `lib/ws.lua`, `conf/binds.lua` |
+| ~~A workspace rule's `layout_opts` carries the band's `column_width`~~ | **Disproven 2026-08-18 on Hyprland 0.56.2.** The scrolling layout reads `direction` from a workspace rule but takes the width only from the global `scrolling:column_width`, so every band got a third. Measured: a new window on the 0.5 band came out at 0.333. `lib/colwidth.lua` sets the global as monitor focus moves instead | `lib/colwidth.lua`, `conf/workspaces.lua` |
+| ~~`monitor.focused` fires after the switch is recorded~~ | **Disproven 2026-08-18.** Inside the handler `hl.get_active_monitor()` still answers with the monitor you left; the event's own argument is the one being focused. Everything reading a monitor from an event takes the argument | `lib/colwidth.lua` |
+| ~~`hyprctl keyword` can set an option under a Lua config~~ | **Disproven 2026-08-18 on Hyprland 0.56.2.** It answers `keyword can't work with non-legacy parsers. Use eval.` — `hyprctl eval 'hl.config({...})'` is the live equivalent, and it is what the width change rides on | `lib/colwidth.lua` |
 | Noctalia gives a dmenu provider ~2 seconds | **Measured 2026-08-18**: a provider that runs longer is SIGTERMed (exit 143) and the launcher shows "No results found". Undocumented, so it could change — re-measure with a `sleep 3` provider if lists start emptying | `bin/noct-common.sh` |
 | Hyprland pauses idle notifications while a client holds a Wayland idle inhibitor | Protocol behaviour, and the layer the windowed-browser-video case rests on. The two window rules are the belt and braces | `conf/rules.lua`, `70-idle.toml` |
 | `shelly install standard/aur --no-confirm` is non-interactive enough for a script | It authenticates through **polkit**, so it needs an agent; in a bare TTY it fails and the pacman path takes over. Both paths are exercised by `--dry-run` | `install.sh` |

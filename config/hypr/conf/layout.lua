@@ -18,10 +18,12 @@ hl.config({
         -- you close its neighbours.
         fullscreen_on_one_column = false,
 
-        -- Default column width. Overridden per band in conf/workspaces.lua,
-        -- so a portrait monitor can use the full width while this stays a
-        -- third on a wide one.
-        column_width = 0.333,
+        -- Default width of a new column. This is the only place the scrolling
+        -- layout reads it from -- a workspace rule's layout_opts carries
+        -- `direction` but not this -- so lib/colwidth.lua rewrites it as focus
+        -- moves between monitors to give the bands a width of their own. See the
+        -- header of that file.
+        column_width = COLUMN_WIDTH,
 
         -- 1 = fit the focused column into view rather than always centring it.
         -- Centring on every focus change makes wide monitors feel seasick.

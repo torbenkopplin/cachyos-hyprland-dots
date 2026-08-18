@@ -52,6 +52,13 @@ KB_OPTIONS = "caps:ctrl_modifier"
 -- config/hypr/host.lua.example. conf/workspaces.lua builds the rules from it.
 WORKSPACE_BAND = 10
 
+-- Default width of a new column, as a fraction of the monitor. A band in
+-- host.lua overrides this for its own monitor -- a portrait screen wants halves
+-- or the whole width where an ultrawide wants a third -- and lib/colwidth.lua is
+-- what makes that per-monitor value stick. This is the value monitors with no
+-- band of their own get.
+COLUMN_WIDTH = 0.333
+
 ------------------------------------------------------------------------------
 -- Pointer
 ------------------------------------------------------------------------------

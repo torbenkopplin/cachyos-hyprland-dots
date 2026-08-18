@@ -96,6 +96,17 @@ Workspaces stay **dynamic**: nothing is persistent, so a workspace exists while
 something is on it and the bar shows exactly those. The band only decides what
 number a new one gets.
 
+A band's other half is its **column width**, and that is not a workspace rule
+either. `layout_opts` carries the scroll `direction` and the scrolling layout
+does read it — but the width it takes only from the global
+`scrolling:column_width`, so the portrait band that asked for halves quietly got
+thirds like everything else. `lib/colwidth.lua` supplies the per-monitor option
+Hyprland does not have: it sets that global as focus crosses monitors. The value
+is only ever consulted when a new column is created, and a new column appears on
+the monitor you are looking at — so the two are indistinguishable, with no poll
+and no timer. Existing columns are deliberately left alone, or every glance at
+the other screen would undo your `SUPER+PLUS` resizing.
+
 ### Idle has exactly one owner
 
 Noctalia's idle service does the locking (`70-idle.toml`: lock at 10 min,

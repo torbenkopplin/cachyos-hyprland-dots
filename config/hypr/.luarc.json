@@ -26,6 +26,7 @@
     "TERMINAL_FLOAT_CLASS",
     "WSBANDS",
     "WORKSPACE_BAND",
+    "COLUMN_WIDTH",
     "ANIMATIONS"
   ]
 }
