@@ -17,6 +17,13 @@
 # Whatever you pick, Noctalia re-renders every enabled template, so the
 # terminal, GTK/Qt apps and Hyprland's window borders all follow. See
 # config/noctalia/40-templates.toml.
+#
+# `list` reads the active scheme off disk rather than asking the running shell
+# for it. It has to: Noctalia blocks while a provider produces its list, so a
+# `noctalia msg` call from in here deadlocks and the provider is killed at the
+# two-second mark with no output at all -- which is exactly what "/theme does
+# nothing" looked like. See the two-second rule in bin/noct-common.sh.
+# `act` is free to use IPC: activation runs detached.
 
 set -uo pipefail
 
@@ -51,10 +58,13 @@ list() {
     provider theme
     begin_list
 
-    # `color-scheme-get` prints two tokens, e.g. "wallpaper m3-content",
-    # "builtin Gruvbox" or "custom noirblaze".
+    # Two tokens, e.g. "wallpaper m3-content", "builtin Gruvbox" or
+    # "custom noirblaze" -- read from Noctalia's own state files by
+    # noct_scheme(), not over IPC. Empty on a machine that has never resolved a
+    # palette, in which case nothing gets marked active and every entry still
+    # works.
     local current kind name
-    current=$(noctalia msg color-scheme-get 2>/dev/null)
+    current=$(noct_scheme 2>/dev/null) || current=""
     kind=${current%% *}
     name=${current#* }
 
@@ -92,7 +102,7 @@ list() {
 
     # --- mode and maintenance ------------------------------------------------
     local mode
-    mode=$(noctalia msg theme-mode-get 2>/dev/null)
+    mode=$(noct_theme_mode 2>/dev/null)
     item "Toggle dark / light" "currently ${mode:-unknown}" "mode:toggle"
     item "Re-apply templates"  "repaint apps without changing the palette" "apply:"
 }

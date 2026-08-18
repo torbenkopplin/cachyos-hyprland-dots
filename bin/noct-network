@@ -47,10 +47,18 @@ list() {
         # Three single-field queries rather than one multi-field query: nmcli
         # only escapes its separator, and asking for one field at a time
         # sidesteps that entirely. The rows line up.
+        #
+        # --rescan no is not an optimisation, it is what keeps this provider
+        # working. Without it nmcli triggers a scan and blocks until the radio
+        # reports back, which is seconds -- and Noctalia SIGTERMs a provider
+        # that takes longer than two, leaving the launcher with nothing to show
+        # (see bin/noct-common.sh). The cached scan list is what the applet in
+        # every other desktop shows too; "Rescan" below asks for a fresh one
+        # from `exec`, which has no deadline.
         local ssids signals security seen=""
-        ssids=$(nmcli -g SSID device wifi list 2>/dev/null | unescape)
-        signals=$(nmcli -g SIGNAL device wifi list 2>/dev/null)
-        security=$(nmcli -g SECURITY device wifi list 2>/dev/null | unescape)
+        ssids=$(nmcli -g SSID device wifi list --rescan no 2>/dev/null | unescape)
+        signals=$(nmcli -g SIGNAL device wifi list --rescan no 2>/dev/null)
+        security=$(nmcli -g SECURITY device wifi list --rescan no 2>/dev/null | unescape)
 
         while IFS=$'\x1f' read -r ssid signal sec; do
             [[ -z $ssid ]] && continue                  # hidden network
@@ -61,6 +69,7 @@ list() {
             item "$ssid" "${signal}%${sec:+ · $sec}" "wifi:$ssid"
         done < <(paste -d$'\x1f' <(echo "$ssids") <(echo "$signals") <(echo "$security"))
 
+        item "Rescan"         "look for networks in range again" "rescan:"
         item "Turn Wi-Fi off" "" "radio:off"
     else
         item "Turn Wi-Fi on" "the radio is off" "radio:on"
@@ -102,6 +111,12 @@ act() {
             else
                 noctalia msg wifi-disable >/dev/null 2>&1
             fi
+            ;;
+        rescan)
+            # Blocking is fine here -- activation is detached. Reopen the list
+            # afterwards so the fresh results are what you are looking at.
+            nmcli device wifi rescan >/dev/null 2>&1
+            noctalia msg panel-open launcher "/net " >/dev/null 2>&1
             ;;
     esac
 }

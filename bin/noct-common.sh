@@ -25,6 +25,23 @@
 # that would break out of the double quotes in `exec`, and a network name or
 # device id never reaches a shell at all -- it is only ever read back out of
 # the map file.
+#
+# The two-second rule
+# -------------------
+# Noctalia runs `command` synchronously on its render thread and SIGTERMs it
+# after ~2 seconds. A provider that overruns produces no output at all, and the
+# launcher shows "No results found" -- there is no partial list and no error
+# you would see without turning the log level up. Measured on v5.0.0-beta.8;
+# the docs do not mention a limit. Two rules follow from it:
+#
+#   1. `list` must not call `noctalia msg`. The shell is blocked waiting for us
+#      while we would be waiting for it, so the IPC call never returns and the
+#      whole provider is killed at the deadline. Read the state files instead --
+#      noct_setting() below -- which is where Noctalia persists this anyway.
+#   2. `list` must not run anything that can block on the network or on
+#      hardware (a Wi-Fi scan, a Bluetooth discovery, an HTTP request). Ask for
+#      cached results, and offer the slow thing as an *entry* the user can pick
+#      -- `exec` is run detached and has no deadline.
 
 set -o pipefail
 
@@ -94,6 +111,81 @@ payload() {
     awk -F'\t' -v k="$key" '$1 == k { sub(/^[^\t]*\t/, ""); print; exit }' \
         "$(_map_file)" 2>/dev/null
 }
+
+# ---------------------------------------------------------------------------
+# Reading Noctalia's own state
+#
+# `noctalia msg color-scheme-get` would answer these, but a provider may not
+# call it -- see "The two-second rule" above. Noctalia persists the same values
+# as TOML, so read them from disk instead.
+#
+# Precedence matches Noctalia's own: state settings.toml (what the GUI and IPC
+# write) wins over the config directory, and within the config directory the
+# alphabetically last file wins, since that is the merge order.
+# ---------------------------------------------------------------------------
+
+_noct_config_dir() { printf '%s/noctalia' "${XDG_CONFIG_HOME:-$HOME/.config}"; }
+_noct_state_dir()  { printf '%s/noctalia' "${XDG_STATE_HOME:-$HOME/.local/state}"; }
+
+# _toml_get <file> <section> <key> -- one scalar out of one TOML section.
+#
+# Deliberately not a general TOML parser: it handles the flat "key = value"
+# lines under a [section] header, which is the whole shape of the files we read
+# here. Sub-tables are indented in Noctalia's output but that changes nothing --
+# the header line is matched after leading space is stripped, so
+# [lockscreen_widgets.grid] simply is not [theme] and its keys are skipped.
+_toml_get() {
+    [[ -f $1 ]] || return 1
+    awk -v want="$2" -v key="$3" '
+        { line = $0; sub(/^[[:space:]]+/, "", line) }
+        line ~ /^#/ { next }
+        line ~ /^\[/ {
+            sect = line
+            sub(/^\[+/, "", sect); sub(/\]+.*$/, "", sect)
+            in_want = (sect == want)
+            next
+        }
+        in_want {
+            eq = index(line, "=")
+            if (eq == 0) next
+            k = substr(line, 1, eq - 1); v = substr(line, eq + 1)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", k)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+            gsub(/^"|"$/, "", v)
+            if (k == key && v != "") { print v; found = 1; exit }
+        }
+        END { if (!found) exit 1 }
+    ' "$1"
+}
+
+# noct_setting <section> <key> -- first hit in Noctalia's merge order.
+noct_setting() {
+    local file
+    _toml_get "$(_noct_state_dir)/settings.toml" "$1" "$2" && return 0
+    while IFS= read -r file; do
+        _toml_get "$file" "$1" "$2" && return 0
+    done < <(find "$(_noct_config_dir)" -maxdepth 1 -name '*.toml' 2>/dev/null | sort -r)
+    return 1
+}
+
+# noct_scheme -- "<source> <name>", the same two tokens `color-scheme-get`
+# prints. The name lives under a different key per source.
+noct_scheme() {
+    local source name
+    source=$(noct_setting theme source) || return 1
+    case "$source" in
+        builtin)   name=$(noct_setting theme builtin) ;;
+        wallpaper) name=$(noct_setting theme wallpaper_scheme) ;;
+        community) name=$(noct_setting theme community_palette) ;;
+        custom)    name=$(noct_setting theme custom_palette) ;;
+        *)         return 1 ;;
+    esac
+    [[ -n ${name:-} ]] || return 1
+    printf '%s %s' "$source" "$name"
+}
+
+# noct_theme_mode -- dark | light | auto, as `theme-mode-get` would report it.
+noct_theme_mode() { noct_setting theme mode; }
 
 # ---------------------------------------------------------------------------
 # Misc
