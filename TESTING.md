@@ -156,15 +156,17 @@ to watch for is the launcher also opening after ordinary chords.
 - [ ] `SUPER+B` pins it on; `SUPER+B` again releases it back to following panels.
 - [ ] The bar renders **above** a fullscreen window (`layer = "overlay"`).
 
-The form is three floating capsules on an invisible bar, matching the windows
-rather than the screen edge:
+The form is floating capsules on an invisible bar, matching the windows rather
+than the screen edge:
 
 - [x] There is **no slab**: no fill and no border behind the capsules, so the
       wallpaper runs unbroken between them. Verified 2026-08-18 from a screenshot
       of all three ends of the bar.
-- [x] Three capsules — navigation (workspaces + title), time, status — each
-      inset 10px from the screen edge like a window, with the same near-square
-      corners.
+- [x] Four capsules — navigation (workspaces + title), time, media, status —
+      each inset 10px from the screen edge like a window, with the same
+      near-square corners. Media is separate because its width moves with the
+      track; inside the status capsule that shuffled the whole row sideways every
+      few minutes. It is gone entirely when nothing is playing.
 - [x] `noctalia config validate` passes. `capsule_group` entries are keyed by
       `id`, and the lanes reference them as `"group:<id>"`; a `name` key is
       accepted by the TOML but ignored, so the lane silently finds no group.
@@ -172,6 +174,34 @@ rather than the screen edge:
       `capsule_opacity` is held at the glass level by hand (0.90) — `noct-glass`
       deliberately does not write Noctalia config, so if you change the level in
       `glass.conf` this is the one number that does not follow.
+
+The styling is three rules, and each is visible in one glance at the bar:
+
+- [x] **One accent.** `primary` appears exactly twice: the workspace pill you
+      are on, and the control-centre button. Nothing else on the bar is coloured
+      by category. (A battery warning is `error`, which is a state, not a
+      category.)
+- [x] **Two text levels.** The clock is `on_surface` at weight 600; the date,
+      the window title and the track are `on_surface_variant` at 400-500. The
+      clock should be the first thing you see in the middle capsule and the date
+      the second.
+- [x] **No word an icon already says.** Network, bluetooth and volume are
+      icon-only — `enp4s0` on a bar is a debug print — and the battery is a
+      glyph. Notifications are absent unless something is unread; bluetooth is
+      absent with nothing connected.
+- [x] `active_window` is `text_only` on purpose: the widget draws a window glyph
+      before the title either way, so asking for the app icon as well gives you
+      two icons for one window. Checked by flipping `display` and comparing
+      screenshots.
+
+> Every widget key here is checked by the validator, contrary to the note that
+> used to be in TODO.md — an unknown key is named and a bad enum value is
+> rejected. That makes it a probe: write a deliberately wrong value and the
+> error tells you the type or the allowed set.
+> ```sh
+> printf '[widget.battery]\ndisplay_mode = "__probe__"\n' > /tmp/w.toml
+> noctalia config validate /tmp/w.toml   # -> not one of the allowed values
+> ```
 
 > If the namespaces are wrong, list them while a panel is open:
 > `hyprctl layers | grep noctalia`
@@ -659,6 +689,8 @@ something misbehaves:
 | ~~`colors.tertiary` is available to a user template~~ | **Verified 2026-08-18 on noctalia v5.0.0-beta.8**: renders to real hex (`#ffffff` on noirblaze), so the border gradient has a second role to use | `templates/hyprland-colors.lua` |
 | ~~A bar capsule group is named with `name`~~ | **Disproven 2026-08-18 on noctalia v5.0.0-beta.8.** The key is `id`; `name` validates as an unknown setting and the lane's `group:<id>` then matches nothing. Probed with `noctalia config validate`, which names unknown keys | `10-bar.toml` |
 | ~~`hyprctl eval` prints what the snippet returns~~ | **Disproven 2026-08-18 on Hyprland 0.56.2.** It prints `ok` or an error, never the value — so every `return ...` check in this file was reading its own hope. Assert instead, or write to a file with `io` (which the sandbox does provide) | this file, throughout |
+| ~~`noctalia config validate` does not check widget keys~~ | **Disproven 2026-08-18 on v5.0.0-beta.8.** It names unknown widget settings and rejects values outside a key's allowed set, which makes it the fastest way to discover both — the widget schema in this repo was derived that way rather than guessed | `10-bar.toml` |
+| ~~A capsule outline draws when `capsule_border` is set~~ | **Disproven 2026-08-18.** The colour applies to nothing on its own; the only width available is `border_width`, which outlines the *bar* — and with an invisible bar that draws a full-width line above and below the capsules. Left unset | `10-bar.toml` |
 | Noctalia gives a dmenu provider ~2 seconds | **Measured 2026-08-18**: a provider that runs longer is SIGTERMed (exit 143) and the launcher shows "No results found". Undocumented, so it could change — re-measure with a `sleep 3` provider if lists start emptying | `bin/noct-common.sh` |
 | Hyprland pauses idle notifications while a client holds a Wayland idle inhibitor | Protocol behaviour, and the layer the windowed-browser-video case rests on. The two window rules are the belt and braces | `conf/rules.lua`, `70-idle.toml` |
 | `shelly install standard/aur --no-confirm` is non-interactive enough for a script | It authenticates through **polkit**, so it needs an agent; in a bare TTY it fails and the pacman path takes over. Both paths are exercised by `--dry-run` | `install.sh` |

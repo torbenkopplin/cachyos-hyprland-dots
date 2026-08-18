@@ -14,10 +14,16 @@ desktop, then delete:
       `direction` from a workspace rule but takes the width only from the global
       option, so `lib/colwidth.lua` sets that global as focus crosses monitors.
       It is a host-level setting, in `WSBANDS` where you expected it
-- [x] zen's translucency meets the desktop's: its own background is tinted to
-      0.6, which lands at 0.54 once the compositor has had its turn, against a
-      tenth of the wallpaper for a terminal. Also fixes why no Zen pref had ever
-      applied — the profile root is `~/.config/zen`, not `~/.zen`
+- [x] zen's translucency meets the desktop's, from both sides: Zen's own
+      background and page area are tinted to 0.75 (~0.67 once the compositor has
+      had its turn) and the terminal comes down to 0.85, where before it was an
+      opaque window beside a hole in the desktop. Also fixes why no Zen pref had
+      ever applied — the profile root is `~/.config/zen`, not `~/.zen`
+- [x] the bar is styled rather than assembled: one accent (`primary`, on the
+      workspace you are on and the control-centre button), two text levels, and
+      no widget stating in words what its icon says — `enp4s0` and a stray
+      percentage are gone, media has its own capsule so the status row stops
+      shuffling
 - [x] `SUPER+CTRL+hjkl` moves whole columns, and at the end of the tape the
       column goes to the next workspace
 - [x] the Wi-Fi passphrase prompt opens at all — `$TERMINAL` is a command line,
@@ -60,16 +66,18 @@ desktop, then delete:
 - [x] After that: `SUPER+,` → Security → Noctalia Greeter → **Sync Now**, so
       the login screen uses the current wallpaper and palette.
 - [ ] `aerc` account setup (first run walks you through it).
-- [ ] **Restart Zen.** `user.js` is only read at startup, and it is already
-      linked into both profiles under `~/.config/zen`. Then look at reddit or
-      youtube next to a terminal: they should read as the same material at
-      different depths. The alpha in `zen_transparency_color` is the knob —
-      raise it towards 1.0 to converge on the rest of the desktop. `TESTING.md`
-      §10 has the two things that could still be wrong on the Zen side.
-- [ ] Say which of the three new numbers to move, if any: `ROUNDING = 2`
-      (`conf/options.lua`), `capsule_opacity = 0.90` (`10-bar.toml`), and the
-      Zen tint above. They are deliberately in three separate files because
-      each governs a different surface.
+- [ ] **Restart Zen.** `user.js` and `userChrome.css` are only read at startup,
+      and both are already linked into the profiles under `~/.config/zen`. Then
+      look at reddit or youtube next to a terminal: they should read as the same
+      material at different depths. Two alphas, kept equal, are the knob —
+      `zen_transparency_color` in `user.js` for the chrome and the same value in
+      `userChrome.css` for the page area. `TESTING.md` §10 has the one thing that
+      could still be wrong on the Zen side.
+- [ ] Say which of these numbers to move, if any: `ROUNDING = 2`
+      (`conf/options.lua`), `capsule_opacity = 0.90` (`10-bar.toml`),
+      `terminal = 0.85` (`glass.conf`) and the Zen tint above. They are in
+      separate files because each governs a different surface — the terminal and
+      the browser are the two that were furthest apart.
 - [ ] The last unticked Wi-Fi check in `TESTING.md` §6 needs a **secured network
       this machine has not joined before** — everything up to the passphrase
       prompt is verified, the no-echo half cannot be faked.
@@ -80,10 +88,13 @@ desktop, then delete:
 ## Open
 
 - [x] The bar's workspace widget shows only occupied workspaces. That is
-      Noctalia's dynamic behaviour and it matches the band model, but if you
-      want a fixed row of ten pills per monitor, that is a `[widget.workspaces]`
-      option — the settings GUI is the fastest way to find its name, since the
-      config validator does not check widget keys.
+      Noctalia's dynamic behaviour and it matches the band model. **Settled
+      2026-08-18:** it is not a widget option — the widget draws the workspaces
+      that exist, so a fixed row of ten per monitor means `persistent = true` on
+      the workspace rules in `conf/workspaces.lua`, which is a compositor change
+      and gives up the dynamic model. The widget's own keys are all checkable:
+      `noctalia config validate` names an unknown one and rejects a bad enum
+      value, so writing a deliberately wrong value is how you find both.
 - [ ] Nothing verifies the greeter's appearance sync from a script; it is a GUI
       action in beta.8 (`noctalia msg greeter-sync` does not exist yet). Worth
       re-checking on the next Noctalia release.

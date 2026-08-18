@@ -60,12 +60,28 @@ Notifications and OSDs are deliberately excluded — a notification must not dra
 the bar on screen with it.
 
 It is also built from the same parts as everything else on screen. The bar
-surface is invisible — no fill, no border — and what you see are three
-**capsules**: navigation, time, status. Each is inset from the screen edge by the
-same 10px a window is, carries the same near-square radius, and shows the same
-amount of wallpaper through it as the frosted-glass level does. A full-width slab
-with concave corners was the one element built to a different rule, which is
-exactly what made it read as furniture rather than as another surface.
+surface is invisible — no fill, no border — and what you see are **capsules**:
+navigation, time, media, status. Each is inset from the screen edge by the same
+10px a window is, carries the same near-square radius, and shows the same amount
+of wallpaper through it as the frosted-glass level does. A full-width slab with
+concave corners was the one element built to a different rule, which is exactly
+what made it read as furniture rather than as another surface.
+
+Inside them the styling is three rules, and they are what separate a bar that
+was *designed* from a bar that merely *works*:
+
+1. **One accent.** `primary` marks the workspace you are on and the button that
+   opens the control centre. Nothing else. A bar that colours every widget by
+   category has spent the only signal it had for "here".
+2. **Two text levels.** `on_surface` at weight 600 for the clock — the one thing
+   you look at deliberately — and `on_surface_variant` at 400–500 for the date,
+   the window title and the track, which you only glance at.
+3. **No word that an icon already says.** The network widget was printing
+   `enp4s0`, the battery a percentage; both are icons now, with the detail in the
+   panel behind them. Notifications appear only when something is unread.
+
+Media has a capsule of its own because its width follows the track title, and in
+a shared capsule that shuffled the whole status row sideways every few minutes.
 
 The blur behind them is the layer rule in `conf/rules.lua`, and
 `ignore_alpha = 0.5` is what keeps the transparent part of the bar from being

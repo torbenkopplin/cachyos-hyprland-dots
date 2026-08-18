@@ -82,7 +82,7 @@ radius_bottom_right  = 2
 ## capsule_thickness is a fraction of `thickness`, so the capsule sits inside the
 ## bar's height with a little air around it rather than filling it edge to edge.
 capsule              = true
-capsule_fill         = "surface_variant"
+capsule_fill         = "surface"
 capsule_opacity      = 0.90
 capsule_padding      = 8
 capsule_radius       = 2
@@ -100,39 +100,149 @@ font_weight     = 500
 ## Lanes name capsule groups rather than widgets; a "group:<id>" entry with no
 ## matching capsule_group below is dropped with a warning at load.
 ##
-## Widget ids are upstream's own spelling, which is inconsistent on purpose:
-## most are snake_case, "control-center" is not.
+## Four islands, not three: media has its own because its width changes with the
+## track, and inside a shared capsule that made the whole status block shuffle
+## sideways every few minutes. It is absent entirely when nothing is playing.
+##
+## Widget ids are arbitrary -- `type` is what names the widget -- which is how
+## `date` below can be a second clock. Upstream's own type spelling is
+## inconsistent on purpose: most are snake_case, "control-center" is not.
 start  = ["group:navigation"]
 center = ["group:time"]
-end    = ["group:status"]
+end    = ["group:media", "group:status"]
 
-## Where you are, and what you are looking at.
+## Where you are, and what you are looking at -- in that order of importance,
+## which the colours below reinforce.
 [[bar.default.capsule_group]]
 id      = "navigation"
 members = ["workspaces", "gap", "active_window"]
 
+## Time, then date at half the emphasis.
 [[bar.default.capsule_group]]
 id      = "time"
-members = ["clock"]
+members = ["clock", "date"]
 
-## Everything that is a state rather than a place.
+[[bar.default.capsule_group]]
+id      = "media"
+members = ["media"]
+
+## System state and the one button. The tray leads because its width is the only
+## thing here that changes; the fixed icons stay anchored to the screen edge.
 [[bar.default.capsule_group]]
 id      = "status"
-members = ["media", "tray", "notifications", "network", "bluetooth", "volume", "battery", "control-center"]
+members = ["tray", "network", "bluetooth", "volume", "battery", "notifications", "control-center"]
+
+## ---------------------------------------------------------------------------
+## Widgets
+##
+## Three rules hold the styling together:
+##
+##   1. ONE accent. `primary` marks the workspace you are on and the button that
+##      opens the control centre -- nothing else, apart from a battery warning,
+##      which is a state and not decoration. A bar that colours every widget by
+##      category has no way left to say "here".
+##   2. Two text levels. `on_surface` for what you read (the clock, the
+##      workspace you are on), `on_surface_variant` for what you glance at (the
+##      window title, the date, the track). Weight follows: 600 for the clock,
+##      the bar default of 500 for everything else.
+##   3. Nothing states in words what its icon already says. The network widget
+##      was printing `enp4s0` and the battery a percentage for a mouse; both are
+##      icons now, with the detail in the tooltip and the panel behind them.
+## ---------------------------------------------------------------------------
+
+## Numbers rather than dots: the bar is summoned rather than watched, so when it
+## does appear "which workspace is this" should be readable rather than inferred.
+## The active pill is more than twice as long as the others, which is what makes
+## the row read as a position on a strip instead of a set of buttons.
+[widget.workspaces]
+style                     = "regular"
+label_source              = "id"
+show_labels               = true
+labels_only_when_occupied = false
+active_pill_size          = 2.4
+inactive_pill_size        = 1.0
+pill_scale                = 0.9
+focused_color             = "primary"
+occupied_color            = "on_surface_variant"
+empty_color               = "outline"
 
 [widget.gap]
 type   = "spacer"
-length = 16
-
-[widget.clock]
-format = "{:%H:%M  ·  %a %d %b}"
-
-[widget.media]
-hide_when_no_media = true
-title_scroll       = "on_hover"
+length = 12
 
 ## The bar is hidden while you work, so when it does appear the window title is
-## useful context rather than permanent noise -- give it room.
+## useful context rather than permanent noise -- give it room, but keep it a
+## shade quieter than the workspace it belongs to.
+## text_only, not icon_and_text: the widget draws a window glyph before the title
+## either way -- that one is not optional -- so asking for the app icon as well
+## gets you two icons for one window. The title is the context; the glyph in front
+## of it is enough of a marker.
 [widget.active_window]
+display      = "text_only"
 max_length   = 420
 title_scroll = "on_hover"
+color        = "on_surface_variant"
+
+## The clock is the one thing on this bar you look at deliberately, so it is the
+## only text carrying weight.
+[widget.clock]
+format      = "{:%H:%M}"
+font_weight = 600
+color       = "on_surface"
+
+## A second clock, as the date: same capsule, half the emphasis. A date is
+## something you check, not something you read.
+[widget.date]
+type        = "clock"
+format      = "{:%a %d %b}"
+font_weight = 400
+color       = "on_surface_variant"
+
+## Title only, capped. The artist doubles the width for something the sound has
+## already told you.
+[widget.media]
+hide_when_no_media = true
+hide_artist        = true
+art_size           = 18
+max_length         = 260
+title_scroll       = "on_hover"
+color              = "on_surface_variant"
+
+## Third-party icons, so the one thing worth enforcing is that they sit on the
+## same rhythm as everything else rather than jammed together.
+[widget.tray]
+match_adjacent_spacing = true
+
+## `enp4s0` on a bar is a debug print, not information: the interface, the
+## address and the speed are all in the panel this opens.
+[widget.network]
+show_label = false
+
+## Hidden when nothing is connected, rather than a permanently dead glyph.
+## SUPER+CTRL+B reaches the devices either way.
+[widget.bluetooth]
+show_label                    = false
+hide_when_no_connected_device = true
+
+[widget.volume]
+show_label = false
+mute_color = "outline"
+
+## Kept for the machines that have one: with no battery at all the widget draws
+## nothing, so it costs this desktop a line of config and no pixels. A glyph
+## rather than a percentage, and `error` for the warning -- the one other colour
+## allowed here, because a flat battery is a state you need told rather than a
+## category being decorated.
+[widget.battery]
+display_mode  = "glyph"
+show_label    = false
+label_content = "percent"
+warning_color = "error"
+
+## Silent unless there is something to say.
+[widget.notifications]
+hide_when_no_unread = true
+
+## The one button, and the only other thing allowed to use the accent.
+[widget.control-center]
+color = "primary"
