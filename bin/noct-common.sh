@@ -203,8 +203,41 @@ need() {
 
 # Run an interactive command in a terminal. Needed for the few operations that
 # must prompt (a Wi-Fi passphrase): Noctalia runs `exec` detached, with no tty.
+#
+# $TERMINAL is a command LINE, not a binary name -- conf/env.lua sets it to
+# "kitty -1". Testing the whole string with `command -v` therefore always failed,
+# fell through to an xterm that is not installed, and lost the error to the
+# redirect below: picking a secured network appeared to do nothing at all. So
+# split it into words and test the first one.
+#
+# $TERMINAL_FLOAT is preferred because everything that comes through here is a
+# modal prompt, and conf/rules.lua already floats, sizes and centres that class.
 in_terminal() {
-    local term=${TERMINAL:-kitty}
-    command -v "$term" >/dev/null 2>&1 || term=xterm
-    setsid "$term" -e "$@" >/dev/null 2>&1 &
+    local -a term
+    read -r -a term <<<"${TERMINAL_FLOAT:-${TERMINAL:-}}"
+
+    if [[ ${#term[@]} -eq 0 ]] || ! command -v "${term[0]}" >/dev/null 2>&1; then
+        term=()
+        local candidate
+        # -e is the historical "run this command" flag; all of these accept it.
+        for candidate in kitty foot alacritty ghostty konsole xterm; do
+            if command -v "$candidate" >/dev/null 2>&1; then
+                term=("$candidate")
+                break
+            fi
+        done
+    fi
+
+    if [[ ${#term[@]} -eq 0 ]]; then
+        notify-send -a Noctalia -u critical "No terminal found" \
+            "Set \$TERMINAL to one that is installed" 2>/dev/null
+        return 1
+    fi
+
+    # A prompt window that closes the instant the command fails tells you
+    # nothing -- and "wrong passphrase" is exactly the case this exists for.
+    setsid "${term[@]}" -e sh -c '"$@" || {
+        printf "\n[%s] failed -- press Enter to close" "$1" >&2
+        read -r _
+    }' sh "$@" >/dev/null 2>&1 &
 }

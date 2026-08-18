@@ -216,8 +216,28 @@ Then through the launcher:
       in range — and it appears **immediately**, because it reads nmcli's
       cached scan. "Rescan" is an entry in that list; picking it re-runs the
       scan and reopens the list.
-- [o] Connecting to a **new, secured** Wi-Fi network opens a kitty window with
-      `nmcli --ask` and the passphrase is not echoed.
+- [x] A prompt window opens at all. This is what was broken: `$TERMINAL` is a
+      command *line* (`kitty -1`), `in_terminal` tested the whole string as a
+      binary name, fell through to an xterm that is not installed, and lost the
+      error to a redirect — so picking a secured network did nothing visible.
+      Exercised without touching the radio, on all three resolution paths:
+      ```sh
+      env -u TERMINAL TERMINAL_FLOAT="kitty --class scratchterm" \
+          bash -c '. bin/noct-common.sh; in_terminal sh -c "echo ok > /tmp/t"'
+      env -u TERMINAL_FLOAT TERMINAL="kitty -1" \
+          bash -c '. bin/noct-common.sh; in_terminal sh -c "echo ok > /tmp/t"'
+      env -u TERMINAL_FLOAT -u TERMINAL \
+          bash -c '. bin/noct-common.sh; in_terminal sh -c "echo ok > /tmp/t"'
+      ```
+      All three write the file. It arrives as the **floating** scratch window
+      (`hyprctl clients` shows class `scratchterm`, 1000x640, centred), because
+      a passphrase prompt is a modal and should not claim a column.
+- [x] A command that *fails* leaves the window on screen with
+      `[...] failed -- press Enter to close` rather than vanishing. Test with
+      `in_terminal false`; a wrong passphrase is exactly this case.
+- [ ] Connecting to a **new, secured** Wi-Fi network runs `nmcli --ask` in that
+      window and the passphrase is not echoed. Needs a network you have not
+      joined before, so it is the one half of this that cannot be faked.
 - [x] `/power` switches profile and toggles night light.
 - [x] `SUPER+CTRL+O/I/B/N/P/T` each open the launcher already filtered.
 
@@ -559,6 +579,7 @@ something misbehaves:
 | `shelly install standard/aur --no-confirm` is non-interactive enough for a script | It authenticates through **polkit**, so it needs an agent; in a bare TTY it fails and the pacman path takes over. Both paths are exercised by `--dry-run` | `install.sh` |
 | `noctalia-greeter-session` is the greetd entry point | From upstream's README; the packaged path is resolved with `command -v` rather than hardcoded | `install.sh` |
 | Gesture action `scroll_move` | Documented, untested | `conf/input.lua` |
+| ~~kitty rejects `-e`~~ | **Disproven 2026-08-18**: undocumented in `kitty --help`, but accepted as a compatibility alias — `kitty -e sh -c '...'` runs the command. foot, alacritty, ghostty, konsole and xterm take it too, so `in_terminal` can use one form for all of them | `bin/noct-common.sh` |
 | Built-in template ids (`qt`, `kcolorscheme`, …) | Taken from CachyOS's shipped config; verify with `noctalia theme --list-templates` | `40-templates.toml` |
 | A `post_hook` is run through a shell (so `${VAR:-default}` expands) | Docs say hooks are rendered by the template engine then executed; shell semantics assumed | `40-templates.toml` |
 | `hyprctl reload` picks up a newly created `generated/colors.lua` | Hyprland reloads on config change; whether it watches `require`d files is unconfirmed, hence the explicit reload | `40-templates.toml` |

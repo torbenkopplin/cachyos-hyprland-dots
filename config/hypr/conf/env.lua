@@ -30,6 +30,14 @@ hl.env("ELECTRON_OZONE_PLATFORM_HINT", "auto")
 -- use $TERMINAL. Do NOT append -e here; Noctalia adds the exec flag itself.
 hl.env("TERMINAL", TERMINAL)
 
+-- The launcher providers open one of these when something has to be typed that
+-- Noctalia cannot prompt for -- a Wi-Fi passphrase (bin/noct-common.sh's
+-- in_terminal). It is exported so that prompt arrives as the floating, centred
+-- scratch window conf/rules.lua already describes, rather than as a new column
+-- shoved onto the tape. Note that both of these are command *lines* and not
+-- binary names: anything reading them has to split on whitespace first.
+hl.env("TERMINAL_FLOAT", TERMINAL_FLOAT)
+
 -- yazi, git and anything else that shells out to an editor read these.
 hl.env("EDITOR", "nvim")
 hl.env("VISUAL", "nvim")
