@@ -217,6 +217,14 @@ window's own alpha, so a 0.9 window gets a tenth of the blur and the effect
 disappears — this is the setting that makes compositor-driven glass actually
 look frosted rather than merely faded.
 
+**The blur is also what makes the levels above mean anything.** `blur.xray` has
+every window sample the wallpaper behind itself, so at a small radius two windows
+at the same level come out as different shades depending on what they happen to be
+sitting over — measured at 4–6 levels of 255 on this wallpaper, which reads as
+"one is grey and one is black". `size 32 / passes 4` at `brightness 0.65` and
+`vibrancy 0.05` flattens that to 2 levels. See [design notes](design.md) for the
+numbers; the cost is that you see less of the wallpaper's shape through a window.
+
 Set `window = 1.0` for app-translucency only, which is what `~/repos/dots`
 does today: nothing fades except surfaces an app draws translucent itself.
 

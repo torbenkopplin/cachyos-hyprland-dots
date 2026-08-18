@@ -266,8 +266,29 @@ hl.config({
 
         blur = {
             enabled = $blur_enabled,
-            size    = 8,
-            passes  = 2,
+
+            -- Big and flat on purpose, and this is the setting that decides
+            -- whether the desktop looks like ONE material.
+            --
+            -- With xray on, every window samples the wallpaper behind itself. At
+            -- size 8 / passes 2 the blur keeps the photo's local brightness, so
+            -- two windows at identical opacity read as different shades -- one
+            -- over a bright part of the image, one over a dark part. Measured
+            -- 2026-08-18 on this wallpaper: the backdrops behind two kitty
+            -- windows differed by 24-41 of 255, which landed as a 4-6 level
+            -- difference in what you saw. Nothing about the windows was
+            -- different; both measured an own-alpha of 1.00.
+            --
+            -- At size 32 / passes 4, dimmed and desaturated, the same two
+            -- backdrops differ by 5 and the windows land within 2 levels of each
+            -- other -- below what the eye picks up. passes = 5 buys the last
+            -- level if you want it, at another full blur pass.
+            --
+            -- The trade is real: the flatter this is, the less of the wallpaper's
+            -- shape you see through a window. The gaps between windows still show
+            -- it unblurred, which is where the image is meant to be looked at.
+            size    = 32,
+            passes  = 4,
 
             -- Blur behind a window at full strength regardless of how
             -- translucent that window is; without it a 0.9 window gets only a
@@ -278,10 +299,14 @@ hl.config({
             -- busy window behind does not show through as noise.
             xray = true,
 
-            brightness = 0.85,
-            contrast   = 1.0,
+            -- Dimmer and nearly colourless: brightness is what stops a bright
+            -- patch of wallpaper from lifting a window out of the set, and
+            -- vibrancy is what stops it from tinting one window blue and its
+            -- neighbour orange.
+            brightness = 0.65,
+            contrast   = 0.90,
             noise      = 0.01,
-            vibrancy   = 0.1696,
+            vibrancy   = 0.05,
 
             popups             = true,
             popups_ignorealpha = 0.4,

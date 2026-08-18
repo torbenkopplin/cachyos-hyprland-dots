@@ -58,13 +58,19 @@ hl.config({
             enabled = false, -- shadows on a scrolling tape are just noise
         },
 
+        -- Fallbacks only, and kept in step with bin/noct-glass, which overwrites
+        -- all of this from generated/glass.lua. Big, dim and desaturated is what
+        -- makes every translucent surface land on the same shade wherever it sits
+        -- over the wallpaper -- see the note in that script for the measurement.
         blur = {
             enabled        = true,
-            size           = 8,
-            passes         = 2,
+            size           = 32,
+            passes         = 4,
             xray           = true,
             ignore_opacity = true,
-            vibrancy       = 0.1696,
+            brightness     = 0.65,
+            contrast       = 0.90,
+            vibrancy       = 0.05,
             popups         = true,
         },
     },
