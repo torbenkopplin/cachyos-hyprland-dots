@@ -14,11 +14,17 @@ desktop, then delete:
       `direction` from a workspace rule but takes the width only from the global
       option, so `lib/colwidth.lua` sets that global as focus crosses monitors.
       It is a host-level setting, in `WSBANDS` where you expected it
-- [x] zen's translucency meets the desktop's, from both sides: Zen's own
-      background and page area are tinted to 0.75 (~0.67 once the compositor has
-      had its turn) and the terminal comes down to 0.85, where before it was an
-      opaque window beside a hole in the desktop. Also fixes why no Zen pref had
-      ever applied — the profile root is `~/.config/zen`, not `~/.zen`
+- [x] zen's translucency meets the desktop's, and the level is a real glass level:
+      `browser` in `glass.conf` alongside `window` and `terminal`, which
+      `noct-glass` divides by the window opacity and writes into the Zen profile.
+      Set 0.02 under a window on purpose — the compositor takes 0.06 off an
+      unfocused one, so anything a full step below reads as *a window in the other
+      focus state*, which is exactly what "zen active looks like kitty inactive"
+      was. Also fixes why no Zen pref had ever applied — the profile root is
+      `~/.config/zen`, not `~/.zen`
+- [x] `terminal` is back to matching `window`, because kitty applies
+      `background_opacity` only at startup (measured): a terminal-specific level
+      quietly gives you two shades of terminal until every window is restarted
 - [x] the bar is styled rather than assembled: one accent (`primary`, on the
       workspace you are on and the control-centre button), two text levels, and
       no widget stating in words what its icon says — `enp4s0` and a stray
@@ -66,18 +72,19 @@ desktop, then delete:
 - [x] After that: `SUPER+,` → Security → Noctalia Greeter → **Sync Now**, so
       the login screen uses the current wallpaper and palette.
 - [ ] `aerc` account setup (first run walks you through it).
-- [ ] **Restart Zen.** `user.js` and `userChrome.css` are only read at startup,
-      and both are already linked into the profiles under `~/.config/zen`. Then
-      look at reddit or youtube next to a terminal: they should read as the same
-      material at different depths. Two alphas, kept equal, are the knob —
-      `zen_transparency_color` in `user.js` for the chrome and the same value in
-      `userChrome.css` for the page area. `TESTING.md` §10 has the one thing that
-      could still be wrong on the Zen side.
+- [ ] **Restart Zen once more.** The prefs and the stylesheet are read at
+      startup, and both are in place now (`~/.config/zen/*/chrome/userChrome.css`,
+      generated). Then compare a page with a window *in the same focus state*:
+      click into the terminal and back. They should read as one material.
+- [ ] Then say which way to take `browser` in `glass.conf`. It is 0.88 against a
+      window of 0.90 — the two read as the same material and the transparency mod
+      is contributing a whisper. 0.83 gives the glassy look back and puts them a
+      focus step apart, which is what you were looking at before. There is no
+      value that does both; `noct-glass apply` plus a Zen restart switches.
 - [ ] Say which of these numbers to move, if any: `ROUNDING = 2`
-      (`conf/options.lua`), `capsule_opacity = 0.90` (`10-bar.toml`),
-      `terminal = 0.85` (`glass.conf`) and the Zen tint above. They are in
-      separate files because each governs a different surface — the terminal and
-      the browser are the two that were furthest apart.
+      (`conf/options.lua`), `capsule_opacity = 0.90` (`10-bar.toml`) and
+      `browser` above. Each governs a different surface, which is why they are in
+      separate files.
 - [ ] The last unticked Wi-Fi check in `TESTING.md` §6 needs a **secured network
       this machine has not joined before** — everything up to the passphrase
       prompt is verified, the no-echo half cannot be faked.

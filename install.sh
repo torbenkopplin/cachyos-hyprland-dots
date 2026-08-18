@@ -783,19 +783,12 @@ install_user_js() {  # <source user.js> <label> <profiles root>...
     # More than one root because a browser's profile directory is not a stable
     # thing: Zen moved from ~/.zen to ~/.config/zen, and a file written to the
     # root the browser is not using is invisible rather than an error.
-    # A userChrome.css beside the user.js is installed with it. It is how you
-    # reach the things no pref exposes -- Zen's page-area backdrop -- and the
-    # pref that makes the browser load it at all is in the user.js next door, so
-    # neither is useful without the other.
-    local chrome_css=${src%/*}/userChrome.css
-
     local found=0 root profile
     for root in "$@"; do
         [[ -d $root ]] || continue
         while IFS= read -r -d '' profile; do
             found=1
             link "$src" "$profile/user.js"
-            [[ -f $chrome_css ]] && link "$chrome_css" "$profile/chrome/userChrome.css"
         done < <(find "$root" -maxdepth 1 -type d -name '*.*' -print0 2>/dev/null)
     done
 
@@ -1039,6 +1032,18 @@ do_browsers() {
     # so the Zen half of --browsers had never actually landed. ~/.zen is kept as
     # a second candidate for older builds and the flatpak.
     install_user_js "$REPO/browsers/zen/user.js" Zen "$HOME/.config/zen" "$HOME/.zen"
+
+    # Zen's frosted-glass level is a stylesheet rather than a pref, and it is
+    # generated from ~/.config/noctalia/glass.conf rather than tracked -- so it is
+    # noct-glass that writes it, into the profiles the user.js above just marked.
+    # Without this a fresh machine gets the prefs and no backdrop, and pages come
+    # out lighter than every window beside them until the next scheme change.
+    if command -v noct-glass >/dev/null 2>&1; then
+        say "generating Zen's glass stylesheet"
+        run noct-glass apply
+    else
+        note "noct-glass not on PATH yet -- run './install.sh' first, then 'noct-glass apply'"
+    fi
 }
 
 # ---------------------------------------------------------------------------

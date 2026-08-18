@@ -172,24 +172,45 @@ On by default, tied to the scheme, and done in the compositor.
 follows whatever `/theme` selects. **`SUPER+SHIFT+G`** cycles as a temporary
 override. Levels live in `config/noctalia/glass.conf`.
 
-Two knobs, and **both are stated as what you see**:
+Three knobs, and **all are stated as what you see**:
 
 | Knob | Means | Applies to |
 |---|---|---|
 | `window` | how opaque an ordinary window is | Hyprland's `active_opacity` — **every window**, including GTK and Qt apps with no transparency of their own. Fades text with the background; the compositor cannot tell one from the other |
-| `terminal` | how opaque a **terminal** ends up | kitty, the one window that can be translucent by itself |
+| `terminal` | how opaque a **terminal** ends up | kitty's own `background_opacity`, which fades only the background and leaves text fully opaque |
+| `browser` | how opaque a browser **page** ends up | a stylesheet in the Zen profile, for the page area the transparency mod and the "Zen Internet" extension leave transparent |
 
 They used to compound, and that was the bug behind "one is darker than the
 other": kitty applied `terminal`, the compositor then applied `window` on top,
 and at 0.85 / 0.90 a terminal landed at 0.77 next to a browser at 0.90 — a
 visible step between two windows nominally set to the same glassiness.
 
-Now `noct-glass` writes `terminal / window` into kitty's `background_opacity`
-— the factor that takes the compositor's level to the one you asked for. At the
-default **0.90 / 0.90** that is `1.0`: kitty adds nothing of its own and a
-terminal and a browser show exactly the same amount of wallpaper. Set
-`terminal` lower if you want the terminal deliberately glassier; it cannot go
-higher, since nothing can be more opaque than the compositor already makes it.
+So what `noct-glass` writes for an app is never the level, it is `level / window`
+— the factor that takes the compositor's level to the one you asked for. At
+`terminal` = `window` that factor is `1.0`: kitty adds nothing of its own.
+
+### The focus step is what "the same" has to beat
+
+An unfocused window is dimmed by 0.06 (`inactive_opacity`). So an app sitting
+0.06 below `window` looks *exactly like a window in the other focus state* — the
+symptom is "the browser when focused looks like the terminal when it isn't, but
+not the other way around". Anything meant to read as the same material has to sit
+well inside that 0.06, which is why `browser` is 0.88 against a `window` of 0.90.
+
+The consequence is worth saying out loud: a browser page cannot be both
+noticeably glassier than a terminal *and* indistinguishable from one. 0.83 buys
+the glassy look and puts them a step apart; 0.88 makes them the same material and
+leaves the transparency mod contributing a whisper. One number, in `glass.conf`.
+
+### What applies live, and what waits for a restart
+
+Only the compositor's `window` level. Measured on 2026-08-18: **kitty re-reads
+colours on `SIGUSR1` but not `background_opacity`** — a running terminal stayed
+at 1.00 while its generated config said 0.94 — and Zen reads stylesheets at
+startup. That is why `terminal` is kept equal to `window` by default: a
+terminal-specific level would otherwise leave you with two shades of terminal
+until every window had been restarted. `browser` has the same limitation but only
+one window's worth of it.
 
 `blur.ignore_opacity` is on. Without it Hyprland scales the blur by the
 window's own alpha, so a 0.9 window gets a tenth of the blur and the effect
@@ -205,10 +226,14 @@ colour through 10% of your wallpaper.
 
 Two consequences worth knowing:
 
-- **Both levels apply live.** Hyprland re-reads its config; kitty re-reads its
-  own on `SIGUSR1`, which `noct-glass` sends after writing — so terminals you
-  already have open change with everything else instead of waiting for the next
-  one you start.
+- **Zen's level is generated, not tracked.** A profile directory is named
+  randomly per install, so no template can render into it and no symlink can be
+  planned for it — `noct-glass` finds the profiles that carry a `user.js` and
+  writes the whole of `chrome/userChrome.css` there. It writes the whole file
+  rather than one that imports a generated half, because Firefox resolves a
+  symlinked sheet to its real path before resolving relative `@import`s, and the
+  import would then quietly look inside this repo. An existing sheet that is not
+  ours is reported and left alone.
 - **Neovim inside a transparent kitty.** Your `noirblaze.lua` paints `Normal`
   with `bg = #121212`, so the editor stays opaque against kitty's translucent
   background. `bg = "none"` fixes it — a change in *your nvim repo*, not this

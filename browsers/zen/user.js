@@ -52,45 +52,32 @@ user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);
 //     shows about a tenth of the wallpaper: a dark surface with a hint of the
 //     image in it.
 //
-//   * Zen. The "transparent zen" mod (sameerasw) plus its companion site styles
-//     make the browser surface AND most page backgrounds fully transparent, so
-//     reddit and youtube showed ~100% wallpaper -- much lighter in shade than
-//     every other window on screen, which is the mismatch these prefs address.
+//   * Zen. The "transparent zen" mod (sameerasw) plus the "Zen Internet"
+//     extension make the browser surface AND most page backgrounds transparent,
+//     so reddit and youtube showed nearly all of the wallpaper -- much lighter
+//     than every window beside them.
 //
-// The two multiply: what you see is Zen's own alpha times the compositor's. So a
-// tint of 0.75 lands at 0.75 x 0.90 = ~0.67, about a third of the wallpaper
-// showing. The terminal meets it from the other side at 0.85 (`terminal` in
-// glass.conf), and the two then read as one material at slightly different
-// depths instead of as an opaque window beside a hole in the desktop.
+// The prefs below only *enable* that. The shade itself is the `browser` level in
+// glass.conf, which noct-glass divides by the window opacity and writes into
+// chrome/noct-glass.css in this profile -- so the browser and the rest of the
+// desktop are two numbers in one file rather than a value copied by hand into a
+// browser config. noct-glass writes the whole of that file; nothing in this repo
+// tracks it, because its only content is a number derived from glass.conf.
 //
-// Hyprland's own window opacity is not the knob to reach for on either side: the
-// compositor cannot separate a window's text from its background, so fading
-// windows further fades their text with them. kitty and the browser both draw
-// their own translucency and keep their text opaque, which is why all the room to
-// meet is in the apps.
-//
-// #121212 is the palette surface (noirblaze); any near-black reads the same
-// under a dark scheme. Unlike the rest of the theming this cannot follow the
-// palette automatically -- a profile path is random per install, so there is
-// nowhere for a Noctalia template to render to.
+// Both are read at startup, so a change here or there needs Zen restarted.
 user_pref("browser.tabs.allow_transparent_browser", true);
 user_pref("zen.widget.linux.transparency", true);
 user_pref("zen.view.grey-out-inactive-windows", false);
 
-// This tints Zen's *chrome*, and its alpha is one of the two knobs. (The mod
-// writes the pref as 8-digit hex itself -- #121212bf is the same colour -- and
-// its placeholder text accepts either; rgba() is the form you can tune by eye.)
-user_pref("mod.sameerasw.zen_bg_color_enabled", true);
-user_pref("mod.sameerasw.zen_transparency_color", "rgba(18, 18, 18, 0.75)");
+// Deliberately OFF, and not a leftover. With it on, the mod defines
+// --zen-main-browser-background on an element below :root, and a variable set
+// further down the tree cannot be reached by inheritance from above -- so the
+// generated stylesheet would lose to it. Off, the mod leaves the variable alone
+// and the generated value applies.
+user_pref("mod.sameerasw.zen_bg_color_enabled", false);
 
-// The page area behind a transparent site is a different element, and the mod's
-// only control for it is a two-position switch -- so its alpha is set from
-// userChrome.css in this directory, installed alongside this file and loaded
-// because of the legacyUserProfileCustomizations pref above. Keep the two equal
-// or the window is two materials.
-//
-// That switch is "light website tint": 1 = Flip, a 10% dark wash behind the page
-// under a dark scheme; 2 = Remove, the fully transparent default that made pages
-// read so much lighter than everything else. Flip is the closer of the two to
-// start from, and userChrome.css overrides the result either way.
+// The mod's own page tint, left on Flip (1) rather than Remove (2). The generated
+// stylesheet overrides it, so this is purely the fallback for a profile where that
+// file is missing: a 10% dark wash under a dark scheme is a far better failure
+// mode than a fully transparent page.
 user_pref("mod.sameerasw_zen_light_tint", "1");

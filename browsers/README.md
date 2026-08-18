@@ -23,6 +23,9 @@ you get that data onto the new machine.
 | `firefox/user.js` | every profile in `~/.mozilla/firefox/` | Firefox |
 | `zen/user.js` | every profile in `~/.config/zen/` (or `~/.zen/`) | Zen |
 
+Zen also gets a `chrome/userChrome.css`, which is **not** in this directory: it
+carries the frosted-glass level and is generated per profile by `bin/noct-glass`.
+
 Chromium-family policy files need root and take effect on next launch.
 Firefox-family `user.js` is read at startup and re-applies its values every
 time, so a setting changed in the UI reverts on restart — that is the point,
@@ -70,14 +73,19 @@ are actually useful; `Locked: false` means you can still change them in the UI.
 **Zen — transparency.** The one place a browser has to know about the desktop.
 `bin/noct-glass` fades *every* window to ~0.9 and blurs the wallpaper behind it,
 so a terminal shows about a tenth of the image. Zen, with the "transparent zen"
-mod and its site styles, was showing nearly all of it: the same wallpaper, two
-completely different shades, side by side. `zen/user.js` tints Zen's own
-background instead, and the two alphas multiply — 0.6 there lands at 0.54 once
-the compositor has had its turn, which is glassier than a terminal on purpose but
-recognisably the same material. The alpha is the only number in that block worth
-touching. The desktop side is deliberately left alone: the compositor cannot tell
-a window's text from its background, so fading windows further fades their text
-with them, while a browser drawing its own translucency keeps text opaque.
+mod and the "Zen Internet" extension, was showing nearly all of it: the same
+wallpaper, two completely different shades, side by side.
+
+`zen/user.js` only *enables* that transparency. The shade is the `browser` level
+in `~/.config/noctalia/glass.conf`, which `noct-glass` divides by the compositor's
+own window opacity and writes into `chrome/userChrome.css` in each profile — so
+the browser and the rest of the desktop are numbers in one file rather than a
+value copied by hand into a browser config. Nothing here tracks that stylesheet;
+see [theming](../docs/theming.md#frosted-glass) for why it has to be generated and
+what the level has to beat to read as the same material.
+
+Both the prefs and the stylesheet are read at startup, so changing either needs
+Zen restarted.
 
 **Not set anywhere:** default search engine, homepage, password manager
 behaviour beyond leaving it enabled, and extension allow/block lists. Those are
