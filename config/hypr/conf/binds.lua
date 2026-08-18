@@ -4,9 +4,10 @@
 --
 --   SUPER              + hjkl   move focus       (niri/PaperWM edge handoff)
 --   SUPER + SHIFT      + hjkl   move the window, same handoff
---   SUPER + CTRL       + hjkl   move the whole column: reorder along the tape,
---                               then onto the next workspace at its end
---   SUPER + CTRL+SHIFT + hl     force the window onto the next monitor
+--   SUPER + CTRL       + hjkl   move the whole column: H/L reorder it along the
+--                               tape and hand it to the next monitor at the
+--                               end, J/K send it to the workspace above/below
+--   SUPER + CTRL+SHIFT + hjkl   force the window onto another monitor
 --
 --   SUPER + <n>                 workspace n on THIS monitor
 --   SUPER + SHIFT + <n>         send window to workspace n on this monitor
@@ -114,29 +115,42 @@ bind_dir(mod .. " + SHIFT", {
 })
 
 -- Unconditional monitor hop, for when you don't want to think about edges.
-hl.bind(mod .. " + CTRL + SHIFT + H", hl.dsp.window.move({ monitor = "l", follow = true }),
-    { description = "Send window to the monitor on the left" })
-hl.bind(mod .. " + CTRL + SHIFT + L", hl.dsp.window.move({ monitor = "r", follow = true }),
-    { description = "Send window to the monitor on the right" })
-hl.bind(mod .. " + CTRL + SHIFT + left",  hl.dsp.window.move({ monitor = "l", follow = true }))
-hl.bind(mod .. " + CTRL + SHIFT + right", hl.dsp.window.move({ monitor = "r", follow = true }))
+--
+-- All four directions, not just left/right: monitors are not always side by
+-- side, and a bind that only exists on one axis is a bind that does nothing on
+-- a vertically stacked desk. nav.monitor_hop tries the direction first and
+-- falls back to "the other monitor" when there are exactly two, so every one of
+-- these keys does something on a two-monitor setup however it is arranged.
+bind_dir(mod .. " + CTRL + SHIFT", {
+    h = function() nav.monitor_hop("l") end,
+    l = function() nav.monitor_hop("r") end,
+    k = function() nav.monitor_hop("u") end,
+    j = function() nav.monitor_hop("d") end,
+}, {
+    h = "Send window to the monitor on the left",
+    l = "Send window to the monitor on the right",
+    k = "Send window to the monitor above",
+    j = "Send window to the monitor below",
+})
 
 ------------------------------------------------------------------------------
 -- Arranging the tape
 ------------------------------------------------------------------------------
 
--- Whole columns, on the same four keys: H/L reorder the column along the tape
--- and, once it is at either end, push it onto the previous/next workspace; J/K
--- send it there directly. Focus goes with the column, so this is "take this
--- stack of windows somewhere else" -- SHIFT is the same gesture for one window.
+-- Whole columns, on the same four keys, and on the same axes as everything
+-- else: H/L reorder the column along the tape and, once it is at either end,
+-- hand the whole column to the next monitor -- the same handoff focus and a
+-- single window make. J/K are the workspace axis. Focus goes with the column,
+-- so this is "take this stack of windows somewhere else"; SHIFT is the same
+-- gesture for one window.
 bind_dir(mod .. " + CTRL", {
     h = function() nav.column_horizontal("l") end,
     l = function() nav.column_horizontal("r") end,
     k = function() nav.column_vertical("u") end,
     j = function() nav.column_vertical("d") end,
 }, {
-    h = "Swap column left / to previous workspace",
-    l = "Swap column right / to next workspace",
+    h = "Swap column left / to the monitor on the left",
+    l = "Swap column right / to the monitor on the right",
     k = "Send column to previous workspace",
     j = "Send column to next workspace",
 })

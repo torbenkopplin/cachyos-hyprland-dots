@@ -13,7 +13,7 @@ dozen you need on the first day -- is in the [README](../README.md#the-keys-that
 | `M + J` / `K` | Focus down / up within the column → next **workspace** at the edge |
 | `M + SHIFT + H/J/K/L` | Move the focused window, with the same handoff |
 | `M + CTRL + H/J/K/L` | Move the whole **column** — see [Arranging the tape](#arranging-the-tape) |
-| `M + CTRL + SHIFT + H/L` | Send window to the monitor left / right, unconditionally |
+| `M + CTRL + SHIFT + H/J/K/L` | Send window to another monitor, unconditionally — see [Monitors](#monitors) |
 | **arrows** | Every directional bind above is on the arrow keys too, same modifiers |
 | `M + Tab` | Window switcher |
 
@@ -31,8 +31,32 @@ without separate chords there was no way to say which you meant.
 
 | Key | Action |
 |---|---|
-| `M + CTRL + H` / `L` | Swap this column with its neighbour → at the end of the tape, send the column to the previous / next **workspace** |
+| `M + CTRL + H` / `L` | Swap this column with its neighbour → at the end of the tape, hand the whole column to the next **monitor** |
 | `M + CTRL + J` / `K` | Send the whole column to the workspace below / above |
+
+One rule runs through all of these: **`H`/`L` is the horizontal axis, `J`/`K` is
+the workspace axis.** Focus, a window and a whole column all run out of columns
+going sideways and hand off to the monitor that way; all three go up and down
+through workspaces. `M + CTRL + SHIFT` is the same monitor handoff for a single
+window, without having to reach the end of the tape first.
+
+### Monitors
+
+| Keys | Action |
+|---|---|
+| `M + CTRL + SHIFT + H/J/K/L` | Send the focused window to the monitor left / below / above / right |
+
+All four directions are bound, not just left and right, because monitors are not
+always side by side. And with **exactly two** monitors every one of the four
+works whatever the arrangement: the direction is tried first, and if no monitor
+lies that way the window goes to the other screen anyway, because with two
+screens there is nothing else "over there" could mean. With three or more the
+directions stay strict.
+
+This used to be left/right only, which meant that on a desk whose second screen
+is to the *left*, `M + CTRL + SHIFT + L` did nothing at all — the selector
+resolved to no monitor and the keypress was swallowed. `noct-check monitor-hop`
+is the test that it stays fixed.
 | `M + O` | Consume — pull the next window into this column |
 | `M + I` | Expel — push this window out into its own column |
 | `M + SHIFT + .` | Promote to a new column |

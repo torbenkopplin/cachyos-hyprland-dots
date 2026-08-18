@@ -12,10 +12,14 @@
 --
 --   SUPER+SHIFT+<hjkl> the same, dragging the focused window along.
 --
+--   SUPER+CTRL+SHIFT+<hjkl>  send the window to another monitor, whatever the
+--                     monitors are arranged like. See M.monitor_hop.
+--
 --   SUPER+CTRL+<hjkl> the same shape one level up, on whole COLUMNS.
 --                     H/L reorder the column along the tape; at either end of
---                     the tape the column goes to the previous/next workspace
---                     instead. J/K send it there directly.
+--                     the tape the whole column crosses to the next MONITOR,
+--                     the same handoff focus and windows make. J/K send it to
+--                     the workspace above/below.
 --
 -- The workspace end of that is band arithmetic, not a relative selector --
 -- see lib/ws.lua for why "m+1" cannot do it.
@@ -91,6 +95,56 @@ local function column_range(win)
     end
 
     return lo, hi
+end
+
+--- The monitor in `dir` from the active one, or nil if there is none.
+---
+--- Worked out here rather than handed to Hyprland's directional monitor
+--- selector, for two reasons. A selector that resolves to nothing fails INSIDE
+--- the dispatcher without raising a Lua error -- pcall around it returns true --
+--- so there is no way to ask "is there one that way?" and get an answer. And
+--- moving a whole column needs to know the target BEFORE anything moves.
+---
+--- With exactly two monitors a direction that points at nothing still resolves
+--- to the other one: with two screens there is nothing else "over there" could
+--- mean, and a key that does nothing is indistinguishable from an unbound one.
+--- With three or more the ambiguity is real, so a miss stays a miss.
+---@param dir "l"|"r"|"u"|"d"
+---@return table|nil
+local function monitor_in_direction(dir)
+    local here = hl.get_active_monitor()
+    if not here then return nil end
+
+    local mons = hl.get_monitors() or {}
+
+    local function centre(m)
+        local p = m.position or {}
+        return (p.x or 0) + (m.width or 0) / 2, (p.y or 0) + (m.height or 0) / 2
+    end
+
+    local hx, hy = centre(here)
+    local best, best_d
+
+    for _, m in ipairs(mons) do
+        if m.id ~= here.id then
+            local mx, my = centre(m)
+            local d
+            if     dir == "l" and mx < hx then d = hx - mx
+            elseif dir == "r" and mx > hx then d = mx - hx
+            elseif dir == "u" and my < hy then d = hy - my
+            elseif dir == "d" and my > hy then d = my - hy
+            end
+            if d and (not best_d or d < best_d) then best, best_d = m, d end
+        end
+    end
+    if best then return best end
+
+    if #mons == 2 then
+        for _, m in ipairs(mons) do
+            if m.id ~= here.id then return m end
+        end
+    end
+    return nil
 end
 
 --- Run a dispatcher and report whether it actually moved focus to a different
@@ -198,11 +252,39 @@ end
 ---     that way, so `binds.window_direction_monitor_fallback` (set in
 ---     conf/input.lua) hands it to the next monitor.
 ---
---- SUPER+CTRL+SHIFT+H/L forces the monitor hop when you want it unconditionally.
+--- SUPER+CTRL+SHIFT+<hjkl> forces the monitor hop when you want it
+--- unconditionally; see M.monitor_hop.
 ---@param dir "l"|"r"
 function M.move_horizontal(dir)
     if not hl.get_active_window() then return end
     hl.dispatch(hl.dsp.window.move({ direction = dir }))
+end
+
+--- Send the focused window to another monitor, unconditionally.
+---
+--- The direction is tried first, because it is what the key says. But a
+--- directional monitor selector only resolves if a monitor actually lies that
+--- way: on a two-monitor desk with the second screen on the LEFT, asking for
+--- the monitor to the right raises "Invalid monitor / monitor doesn't exist"
+--- and the keypress does nothing at all. That is what this used to do, and a
+--- bind that silently does nothing is indistinguishable from a broken one.
+---
+--- So: with exactly two monitors there is no ambiguity about what was meant --
+--- "the other one" -- and any of the four directions goes there. With three or
+--- more there genuinely is ambiguity, and a direction that points at nothing
+--- stays a no-op rather than guessing.
+---
+--- This is also the answer for monitors stacked vertically: J/K are bound to
+--- "u"/"d" alongside H/L, so the pair that matches the arrangement resolves
+--- directionally and the other pair still works through the two-monitor case.
+---@param dir "l"|"r"|"u"|"d"
+function M.monitor_hop(dir)
+    if not hl.get_active_window() then return end
+
+    local target = monitor_in_direction(dir)
+    if not target then return end
+
+    hl.dispatch(hl.dsp.window.move({ monitor = target.name, follow = true }))
 end
 
 ------------------------------------------------------------------------------
@@ -282,9 +364,19 @@ function M.column_horizontal(dir)
         return
     end
 
-    -- Off the left end is "back one workspace", off the right end is "on one".
-    local target = bands.neighbour(dir == "l" and "u" or "d")
-    if target then move_column(win, target) end
+    -- Off the end of the tape is the next MONITOR, not the next workspace.
+    --
+    -- h/l is the horizontal axis everywhere else in this keymap -- focus and
+    -- window both run out of columns and hand off to the screen that way -- and
+    -- j/k is the workspace axis. A column doing something different from the
+    -- window inside it on the same two keys is the thing that made this feel
+    -- arbitrary. Sending a column to another workspace is SUPER+CTRL+J/K, which
+    -- is where the band arithmetic still lives.
+    local mon = monitor_in_direction(dir)
+    if not mon then return end
+
+    local ws = mon.active_workspace
+    if ws and ws.id then move_column(win, ws.id) end
 end
 
 --- Send the whole column to the workspace above/below, clamped at the band edge
