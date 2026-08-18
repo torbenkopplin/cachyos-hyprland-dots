@@ -783,12 +783,19 @@ install_user_js() {  # <source user.js> <label> <profiles root>...
     # More than one root because a browser's profile directory is not a stable
     # thing: Zen moved from ~/.zen to ~/.config/zen, and a file written to the
     # root the browser is not using is invisible rather than an error.
+    # A userChrome.css beside the user.js is installed with it. It is how you
+    # reach the things no pref exposes -- Zen's page-area backdrop -- and the
+    # pref that makes the browser load it at all is in the user.js next door, so
+    # neither is useful without the other.
+    local chrome_css=${src%/*}/userChrome.css
+
     local found=0 root profile
     for root in "$@"; do
         [[ -d $root ]] || continue
         while IFS= read -r -d '' profile; do
             found=1
             link "$src" "$profile/user.js"
+            [[ -f $chrome_css ]] && link "$chrome_css" "$profile/chrome/userChrome.css"
         done < <(find "$root" -maxdepth 1 -type d -name '*.*' -print0 2>/dev/null)
     done
 

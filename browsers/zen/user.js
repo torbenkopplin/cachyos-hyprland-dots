@@ -57,17 +57,17 @@ user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);
 //     reddit and youtube showed ~100% wallpaper -- much lighter in shade than
 //     every other window on screen, which is the mismatch these prefs address.
 //
-// The two multiply: what you see is Zen's own alpha times the compositor's. So
-// a tint of 0.6 lands at 0.6 x 0.90 = 0.54, i.e. roughly half the wallpaper
-// showing where the rest of the desktop shows a tenth of it. That is the
-// deliberate meeting point -- clearly glassier than a terminal, clearly the same
-// material. Raise it towards 1.0 to converge on the rest of the desktop, lower
-// it for more wallpaper.
+// The two multiply: what you see is Zen's own alpha times the compositor's. So a
+// tint of 0.75 lands at 0.75 x 0.90 = ~0.67, about a third of the wallpaper
+// showing. The terminal meets it from the other side at 0.85 (`terminal` in
+// glass.conf), and the two then read as one material at slightly different
+// depths instead of as an opaque window beside a hole in the desktop.
 //
-// The desktop side is not the one to move: the compositor cannot separate a
-// window's text from its background, so fading windows further fades their text
-// with them. The browser draws its own translucency and keeps its text opaque,
-// which is why the room to meet is on this side.
+// Hyprland's own window opacity is not the knob to reach for on either side: the
+// compositor cannot separate a window's text from its background, so fading
+// windows further fades their text with them. kitty and the browser both draw
+// their own translucency and keep their text opaque, which is why all the room to
+// meet is in the apps.
 //
 // #121212 is the palette surface (noirblaze); any near-black reads the same
 // under a dark scheme. Unlike the rest of the theming this cannot follow the
@@ -77,21 +77,20 @@ user_pref("browser.tabs.allow_transparent_browser", true);
 user_pref("zen.widget.linux.transparency", true);
 user_pref("zen.view.grey-out-inactive-windows", false);
 
-// The alpha in this string IS the knob -- it is the only number here worth
-// touching. (The mod writes this pref as 8-digit hex itself, #12121299 being the
-// same colour; its own placeholder text accepts either, and rgba() is the form
-// you can actually tune by eye.)
+// This tints Zen's *chrome*, and its alpha is one of the two knobs. (The mod
+// writes the pref as 8-digit hex itself -- #121212bf is the same colour -- and
+// its placeholder text accepts either; rgba() is the form you can tune by eye.)
 user_pref("mod.sameerasw.zen_bg_color_enabled", true);
-user_pref("mod.sameerasw.zen_transparency_color", "rgba(18, 18, 18, 0.6)");
+user_pref("mod.sameerasw.zen_transparency_color", "rgba(18, 18, 18, 0.75)");
 
-// The mod's own "light website tint": 1 = Flip, which puts a 10% dark wash
-// behind the page under a dark scheme, 2 = Remove, which is the fully
-// transparent default that made pages read so much lighter than everything else.
-user_pref("mod.sameerasw_zen_light_tint", "1");
-
-// If the page area still reads lighter than the chrome around it, the pref above
-// is reaching the browser background but not the content stack. Add this to
-// <profile>/chrome/userChrome.css, which the pref at the top of this section
-// already enables, and restart:
+// The page area behind a transparent site is a different element, and the mod's
+// only control for it is a two-position switch -- so its alpha is set from
+// userChrome.css in this directory, installed alongside this file and loaded
+// because of the legacyUserProfileCustomizations pref above. Keep the two equal
+// or the window is two materials.
 //
-//   .browserStack > browser { background-color: rgba(18, 18, 18, 0.6) !important; }
+// That switch is "light website tint": 1 = Flip, a 10% dark wash behind the page
+// under a dark scheme; 2 = Remove, the fully transparent default that made pages
+// read so much lighter than everything else. Flip is the closer of the two to
+// start from, and userChrome.css overrides the result either way.
+user_pref("mod.sameerasw_zen_light_tint", "1");
