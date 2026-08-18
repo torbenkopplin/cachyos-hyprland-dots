@@ -251,10 +251,14 @@ Then through the launcher:
 - [ ] `nvm --version` works **in fish** (this is nvm.fish, not the bash one).
 - [ ] `node --version` works in a shell where no nvm version is selected —
       this is the system package mason depends on.
-- [ ] `cargo --version` works, i.e. `conf.d/rustup.fish` found
-      `~/.cargo/env.fish`. If rustup was installed but never initialised, that
-      file does not exist and fish reports an error on every startup — run
-      `rustup default stable` once.
+- [ ] `cargo --version` works. With the repo `rust` package this is
+      `/usr/bin/cargo` and `~/.cargo/env.fish` does not exist at all —
+      `conf.d/rustup.fish` tests for it before sourcing, so a **new shell must
+      print no error**. Check that specifically; the previous version sourced it
+      unconditionally and complained on every startup.
+- [ ] `~/.cargo/bin` is on `PATH` (`contains ~/.cargo/bin $PATH`), so binaries
+      from `cargo install` are reachable. Nothing else adds it when cargo came
+      from the repos rather than rustup.
 - [ ] `claude --version` works.
 - [ ] `auto-Hypr.fish` is still inert. It sits at the top level of the fish
       config, which fish does **not** auto-source — only `conf.d/` is. Move it
@@ -393,7 +397,7 @@ something misbehaves:
 | `[plugins].enabled` activates the wallhaven plugin declaratively | Documented, but the plugin system is beta; `noctalia msg plugins enable noctalia/wallhaven` is the fallback | `60-wallpaper.toml` |
 | `blur.xray` samples the wallpaper rather than windows behind | Documented behaviour; turn it off in `noct-glass` if windows behind show through oddly | `bin/noct-glass` |
 | `uwsm start -S -F hyprland.desktop` is the right invocation | Adapted from your `start-hyprland`; the original is kept as a fallback in the same file | `config/fish/auto-Hypr.fish` |
-| `starship`, `eza`, `rustup`, `fastfetch`, `claude-code` resolve as package names | Same caveat as every other package name here | `install.sh` |
+| `starship`, `eza`, `fastfetch`, `claude-code` resolve as package names | Verified against the CachyOS repos 2026-08-18; all resolve | `install.sh` |
 
 ---
 

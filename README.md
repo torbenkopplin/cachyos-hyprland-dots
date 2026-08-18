@@ -469,16 +469,32 @@ ignored, look there first.
 | Group | Why |
 |---|---|
 | hyprland, portals, kitty, qt6ct, hypr{picker,lock,idle}, fonts | the session itself |
+| uwsm | `options.lua` sets `LAUNCH_PREFIX = "uwsm app -- "`, so **every** app bind goes through it. Clear `LAUNCH_PREFIX` if you do not boot Hyprland via uwsm |
+| nautilus | `options.lua` `FILE_MANAGER` |
+| polkit **and** hyprpolkitagent | `polkit` is only the library — the agent is what shows the password prompt |
+| libnotify | `notify-send`, which every `bin/noct-*` script uses to report what it did |
 | noctalia, satty | the shell and its screenshot editor |
 | libpulse, networkmanager, bluez, power-profiles-daemon | the backends `/aout` `/ain` `/bt` `/net` `/power` shell out to — without these those providers just say "not installed" |
 | neovim, git, base-devel, nodejs, npm | editor, and what mason needs to build its servers |
 | fish, fisher, fastfetch | the login shell and its plugin manager |
-| starship, eza, rustup | what your fish config calls: the prompt, `ls`/`lt`, and the cargo env `conf.d/rustup.fish` sources |
+| starship, eza | what your fish config calls: the prompt, and `ls`/`lt` |
 | claude-code | tried as a package, npm as fallback |
 | ripgrep, fd, fzf, bat | what the neovim config calls out to (fzf-lua and its previewer) |
-| yazi, ffmpeg, p7zip, jq, poppler, imagemagick, chafa | file manager and its preview pipeline |
+| yazi, ffmpeg, 7zip, jq, poppler, imagemagick, chafa | file manager and its preview pipeline |
 | brave-bin, zen-browser-bin, chromium, firefox | browsers |
 | eslint, mermaid-cli (npm, into `~/.local`) | used directly by the neovim config |
+
+**`rustup` is not installed, on purpose.** It declares `Conflicts With: rust
+cargo`, and because pacman runs with `--noconfirm` it would answer the "remove
+them?" prompt instead of stopping — swapping a working repo toolchain for a
+rustup that carries no toolchain until `rustup default stable` is run by hand.
+Cargo from the repos is already on `PATH` at `/usr/bin/cargo`, and CachyOS builds
+it with the same architecture optimisations that are the reason this installer
+prefers repo packages in the first place. `conf.d/rustup.fish` keeps its name but
+works with either toolchain: it sources `~/.cargo/env.fish` only if rustup
+created it, and adds `~/.cargo/bin` to `PATH` either way so `cargo install`
+binaries stay reachable. Install rustup yourself if you want per-project
+toolchain pinning.
 
 **LSP servers are not installed.** Your neovim config already installs `tsgo`,
 `eslint`, `vimls`, `lua_ls` and `lemminx` through mason on first launch, and a
@@ -493,10 +509,17 @@ put on `PATH` and it cannot work under fish. Your config already uses
 because mason needs a `node` on `PATH` when neovim is launched from the app
 launcher, where nothing has sourced a version manager.
 
-Package names could not be verified against the CachyOS repos from here, so
-a failed batch retries package-by-package and anything unresolved is listed in
-a warning summary at the end. **Read that summary** rather than assuming a
-clean run.
+Every name above was checked against the enabled CachyOS repos on 2026-08-18 and
+all of them resolve there — including `brave-bin`, `zen-browser-bin`, `noctalia`,
+`satty` and `claude-code`, so the AUR pass is currently never reached. The
+installer still cannot verify names at runtime, so a failed batch retries
+package-by-package and anything unresolved is listed in a warning summary at the
+end. **Read that summary** rather than assuming a clean run.
+
+`noctalia` here is the 5.x native shell, which is what the numbered TOML
+fragments and `~/.local/state/noctalia/settings.toml` in this repo target — not
+`noctalia-shell` 4.x, the older Quickshell-based generation that is also in the
+repos. Installing both would be a mistake.
 
 `~/.local/bin` must be on `PATH` — the launcher runs provider commands through
 `sh -lc`.

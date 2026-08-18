@@ -233,12 +233,31 @@ do_status() {
 # ---------------------------------------------------------------------------
 
 # Compositor, shell, and the pieces the config actually calls out to.
+#
+# uwsm, nautilus, libnotify and hyprpolkitagent are here because conf/ names
+# them directly -- see the comment on each. They are easy to miss precisely
+# because a CachyOS Hyprland install usually pulls them in already, so the gap
+# only shows up on a machine that started from a different base.
 PKGS_DESKTOP=(
     hyprland xdg-desktop-portal-hyprland xdg-desktop-portal-gtk
-    kitty qt6ct polkit
+    kitty qt6ct
     hyprpicker hyprlock hypridle
     wl-clipboard brightnessctl playerctl
     noto-fonts noto-fonts-emoji ttf-jetbrains-mono-nerd
+
+    # options.lua sets LAUNCH_PREFIX = "uwsm app -- ", so without uwsm every
+    # single app bind fails. Clear LAUNCH_PREFIX instead if you do not want it.
+    uwsm
+
+    # options.lua FILE_MANAGER.
+    nautilus
+
+    # polkit is only the library; an agent is what actually shows the password
+    # prompt, so GUI privilege escalation is silently dead without one.
+    polkit hyprpolkitagent
+
+    # notify-send, which every bin/noct-* script uses to report what it did.
+    libnotify
 )
 
 # Backends behind the launcher's /aout /ain /bt /net /power providers.
@@ -259,9 +278,19 @@ PKGS_DEV=(
 )
 
 # Referenced directly by the carried-over fish config: starship builds the
-# prompt, eza backs `ls`/`lt`, bat backs `cat`, rustup provides the cargo env
-# that conf.d/rustup.fish sources.
-PKGS_PROMPT=( starship eza rustup )
+# prompt, eza backs `ls`/`lt`, bat backs `cat`.
+#
+# rustup is deliberately NOT here, though conf.d/rustup.fish is named after it.
+# It declares `Conflicts With: rust cargo`, and pacman runs with --noconfirm
+# below, which answers the "remove them?" prompt rather than aborting -- so on
+# any machine that already has the repo toolchain this would swap a working
+# rust/cargo for a rustup that ships no toolchain at all until
+# `rustup default stable` is run by hand. Nothing here needs rustup: cargo from
+# the repos lands on PATH at /usr/bin/cargo, and CachyOS builds it with the same
+# architecture optimisations that are the whole reason this script prefers repo
+# packages. Install rustup yourself if you want per-project toolchain pinning;
+# conf.d/rustup.fish works either way.
+PKGS_PROMPT=( starship eza )
 
 # The shell, and the plugin manager used to get a fish-native nvm.
 PKGS_SHELL=( fish fisher fastfetch )
