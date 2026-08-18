@@ -12,6 +12,11 @@
 --
 --   SUPER+SHIFT+<hjkl> the same, dragging the focused window along.
 --
+--   SUPER+CTRL+<hjkl> the same shape one level up, on whole COLUMNS.
+--                     H/L reorder the column along the tape; at either end of
+--                     the tape the column goes to the previous/next workspace
+--                     instead. J/K send it there directly.
+--
 -- The workspace end of that is band arithmetic, not a relative selector --
 -- see lib/ws.lua for why "m+1" cannot do it.
 --
@@ -198,6 +203,106 @@ end
 function M.move_horizontal(dir)
     if not hl.get_active_window() then return end
     hl.dispatch(hl.dsp.window.move({ direction = dir }))
+end
+
+------------------------------------------------------------------------------
+-- Moving whole columns
+--
+-- SUPER+SHIFT moves a window; SUPER+CTRL moves the column it lives in. Keeping
+-- them on separate chords is what stops the two from feeling identical: with a
+-- single-window column, "drag the window right" and "reorder the column right"
+-- are the same gesture, and there was no way to say which you meant.
+--
+-- There is no "move column to workspace" dispatcher. The layout only ever moves
+-- one window, and a window arriving on another workspace starts a column of its
+-- own -- so moving a two-window column naively arrives as two columns. Hence
+-- move_column() below: move them all silently, then consume the followers back
+-- into the first one's column, which also restores the order they were in.
+------------------------------------------------------------------------------
+
+--- Move every window of `win`'s column to workspace `target`, rebuild the
+--- column there, and follow it, landing on the window that was focused.
+---@param win table    the focused window, known to be on a scrolling tape
+---@param target integer  absolute workspace id
+local function move_column(win, target)
+    local addrs = {}
+    for _, w in ipairs(win.layout.column.windows or {}) do
+        if w.address then table.insert(addrs, w.address) end
+    end
+    if #addrs == 0 then return end
+
+    -- follow = false on every move: without it the view chases each window in
+    -- turn and a three-window column flickers through three workspace switches.
+    for _, address in ipairs(addrs) do
+        hl.dispatch(hl.dsp.window.move({
+            workspace = target,
+            window    = "address:" .. address,
+            follow    = false,
+        }))
+    end
+
+    hl.dispatch(hl.dsp.focus({ workspace = target }))
+
+    -- Re-stack. `consume` pulls the next column into the focused one, so
+    -- calling it from the first window as many times as there are followers
+    -- puts the column back together in its original order.
+    if #addrs > 1 then
+        hl.dispatch(hl.dsp.focus({ window = "address:" .. addrs[1] }))
+        for _ = 2, #addrs do
+            hl.dispatch(hl.dsp.layout("consume"))
+        end
+    end
+
+    -- Selectors need the hyprctl form: a bare "0x..." is not matched.
+    hl.dispatch(hl.dsp.focus({ window = "address:" .. win.address }))
+end
+
+--- Reorder the column along the tape; at either end of the tape, send the whole
+--- column to the previous/next workspace instead.
+---
+--- The tape end deliberately hands off to a *workspace* and never to another
+--- monitor: SUPER+CTRL+SHIFT+H/L is the monitor hop, and a chord that could do
+--- either depending on how full the tape is would be unpredictable.
+---@param dir "l"|"r"
+function M.column_horizontal(dir)
+    local win = hl.get_active_window()
+    if not win then return end
+
+    -- A floating window is not on the tape, so it has no column to reorder and
+    -- nothing to spill: leave it alone rather than surprising you with a move.
+    local p = pos_of(win)
+    if not p then return end
+
+    local lo, hi = column_range(win)
+    local at_edge = (dir == "l") and (lo == nil or p.col <= lo)
+        or (dir == "r") and (hi == nil or p.col >= hi)
+
+    if not at_edge then
+        hl.dispatch(hl.dsp.layout("swapcol " .. dir))
+        return
+    end
+
+    -- Off the left end is "back one workspace", off the right end is "on one".
+    local target = bands.neighbour(dir == "l" and "u" or "d")
+    if target then move_column(win, target) end
+end
+
+--- Send the whole column to the workspace above/below, clamped at the band edge
+--- exactly as a focus or window step is.
+---@param dir "u"|"d"
+function M.column_vertical(dir)
+    local win = hl.get_active_window()
+    if not win then return end
+
+    local target = bands.neighbour(dir)
+    if not target then return end
+
+    if pos_of(win) then
+        move_column(win, target)
+    else
+        -- Floating: there is no column, so the window itself is the whole of it.
+        hl.dispatch(hl.dsp.window.move({ workspace = target, follow = true }))
+    end
 end
 
 return M

@@ -38,6 +38,7 @@ never tracked.
 | **tap `SUPER`** | Launcher |
 | `M + H J K L` | Move focus — off the end of the tape goes to the next monitor, off the end of a column to the next workspace |
 | `M + SHIFT + H J K L` | The same, dragging the window along |
+| `M + CTRL + H J K L` | The same for the whole column it sits in |
 | `M + 1…9`, `0` | Workspace *n* **on the monitor you are looking at** |
 | `M + SHIFT + 1…9` | Send the window there |
 | `M + T` / `Return` | Terminal |
@@ -48,10 +49,11 @@ never tracked.
 | `M + W` | Wallpaper picker |
 | `M + Escape` | Session menu |
 
-`SHIFT` always means "bring the window with you". `CTRL` reorders columns
-(`M + CTRL + H/L`) and, with a letter, opens the launcher already filtered to
-one system-control provider: `O`utput, `I`nput, `B`luetooth, `N`etwork,
-`P`ower, `T`heme.
+`SHIFT` always means "bring the window with you". `CTRL` on the same four keys
+moves the whole **column** — reorder it along the tape, and at the end of the
+tape it goes to the next workspace — and, with a letter, opens the launcher
+already filtered to one system-control provider: `O`utput, `I`nput,
+`B`luetooth, `N`etwork, `P`ower, `T`heme.
 
 **[→ the full keymap](docs/keymap.md)**
 

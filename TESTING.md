@@ -48,24 +48,55 @@ right-hand column.
 This is the part most likely to need adjusting, since it depends on the exact
 shape of `window.layout`.
 
-- [ ] `SUPER+H`/`L` moves between columns.
-- [ ] `SUPER+J`/`K` moves between windows **within a column** (stack two windows
+- [x] `SUPER+H`/`L` moves between columns.
+- [x] `SUPER+J`/`K` moves between windows **within a column** (stack two windows
       in one column with `SUPER+O` first).
-- [ ] At the **last column**, `SUPER+L` moves focus to the next monitor.
-- [ ] At the **first column**, `SUPER+H` moves to the previous monitor.
-- [ ] At the **bottom of a column**, `SUPER+J` goes to the next workspace.
-- [ ] At the **top of a column**, `SUPER+K` goes to the previous workspace.
-- [ ] On an **empty** workspace, `SUPER+J`/`K` still change workspace.
-- [ ] Nothing **wraps** — at the last workspace `SUPER+J` does nothing, it does
+- [x] At the **last column**, `SUPER+L` moves focus to the next monitor.
+- [x] At the **first column**, `SUPER+H` moves to the previous monitor.
+- [x] At the **bottom of a column**, `SUPER+J` goes to the next workspace.
+- [x] At the **top of a column**, `SUPER+K` goes to the previous workspace.
+- [x] On an **empty** workspace, `SUPER+J`/`K` still change workspace.
+- [x] Nothing **wraps** — at the last workspace `SUPER+J` does nothing, it does
       not jump back to the first.
-- [ ] `SUPER+SHIFT+<hjkl>` does all of the above dragging the window along.
-      (This moved off `CTRL`, which now reorders columns.)
-- [ ] Every one of the checks above behaves identically on the **arrow keys**
+- [x] `SUPER+SHIFT+<hjkl>` does all of the above dragging the window along.
+      (This moved off `CTRL`, which now moves whole columns.)
+- [x] Every one of the checks above behaves identically on the **arrow keys**
       with the same modifiers — they are bound from the same table, so a
       difference means a bind went missing rather than a behaviour differing.
-- [ ] `SUPER+CTRL+H`/`L` swaps this column with its neighbour, without changing
+- [x] With a **floating** window focused, `SUPER+hjkl` still behaves sanely.
+
+`SUPER+CTRL` is the same four keys applied to the **column** the focused window
+lives in, which is what keeps it from duplicating `SHIFT`. Stack two windows in
+one column with `SUPER+O` before testing, since a one-window column cannot show
+the difference:
+
+- [x] `SUPER+CTRL+H`/`L` swaps this column with its neighbour, without changing
       which window is focused.
-- [ ] With a **floating** window focused, `SUPER+hjkl` still behaves sanely.
+- [x] At the **end of the tape**, `SUPER+CTRL+L` sends the *whole* column to the
+      next workspace and follows it — both windows still stacked in one column,
+      in the same order, with the same one focused. `SUPER+CTRL+H` at the start
+      of the tape does the same to the previous workspace.
+- [x] `SUPER+CTRL+J`/`K` sends the whole column to the workspace below / above
+      directly, without needing to walk it to the end first.
+- [x] At the **last workspace of the band**, `SUPER+CTRL+L`/`J` does nothing —
+      the clamp is the same one `SUPER+J` uses, so a column can never land on
+      another monitor's numbers.
+- [x] Columns left behind stay behind: a neighbouring column does not follow.
+
+> Verified against the live session rather than by eye — the column is rebuilt
+> on arrival, and that is the part that can silently half-work:
+> ```sh
+> hyprctl eval 'require("lib.nav").column_vertical("d")'
+> hyprctl eval 'local o = {}
+>   for _, w in ipairs(hl.get_workspace_windows(hl.get_active_workspace().id)) do
+>     o[#o+1] = w.class .. " col=" .. tostring(w.layout.column.index)
+>       .. " row=" .. tostring(w.layout.index_in_column)
+>   end
+>   local f = io.open("/tmp/col.txt", "w"); f:write(table.concat(o, "\n")); f:close()'
+> ```
+> Every window of the moved column must report the **same** `col` and a distinct
+> `row`. Two different `col` values means the re-stack did not happen and the
+> column arrived as N separate columns.
 
 > If edge detection misfires, dump what the layout actually reports:
 > ```sh
@@ -114,22 +145,22 @@ to watch for is the launcher also opening after ordinary chords.
 The band model is adopted from `~/repos/dots`: monitor id N owns workspaces
 N*10+1 … N*10+10, and each band carries its own scroll direction.
 
-- [ ] Copy `config/hypr/host.lua.example` to `~/.config/hypr/host.lua` and fill
+- [x] Copy `config/hypr/host.lua.example` to `~/.config/hypr/host.lua` and fill
       in `WSBANDS` with your real monitor names and ids (`hyprctl monitors`).
-- [ ] Without a `host.lua`, Hyprland still starts — the fallback is a single
+- [x] Without a `host.lua`, Hyprland still starts — the fallback is a single
       band. Confirm this before relying on the pcall.
-- [ ] `hyprctl workspacerules` shows one band of 10 per monitor. (`hyprctl
+- [x] `hyprctl workspacerules` shows one band of 10 per monitor. (`hyprctl
       workspaces` lists only the ones that *exist* — workspaces here are
       dynamic, so an empty one is not there at all. That is the intended
       behaviour, not a missing rule.)
-- [ ] `SUPER+2` goes to the second workspace **on the monitor you are looking
+- [x] `SUPER+2` goes to the second workspace **on the monitor you are looking
       at**, whichever that is. On the second monitor that is id 12, not 2 —
       check with `hyprctl activeworkspace`.
-- [ ] `SUPER+SHIFT+2` sends the window there and follows it.
-- [ ] `SUPER+J` past the **last** workspace of a band does nothing, and
+- [x] `SUPER+SHIFT+2` sends the window there and follows it.
+- [x] `SUPER+J` past the **last** workspace of a band does nothing, and
       `SUPER+K` past the first does nothing. The clamp is what keeps a
       workspace step from landing on another monitor's numbers.
-- [ ] A workspace never migrates to a monitor outside its band.
+- [x] A workspace never migrates to a monitor outside its band.
 
 > Both of the workspace selectors that *look* like they would do this are
 > traps: `m~n` is not valid syntax in 0.56 (the dispatcher answers `ok` and
@@ -150,15 +181,15 @@ First, straight from a terminal — this is where parsing bugs show up plainly.
 Each should print readable `title <TAB> description` lines with **no base64 or
 device ids visible**; the payloads go to a side map in `$XDG_RUNTIME_DIR`:
 
-- [ ] `noct-audio list sinks` — outputs, current one marked `●`
-- [ ] `noct-audio list sources` — inputs, with no `.monitor` entries
-- [ ] `noct-bluetooth list`
-- [ ] `noct-network list`
-- [ ] `noct-power list`
-- [ ] `noct-theme list` — and it marks the active scheme without asking the
+- [x] `noct-audio list sinks` — outputs, current one marked `●`
+- [x] `noct-audio list sources` — inputs, with no `.monitor` entries
+- [x] `noct-bluetooth list`
+- [x] `noct-network list`
+- [x] `noct-power list`
+- [x] `noct-theme list` — and it marks the active scheme without asking the
       running shell for it (`grep -c 'noctalia msg' bin/noct-theme` counts only
       the `act` path; see the two-second rule below)
-- [ ] Every one of those returns in **well under two seconds** — measured, not
+- [x] Every one of those returns in **well under two seconds** — measured, not
       eyeballed (the GNU `time` binary is not installed by default, hence
       `date`):
       ```sh
@@ -169,26 +200,26 @@ device ids visible**; the payloads go to a side map in `$XDG_RUNTIME_DIR`:
       done
       ```
       On this machine they land between 25 and 210 ms.
-- [ ] `cat "$XDG_RUNTIME_DIR"/noct-*.map` — one `title <TAB> payload` per result
+- [x] `cat "$XDG_RUNTIME_DIR"/noct-*.map` — one `title <TAB> payload` per result
 - [ ] Two devices with the *same* name both stay selectable (the second gets a
       ` (2)` suffix). Only testable if you have a duplicate; skip otherwise.
 
 Then through the launcher:
 
-- [ ] `/aout` lists outputs, the current one marked `●`.
-- [ ] Picking one switches the default **and moves audio that is already
+- [x] `/aout` lists outputs, the current one marked `●`.
+- [x] Picking one switches the default **and moves audio that is already
       playing** — test with music running.
-- [ ] `/ain` switches the microphone.
-- [ ] `/bt` lists paired devices; connect and disconnect both work; "Scan for
+- [x] `/ain` switches the microphone.
+- [x] `/bt` lists paired devices; connect and disconnect both work; "Scan for
       devices" finds something new and reopens the list.
-- [ ] `/net` lists the active connection first, then saved profiles, then Wi-Fi
+- [x] `/net` lists the active connection first, then saved profiles, then Wi-Fi
       in range — and it appears **immediately**, because it reads nmcli's
       cached scan. "Rescan" is an entry in that list; picking it re-runs the
       scan and reopens the list.
-- [ ] Connecting to a **new, secured** Wi-Fi network opens a kitty window with
+- [o] Connecting to a **new, secured** Wi-Fi network opens a kitty window with
       `nmcli --ask` and the passphrase is not echoed.
-- [ ] `/power` switches profile and toggles night light.
-- [ ] `SUPER+CTRL+O/I/B/N/P/T` each open the launcher already filtered.
+- [x] `/power` switches profile and toggles night light.
+- [x] `SUPER+CTRL+O/I/B/N/P/T` each open the launcher already filtered.
 
 > **A provider that shows "No results found" has usually been killed, not
 > failed.** Noctalia gives `command` about two seconds and then SIGTERMs it;
@@ -383,12 +414,12 @@ Then through the launcher:
 
 ## 9. Installer — `install.sh`
 
-- [ ] `./install.sh --all --dry-run` completes with no errors before you run
+- [x] `./install.sh --all --dry-run` completes with no errors before you run
       it for real.
-- [ ] The **warning summary** at the end is empty. Any "could not install"
+- [x] The **warning summary** at the end is empty. Any "could not install"
       line is a package name that does not exist in the CachyOS repos and
       needs correcting in `install.sh`.
-- [ ] `nvim` starts, mason installs `tsgo`, `eslint`, `vimls`, `lua_ls`,
+- [x] `nvim` starts, mason installs `tsgo`, `eslint`, `vimls`, `lua_ls`,
       `lemminx` on first launch, and `:checkhealth` is clean.
 - [ ] `yazi` opens; pressing Enter on a text file opens it in neovim — this
       confirms both `$EDITOR` and that the carried-over `%s` opener syntax is
@@ -432,9 +463,9 @@ Then through the launcher:
 
 The point of the whole setup — worth testing deliberately:
 
-- [ ] A background app finishing a task does **not** steal focus or scroll the
+- [x] A background app finishing a task does **not** steal focus or scroll the
       tape away from what you are reading.
-- [ ] Moving the mouse does not change which monitor is active.
+- [x] Moving the mouse does not change which monitor is active.
 
 ### Idle and locking
 
@@ -520,6 +551,8 @@ something misbehaves:
 | dmenu `prefix` is a bare word | Docs contradict themselves — the config reference says bare (`"ssh"` → `/ssh`), one example page shows `"/cmd"` | `20-launcher.toml` |
 | `control-center` widget id is hyphenated while others are snake_case | Matches upstream doc titles, which are genuinely inconsistent | `10-bar.toml` |
 | ~~`hl.get_workspace_windows(<id>)` accepts a numeric id~~ | **Verified 2026-08-18** | `lib/nav.lua` |
+| ~~A dispatcher's `window` selector accepts a bare address~~ | **Disproven 2026-08-18 on Hyprland 0.56.2.** `window = "0x…"` answers `hl.focus: window not found`; the hyprctl form `"address:0x…"` is what matches. Everything in `lib/nav.lua` that names a window uses the prefixed form | `lib/nav.lua` |
+| ~~Moving a column's windows to another workspace keeps them in one column~~ | **Disproven 2026-08-18 on Hyprland 0.56.2.** Each arriving window starts a column of its own, so a two-window column arrives as two columns. `move_column()` moves them with `follow = false` and then re-consumes them, which also restores the row order | `lib/nav.lua` |
 | ~~`m~n` selects the n-th workspace of the focused monitor~~ | **Disproven 2026-08-18 on Hyprland 0.56.2.** Not valid syntax; the dispatcher answers `ok` and nothing happens, which is why every number key was dead. `lib/ws.lua` does band arithmetic instead | `lib/ws.lua`, `conf/binds.lua` |
 | Noctalia gives a dmenu provider ~2 seconds | **Measured 2026-08-18**: a provider that runs longer is SIGTERMed (exit 143) and the launcher shows "No results found". Undocumented, so it could change — re-measure with a `sleep 3` provider if lists start emptying | `bin/noct-common.sh` |
 | Hyprland pauses idle notifications while a client holds a Wayland idle inhibitor | Protocol behaviour, and the layer the windowed-browser-video case rests on. The two window rules are the belt and braces | `conf/rules.lua`, `70-idle.toml` |

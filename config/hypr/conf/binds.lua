@@ -4,7 +4,8 @@
 --
 --   SUPER              + hjkl   move focus       (niri/PaperWM edge handoff)
 --   SUPER + SHIFT      + hjkl   move the window, same handoff
---   SUPER + CTRL       + hl     reorder columns on the tape
+--   SUPER + CTRL       + hjkl   move the whole column: reorder along the tape,
+--                               then onto the next workspace at its end
 --   SUPER + CTRL+SHIFT + hl     force the window onto the next monitor
 --
 --   SUPER + <n>                 workspace n on THIS monitor
@@ -124,11 +125,21 @@ hl.bind(mod .. " + CTRL + SHIFT + right", hl.dsp.window.move({ monitor = "r", fo
 -- Arranging the tape
 ------------------------------------------------------------------------------
 
--- Reorder whole columns without changing which window is focused.
-hl.bind(mod .. " + CTRL + H", hl.dsp.layout("swapcol l"), { description = "Swap column left" })
-hl.bind(mod .. " + CTRL + L", hl.dsp.layout("swapcol r"), { description = "Swap column right" })
-hl.bind(mod .. " + CTRL + left",  hl.dsp.layout("swapcol l"))
-hl.bind(mod .. " + CTRL + right", hl.dsp.layout("swapcol r"))
+-- Whole columns, on the same four keys: H/L reorder the column along the tape
+-- and, once it is at either end, push it onto the previous/next workspace; J/K
+-- send it there directly. Focus goes with the column, so this is "take this
+-- stack of windows somewhere else" -- SHIFT is the same gesture for one window.
+bind_dir(mod .. " + CTRL", {
+    h = function() nav.column_horizontal("l") end,
+    l = function() nav.column_horizontal("r") end,
+    k = function() nav.column_vertical("u") end,
+    j = function() nav.column_vertical("d") end,
+}, {
+    h = "Swap column left / to previous workspace",
+    l = "Swap column right / to next workspace",
+    k = "Send column to previous workspace",
+    j = "Send column to next workspace",
+})
 
 -- Stack / unstack windows within a column. This is PaperWM's core gesture:
 -- pull the neighbouring window into my column, or push mine back out.

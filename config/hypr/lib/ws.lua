@@ -92,9 +92,13 @@ end
 --- band's edge. Stopping there is deliberate: the band IS the monitor, so
 --- wrapping or spilling over would land you on another screen's workspaces
 --- while looking at this one.
+---
+--- Public because lib/nav.lua needs the same clamped arithmetic for the column
+--- moves on SUPER+CTRL, which are not a focus or a window step and so cannot go
+--- through step_focus / step_move below.
 ---@param dir "u"|"d"
 ---@return integer|nil
-local function neighbour(dir)
+function M.neighbour(dir)
     local base, current = context()
     if not base or not current then return nil end
 
@@ -106,7 +110,7 @@ end
 --- Focus the previous/next workspace on this monitor.
 ---@param dir "u"|"d"
 function M.step_focus(dir)
-    local target = neighbour(dir)
+    local target = M.neighbour(dir)
     if target then hl.dispatch(hl.dsp.focus({ workspace = target })) end
 end
 
@@ -114,7 +118,7 @@ end
 --- and follow it there.
 ---@param dir "u"|"d"
 function M.step_move(dir)
-    local target = neighbour(dir)
+    local target = M.neighbour(dir)
     if target then
         hl.dispatch(hl.dsp.window.move({ workspace = target, follow = true }))
     end
