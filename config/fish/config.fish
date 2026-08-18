@@ -56,8 +56,8 @@ if status is-interactive # Commands to run in interactive sessions can go here
   starship init fish | source
 
   # CHANGED: was the quickshell/illogical-impulse sequences file. Noctalia
-  # themes terminals two ways instead -- its kitty template writes
-  # current-theme.conf for new windows, and the terminal-colors.sh template
+  # themes terminals two ways instead -- the kitty-colors.conf template writes
+  # generated-colors.conf for new windows, and the terminal-colors.sh template
   # pushes OSC sequences into open ones. Neither needs anything sourced here.
 
   # Aliases
@@ -93,7 +93,25 @@ if status is-interactive # Commands to run in interactive sessions can go here
   alias pop='git stash pop'
   alias diff='git diff'
 
-  if test -f /etc/debian_version
+  # Shelly -- CachyOS's package manager. One tool for the repositories, the
+  # AUR, Flatpaks and AppImages, which is why install.sh reaches for it before
+  # pacman + paru and why it is worth having on the keyboard too.
+  #
+  # Guarded on the binary rather than on the distro: these names should not
+  # exist on a machine that cannot run them, and the pacman `update` below
+  # stays the fallback there.
+  #
+  # `shelly <words>` with no subcommand searches the repos and the AUR and
+  # offers to install what it finds, which is the one worth remembering.
+  if type -q shelly
+    alias sfind='shelly search'                # sfind ripgrep
+    alias sin='shelly install standard'        # sin ripgrep fd
+    alias sinaur='shelly install aur'          # sinaur some-aur-package
+    alias srem='shelly remove standard'
+    alias supd='shelly list-updates'           # what would change
+    alias supg='shelly upgrade'                # everything, all backends
+    alias update='shelly upgrade'
+  else if test -f /etc/debian_version
     alias update='sudo apt update ; sudo apt upgrade -y'
   else if test -f /etc/arch-release
     alias update='sudo pacman -Syu'

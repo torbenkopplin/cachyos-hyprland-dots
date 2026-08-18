@@ -6,7 +6,17 @@
 #   ./install.sh --nvim          clone the neovim config
 #   ./install.sh --browsers      install browser policies (needs sudo)
 #   ./install.sh --wallpapers    download wallpapers into ~/Pictures/Wallpapers
-#   ./install.sh --all           all of the above, in the right order
+#   ./install.sh --all           all of the above, in the right order. This
+#                                includes the wallpaper download, which is a few
+#                                hundred megabytes over the network -- use
+#                                --dry-run first if that matters.
+#
+#   ./install.sh --login         replace the display manager with greetd +
+#                                noctalia-greeter (needs sudo). NOT in --all:
+#                                it changes what happens at boot, so it is one
+#                                command you run deliberately. Reverse it with
+#                                'sudo systemctl disable --now greetd &&
+#                                sudo systemctl enable --now plasmalogin'.
 #
 #   ./install.sh --dry-run       show what any of the above would do
 #   ./install.sh --status        show which setup currently owns each path
@@ -38,7 +48,7 @@ BIN_HOME=$HOME/.local/bin
 STAMP=$(date +%Y%m%d-%H%M%S)
 
 DRY_RUN=0 UNLINK=0 STATUS=0
-DO_LINK=0 DO_PACKAGES=0 DO_BROWSERS=0 DO_NVIM=0 DO_WALLPAPERS=0
+DO_LINK=0 DO_PACKAGES=0 DO_BROWSERS=0 DO_NVIM=0 DO_WALLPAPERS=0 DO_LOGIN=0
 
 for arg in "$@"; do
     case "$arg" in
@@ -49,13 +59,18 @@ for arg in "$@"; do
         --browsers) DO_BROWSERS=1 ;;
         --nvim)     DO_NVIM=1 ;;
         --wallpapers) DO_WALLPAPERS=1 ;;
-        --all)      DO_LINK=1; DO_PACKAGES=1; DO_BROWSERS=1; DO_NVIM=1 ;;
-        -h|--help)  sed -n '2,24p' "$0" | sed 's/^# \?//'; exit 0 ;;
+        # Deliberately not part of --all: everything else here is reversible by
+        # rerunning something, this one decides whether you get a login screen.
+        --login)    DO_LOGIN=1 ;;
+        --all)      DO_LINK=1; DO_PACKAGES=1; DO_BROWSERS=1; DO_NVIM=1; DO_WALLPAPERS=1 ;;
+        # The whole header comment, found by shape rather than by line number,
+        # so editing the block above cannot silently truncate --help.
+        -h|--help)  awk 'NR==1 {next} /^#/ {sub(/^# ?/, ""); print; next} {exit}' "$0"; exit 0 ;;
         *) echo "unknown option: $arg" >&2; exit 2 ;;
     esac
 done
 # No action flags at all -> just link, which is the common case.
-(( DO_PACKAGES || DO_BROWSERS || DO_NVIM || DO_WALLPAPERS || DO_LINK )) || DO_LINK=1
+(( DO_PACKAGES || DO_BROWSERS || DO_NVIM || DO_WALLPAPERS || DO_LOGIN || DO_LINK )) || DO_LINK=1
 
 # ---------------------------------------------------------------------------
 # Output helpers
@@ -241,9 +256,17 @@ do_status() {
 PKGS_DESKTOP=(
     hyprland xdg-desktop-portal-hyprland xdg-desktop-portal-gtk
     kitty qt6ct
-    hyprpicker hyprlock hypridle
+    hyprpicker hyprlock
     wl-clipboard brightnessctl playerctl
-    noto-fonts noto-fonts-emoji ttf-jetbrains-mono-nerd
+
+    # Fonts, all three named because something reads each of them:
+    #   ttf-jetbrains-mono-nerd  kitty's font_family, and the glyphs starship
+    #                            and eza draw their icons from
+    #   adwaita-fonts            Adwaita Sans, the shell's UI face
+    #                            (00-shell.toml). Usually present as a GNOME
+    #                            dependency, which is not a thing to rely on
+    #   noto-*                   everything else, emoji included
+    noto-fonts noto-fonts-emoji ttf-jetbrains-mono-nerd adwaita-fonts
 
     # options.lua sets LAUNCH_PREFIX = "uwsm app -- ", so without uwsm every
     # single app bind fails. Clear LAUNCH_PREFIX instead if you do not want it.
@@ -258,6 +281,34 @@ PKGS_DESKTOP=(
 
     # notify-send, which every bin/noct-* script uses to report what it did.
     libnotify
+
+    # hypridle is deliberately NOT here. Noctalia has its own idle service and
+    # this repo configures it (config/noctalia/70-idle.toml); running hypridle
+    # as well means two countdowns to the same lock screen, each unaware of the
+    # other. That is not hypothetical -- it is what a machine upgraded from
+    # ~/repos/dots ends up with, and do_services() below turns the leftover
+    # unit off. Nothing else here needs it: hyprlock stays, since it is a
+    # perfectly good fallback lock you can call by hand.
+)
+
+# Applications that are part of the setup rather than of the desktop.
+PKGS_APPS=(
+    # TODO asked for it by name, and it is the one messenger with no web
+    # client worth using.
+    signal-desktop
+
+    # Mail. The brief was keyboard-driven, vim-style, TUI, and able to send
+    # attachments -- which is aerc almost exactly: modal keybinds, :commands,
+    # `:attach` for files, and it opens the message in $EDITOR (nvim, per
+    # conf/env.lua). neomutt is the other candidate and is more configurable;
+    # aerc wins on arriving usable, understanding maildir and IMAP out of the
+    # box, and having a first-run account wizard rather than a .muttrc.
+    #
+    # No account config is tracked here: an accounts.conf holds mail addresses
+    # and server names, and its password entries would either be secrets in git
+    # or a keyring reference that only works on one machine. Run `aerc` once
+    # and answer the wizard.
+    aerc
 )
 
 # Backends behind the launcher's /aout /ain /bt /net /power providers.
@@ -304,12 +355,47 @@ PKGS_BROWSERS=( chromium firefox brave-bin zen-browser-bin )
 
 # Usually AUR-only -- but still attempted with pacman first, because CachyOS
 # ships some of these in its own repos and a repo build beats a local one.
+#
 PKGS_LIKELY_AUR=( noctalia satty claude-code )
+
+# cursor_packages -- the cursor theme named by CURSOR_THEME in
+# conf/options.lua, unless some Bibata build already provides it.
+#
+# No Bibata package exists in the repos, so this is AUR-only, and the AUR
+# variants (bibata-cursor-theme, -bin, -git, and the illogical-impulse build
+# that ~/repos/dots pulls in) all ship /usr/share/icons/Bibata-*. pacman aborts
+# an entire transaction on a file conflict, so asking for one on a machine that
+# already has another would take the rest of the package step down with it.
+#
+# Nothing breaks if this ends up not installed either: an XCURSOR_THEME that
+# names a missing theme means the pointer stays the compositor default.
+cursor_packages() {
+    compgen -G '/usr/share/icons/Bibata-*' >/dev/null 2>&1 && return 0
+    printf '%s\n' bibata-cursor-theme-bin
+}
+
+# Installed by --login only. greetd is the daemon; noctalia-greeter is the
+# greeter that runs inside it, and it brings its own small wlroots compositor
+# so it does not need Hyprland to be up first.
+PKGS_LOGIN=( greetd noctalia-greeter )
 
 # Installed with npm rather than pacman. LSP servers are deliberately absent:
 # your neovim config installs those through mason (tsgo, eslint, vimls,
 # lua_ls, lemminx), and a second copy on PATH would only cause confusion.
 NPM_GLOBALS=( eslint @mermaid-js/mermaid-cli )
+
+# Package frontends
+# -----------------
+# shelly is CachyOS's own manager (`shelly` in the cachyos repo) and it is
+# preferred wherever it exists, for one reason that matters here: it installs
+# repository packages AND AUR packages through one tool, so a fresh CachyOS
+# machine needs no separate AUR helper for this script to finish. It
+# authenticates through polkit rather than sudo, which means a graphical
+# password prompt in a session -- and nothing at all in a bare TTY, where it
+# simply fails and the pacman path below picks the list up.
+#
+# pacman + paru/yay stays as the fallback, unchanged, so this script still
+# works on plain Arch.
 
 detect_aur_helper() {
     local helper
@@ -319,60 +405,104 @@ detect_aur_helper() {
     return 1
 }
 
-# Names that pacman could not resolve, collected for the AUR pass.
+have_shelly() { command -v shelly >/dev/null 2>&1; }
+
+# pkg_installed <name> -- true when the name is already satisfied.
+#
+# `pacman -T` rather than `-Q`: it resolves *provides* too, so a package
+# installed under a different name than the one asked for (very common with
+# -bin and -git variants) does not get reinstalled on every run. This is what
+# makes every frontend below idempotent, including the ones with no --needed.
+pkg_installed() { pacman -T -- "$1" >/dev/null 2>&1; }
+
+# Names that could not be resolved from the repositories, for the AUR pass.
 UNRESOLVED=()
 
 # pacman_install <packages...>
 #
-# Tries the whole list in one transaction, which is fast and resolves
-# dependencies together. If that fails, retries one at a time so a single
-# unknown name cannot block the other twenty; anything still failing goes to
+# Named for what it means -- "get these from the repositories" -- rather than
+# for which binary does it. Already-installed names are dropped first, then the
+# whole list goes in one transaction, which is fast and resolves dependencies
+# together. If that fails it retries one at a time, so a single unknown name
+# cannot block the other twenty; anything still missing afterwards goes to
 # UNRESOLVED for the AUR pass rather than being reported as an error here.
 pacman_install() {
-    local -a pkgs=("$@")
-    (( ${#pkgs[@]} )) || return 0
+    local -a want=("$@") pkgs=()
+    local pkg
+    for pkg in "${want[@]}"; do
+        pkg_installed "$pkg" || pkgs+=("$pkg")
+    done
 
-    local -a cmd=(sudo pacman -S --needed --noconfirm)
+    if (( ! ${#pkgs[@]} )); then
+        (( ${#want[@]} )) && note "already installed: ${#want[@]} package(s)"
+        return 0
+    fi
 
     if (( DRY_RUN )); then
-        say "would: pacman -S --needed ${pkgs[*]}"
-        return 0
-    fi
-
-    if "${cmd[@]}" "${pkgs[@]}" >/dev/null 2>&1; then
-        say "pacman: ${pkgs[*]}"
-        return 0
-    fi
-
-    note "batch failed, resolving individually"
-    local pkg
-    for pkg in "${pkgs[@]}"; do
-        if "${cmd[@]}" "$pkg" >/dev/null 2>&1; then
-            say "pacman: $pkg"
+        if have_shelly; then
+            say "would: shelly install standard ${pkgs[*]}"
         else
-            UNRESOLVED+=("$pkg")
+            say "would: pacman -S --needed ${pkgs[*]}"
         fi
+        return 0
+    fi
+
+    if have_shelly && shelly install standard --no-confirm "${pkgs[@]}" >/dev/null 2>&1; then
+        say "shelly: ${pkgs[*]}"
+    elif sudo pacman -S --needed --noconfirm "${pkgs[@]}" >/dev/null 2>&1; then
+        say "pacman: ${pkgs[*]}"
+    else
+        note "batch failed, resolving individually"
+        for pkg in "${pkgs[@]}"; do
+            if sudo pacman -S --needed --noconfirm "$pkg" >/dev/null 2>&1; then
+                say "pacman: $pkg"
+            fi
+        done
+    fi
+
+    # One truth at the end, whichever frontend ran: what is still not there.
+    for pkg in "${pkgs[@]}"; do
+        pkg_installed "$pkg" || UNRESOLVED+=("$pkg")
     done
 }
 
-# Only reached for what pacman could not provide.
+# Only reached for what the repositories could not provide.
 aur_install() {
-    local -a pkgs=("$@")
+    local -a want=("$@") pkgs=()
+    local pkg
+    for pkg in "${want[@]}"; do
+        pkg_installed "$pkg" || pkgs+=("$pkg")
+    done
     (( ${#pkgs[@]} )) || return 0
+
+    if (( DRY_RUN )); then
+        if have_shelly; then
+            say "would: shelly install aur ${pkgs[*]}"
+        else
+            say "would: $(detect_aur_helper || echo '<no AUR helper>') -S --needed ${pkgs[*]}"
+        fi
+        return 0
+    fi
+
+    # shelly builds AUR packages itself, so this is the branch that runs on
+    # CachyOS whether or not paru is installed.
+    if have_shelly; then
+        shelly install aur --no-confirm "${pkgs[@]}" >/dev/null 2>&1 || true
+        local -a left=()
+        for pkg in "${pkgs[@]}"; do
+            if pkg_installed "$pkg"; then say "shelly: $pkg"; else left+=("$pkg"); fi
+        done
+        pkgs=("${left[@]}")
+        (( ${#pkgs[@]} )) || return 0
+    fi
 
     local helper
     if ! helper=$(detect_aur_helper); then
-        warn "no AUR helper (paru/yay) -- not installed: ${pkgs[*]}"
-        note "install paru, then rerun with --packages"
+        warn "not installed, and no AUR helper to try: ${pkgs[*]}"
+        note "install shelly or paru, then rerun with --packages"
         return 0
     fi
 
-    if (( DRY_RUN )); then
-        say "would: $helper -S --needed ${pkgs[*]}"
-        return 0
-    fi
-
-    local pkg
     for pkg in "${pkgs[@]}"; do
         if "$helper" -S --needed --noconfirm "$pkg" >/dev/null 2>&1; then
             say "$helper: $pkg"
@@ -397,8 +527,8 @@ do_packages() {
     pacman_install \
         "${PKGS_DESKTOP[@]}" "${PKGS_SYSTEM[@]}" "${PKGS_DEV[@]}" \
         "${PKGS_SHELL[@]}" "${PKGS_PROMPT[@]}" \
-        "${PKGS_YAZI[@]}" "${PKGS_BROWSERS[@]}" \
-        "${PKGS_LIKELY_AUR[@]}"
+        "${PKGS_YAZI[@]}" "${PKGS_BROWSERS[@]}" "${PKGS_APPS[@]}" \
+        "${PKGS_LIKELY_AUR[@]}" $(cursor_packages)
 
     if (( ${#UNRESOLVED[@]} )); then
         heading "AUR fallback"
@@ -553,6 +683,27 @@ do_services() {
             run sudo systemctl enable --now "$svc.service"
         fi
     done
+
+    stop_stray_idle_daemon
+}
+
+# Noctalia's idle service is what this repo configures (70-idle.toml). hypridle
+# does the same job from a config directory the repo does not manage, and on a
+# machine that ran ~/repos/dots it is still enabled as a user unit -- so the
+# screen locks on whichever of the two counts down first, with two different
+# sets of timeouts and only one of them written down here.
+#
+# A user unit, so no sudo, and disabling it is a one-word undo if you would
+# rather keep hypridle: `systemctl --user enable --now hypridle`, and then set
+# every behaviour in 70-idle.toml to enabled = false so only one of them acts.
+stop_stray_idle_daemon() {
+    systemctl --user list-unit-files hypridle.service >/dev/null 2>&1 || return 0
+    systemctl --user is-enabled hypridle.service >/dev/null 2>&1 ||
+        systemctl --user is-active hypridle.service >/dev/null 2>&1 || return 0
+
+    say "hypridle is running as well as Noctalia's idle service -- disabling it"
+    note "two idle daemons means two countdowns to the lock screen"
+    run systemctl --user disable --now hypridle.service
 }
 
 # ---------------------------------------------------------------------------
@@ -645,28 +796,219 @@ install_user_js() {  # <source user.js> <profiles root> <label>
 # ---------------------------------------------------------------------------
 # Wallpapers
 #
-# Not part of --all on purpose: this pulls a few hundred megabytes of images
-# over the network, which is not something an install script should do without
-# being asked. The palette is wallpaper-derived, though, so the desktop is not
-# really finished until this has run once.
+# Part of --all, and last in it: the palette is wallpaper-derived, so the
+# desktop is not finished until this has run once and leaving it out of the
+# one-command setup just means a fresh machine looks half-configured.
+#
+# It does pull a few hundred megabytes of images over the network, which is the
+# one step here with a real cost attached -- hence the note in --all's help and
+# the advice to try --dry-run on a metered connection.
 # ---------------------------------------------------------------------------
+
+# check_wallpaper_monitors -- warn when 60-wallpaper.toml names monitors this
+# machine does not have.
+#
+# This is the one part of the setup that cannot be made host-agnostic: Noctalia
+# keys per-monitor wallpaper directories on connector names, and it has no
+# per-host mechanism the way hypr/host.lua does. An unmatched
+# [wallpaper.monitor.X] section is not an error -- Noctalia just ignores it and
+# falls back to the global `directory`, so the failure mode on a machine with
+# different connectors is every screen quietly showing the same 16:9 set. That
+# is invisible unless something says so, which is what this does.
+check_wallpaper_monitors() {
+    local toml=$REPO/config/noctalia/60-wallpaper.toml
+    [[ -f $toml ]] || return 0
+
+    local -a configured=()
+    while IFS= read -r name; do configured+=("$name"); done \
+        < <(sed -n 's/^\[wallpaper\.monitor\.\([^]]*\)\].*/\1/p' "$toml")
+    (( ${#configured[@]} )) || return 0
+
+    # Only answerable from inside a running session, which an install run from a
+    # TTY is not. Say so rather than pretending the names are fine.
+    if ! command -v hyprctl >/dev/null 2>&1 || ! hyprctl monitors >/dev/null 2>&1; then
+        note "per-monitor sections: ${configured[*]}"
+        note "not verifiable outside a Hyprland session -- recheck in one with"
+        note "'hyprctl monitors' if the wrong wallpapers show up per screen"
+        return 0
+    fi
+
+    local -a live=()
+    while IFS= read -r name; do live+=("$name"); done \
+        < <(hyprctl monitors | awk '/^Monitor /{print $2}')
+
+    local cfg mon found
+    local -a unmatched=()
+    for cfg in "${configured[@]}"; do
+        found=0
+        for mon in "${live[@]}"; do [[ $cfg == "$mon" ]] && { found=1; break; }; done
+        (( found )) || unmatched+=("$cfg")
+    done
+
+    if (( ${#unmatched[@]} )); then
+        warn "60-wallpaper.toml targets monitors this machine does not have: ${unmatched[*]}"
+        note "connected: ${live[*]}"
+        note "rename the [wallpaper.monitor.X] sections to match, or those"
+        note "screens silently fall back to the global directory"
+    else
+        say "per-monitor sections match the connected monitors (${live[*]})"
+    fi
+}
 
 do_wallpapers() {
     heading "Wallpapers"
 
-    if ! command -v noct-wallfetch >/dev/null 2>&1; then
-        warn "noct-wallfetch not on PATH -- run the linking step first"
-        return 0
+    # Called by absolute path rather than through PATH: the linking step puts
+    # this in ~/.local/bin, but that directory is only on PATH once a new login
+    # shell has picked it up -- so on a fresh machine `--all --wallpapers` in one
+    # go would otherwise fail here having just installed the very script it
+    # cannot find.
+    local wallfetch=$BIN_HOME/noct-wallfetch
+    if [[ ! -x $wallfetch ]]; then
+        wallfetch=$REPO/bin/noct-wallfetch
+        [[ -x $wallfetch ]] || { warn "noct-wallfetch not found -- run the linking step first"; return 0; }
+        note "not linked yet; running it from the repo"
     fi
 
     if (( DRY_RUN )); then
-        run noct-wallfetch --dry-run
+        # Actually run it rather than printing "would: ...". noct-wallfetch
+        # --dry-run only queries the API and prints what it would fetch, so it
+        # writes nothing -- and now that --wallpapers is part of --all,
+        # `--all --dry-run` is how you see the size of the download before
+        # committing to it. Printing the command name would defeat the point.
+        "$wallfetch" --dry-run || warn "wallpaper dry run reported problems"
+        check_wallpaper_monitors
         return 0
     fi
 
-    noct-wallfetch || warn "wallpaper fetch reported problems"
-    note "monitor names in 60-wallpaper.toml are placeholders --"
-    note "check them against 'hyprctl monitors'"
+    "$wallfetch" || warn "wallpaper fetch reported problems"
+    check_wallpaper_monitors
+}
+
+# ---------------------------------------------------------------------------
+# Login manager
+#
+# A CachyOS install boots into plasmalogin (SDDM under Plasma 6.5's new name),
+# which is a Qt/Plasma login screen in front of a session that has nothing else
+# Plasma in it -- different fonts, different accent colour, different cursor,
+# and a session list where the Hyprland entry is one of three.
+#
+# greetd + noctalia-greeter replaces it with the same shell you are logging
+# into: noctalia-greeter brings its own small wlroots compositor, so it runs
+# before Hyprland exists, and it reads the palette and wallpaper Noctalia
+# already resolved.
+#
+# This is the one step here that changes what happens at boot, which is why it
+# is not in --all and why it prints how to undo itself. If the greeter ever
+# fails to come up you are not locked out: switch to a TTY with
+# ctrl+alt+F2, log in, and run the revert line below.
+# ---------------------------------------------------------------------------
+
+GREETD_CONF=/etc/greetd/config.toml
+
+# The display manager currently enabled, by unit name -- plasmalogin.service,
+# sddm.service, gdm.service, ... Read from the symlink systemd itself uses, so
+# it is right regardless of which of them the distro shipped.
+current_display_manager() {
+    local target
+    target=$(readlink -f /etc/systemd/system/display-manager.service 2>/dev/null) || return 1
+    [[ -n $target ]] || return 1
+    basename "$target"
+}
+
+do_login() {
+    heading "Login manager"
+
+    if ! command -v pacman >/dev/null 2>&1; then
+        warn "pacman not found -- this step only works on CachyOS/Arch"
+        return 0
+    fi
+
+    say "packages"
+    UNRESOLVED=()
+    pacman_install "${PKGS_LOGIN[@]}"
+    if (( ${#UNRESOLVED[@]} )); then
+        note "not in any enabled repo: ${UNRESOLVED[*]}"
+        aur_install "${UNRESOLVED[@]}"
+    fi
+
+    # The session entry point, not the greeter binary: it starts the bundled
+    # compositor and runs the greeter inside it. Resolved rather than
+    # hardcoded, since a repo build lands in /usr/bin and a manual one in
+    # /usr/local/bin.
+    local session
+    session=$(command -v noctalia-greeter-session 2>/dev/null || true)
+    if [[ -z $session ]]; then
+        if (( DRY_RUN )); then
+            session=/usr/bin/noctalia-greeter-session
+            note "noctalia-greeter is not installed yet; assuming $session"
+        else
+            warn "noctalia-greeter-session not found -- greeter not configured"
+            note "install noctalia-greeter and rerun ./install.sh --login"
+            return 0
+        fi
+    fi
+
+    # --- greetd config -------------------------------------------------------
+    #
+    # greetd itself only knows how to run one command as one user; everything
+    # about how the login screen looks, and which session it starts afterwards,
+    # belongs to the greeter.
+    local tmp
+    tmp=$(mktemp)
+    cat >"$tmp" <<EOF
+# Written by cachyos-hyprland-dots (install.sh --login).
+#
+# greetd runs one command as the unprivileged 'greeter' user. That command is
+# noctalia-greeter-session, which starts a small wlroots compositor, shows the
+# greeter inside it, and hands over to whichever session you pick from
+# /usr/share/wayland-sessions -- hyprland-uwsm.desktop being the one this repo
+# is built around.
+#
+# Appearance comes from Noctalia: open its settings (SUPER+comma) ->
+# Security -> Noctalia Greeter -> Sync Now to push the current palette and
+# wallpaper to the login screen.
+
+[terminal]
+vt = 1
+
+[default_session]
+command = "$session"
+user = "greeter"
+EOF
+
+    if [[ -f $GREETD_CONF ]] && ! diff -q "$tmp" "$GREETD_CONF" >/dev/null 2>&1; then
+        say "back up $GREETD_CONF"
+        run sudo cp -a "$GREETD_CONF" "$GREETD_CONF.bak-$STAMP"
+    fi
+    say "write $GREETD_CONF"
+    run sudo install -Dm644 "$tmp" "$GREETD_CONF"
+    rm -f "$tmp"
+
+    # --- switch over ---------------------------------------------------------
+    local current
+    current=$(current_display_manager || true)
+
+    if [[ $current == greetd.service ]]; then
+        say "greetd is already the display manager"
+    else
+        if [[ -n $current ]]; then
+            say "disable $current"
+            run sudo systemctl disable "$current"
+        fi
+        say "enable greetd"
+        # Not --now: restarting the display manager from inside a session it
+        # started would kill that session, i.e. this one. It takes effect at
+        # the next boot, or the next `systemctl isolate graphical.target` from
+        # a TTY.
+        run sudo systemctl enable greetd.service
+    fi
+
+    note "takes effect at the next boot; this session is not touched"
+    note "sync its look: SUPER+comma -> Security -> Noctalia Greeter -> Sync Now"
+    if [[ -n ${current:-} && $current != greetd.service ]]; then
+        note "undo: sudo systemctl disable greetd && sudo systemctl enable $current"
+    fi
 }
 
 do_browsers() {
@@ -695,6 +1037,7 @@ printf '%shyprland + noctalia dotfiles%s\n' "$BOLD" "$RESET"
 (( DO_LINK ))     && do_link
 (( DO_BROWSERS ))   && do_browsers
 (( DO_WALLPAPERS )) && do_wallpapers
+(( DO_LOGIN ))      && do_login
 
 if (( STATUS )); then
     do_status
@@ -729,7 +1072,14 @@ cat <<'EOF'
      could not be verified without a live session.
   3. Sign into browser sync for bookmarks and extensions; nothing in this
      repo carries them.
-  4. ./install.sh --wallpapers  -- not included in --all, since it downloads
-     a few hundred megabytes. The colour palette is derived from whatever
-     wallpaper is active, so this is worth running.
+  4. Pick a wallpaper per monitor from the shell's picker. The colour palette
+     is derived from the active one, so this is what finishes the theming.
 EOF
+
+if (( ! DO_LOGIN )) && [[ $(current_display_manager 2>/dev/null || echo none) != greetd.service ]]; then
+cat <<'EOF'
+  5. ./install.sh --login  -- replaces the Plasma login screen with greetd +
+     noctalia-greeter, which looks like the shell you are logging into.
+     Separate from --all because it changes what happens at boot.
+EOF
+fi
