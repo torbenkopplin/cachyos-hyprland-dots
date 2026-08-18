@@ -10,7 +10,10 @@
 --                     Past the last / first column, go to the monitor in
 --                     that direction instead.
 --
---   SUPER+CTRL+<hjkl> the same, dragging the focused window along.
+--   SUPER+SHIFT+<hjkl> the same, dragging the focused window along.
+--
+-- The workspace end of that is band arithmetic, not a relative selector --
+-- see lib/ws.lua for why "m+1" cannot do it.
 --
 -- How the edge is detected
 -- ------------------------
@@ -31,6 +34,10 @@
 -- The scrolling layout reports "no column that way" as a *success* (it just
 -- re-centres), so only the row case would be detectable that way. Reading the
 -- indices is uniform and does not depend on that asymmetry.
+
+-- Named for what it provides rather than "ws": column_range() below has its
+-- own local `ws`, which is a workspace object and not this.
+local bands = require("lib.ws")
 
 local M = {}
 
@@ -122,7 +129,7 @@ function M.focus_vertical(dir)
         end
     end
 
-    hl.dispatch(hl.dsp.focus({ workspace = (dir == "u") and "m-1" or "m+1" }))
+    bands.step_focus(dir)
 end
 
 --- Focus left/right along the tape; fall through to the monitor in that
@@ -172,10 +179,7 @@ function M.move_vertical(dir)
         end
     end
 
-    hl.dispatch(hl.dsp.window.move({
-        workspace = (dir == "u") and "m-1" or "m+1",
-        follow    = true,
-    }))
+    bands.step_move(dir)
 end
 
 --- Move the window left/right along the tape.

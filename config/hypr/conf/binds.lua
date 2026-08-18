@@ -3,8 +3,8 @@
 -- Layout of the keymap:
 --
 --   SUPER              + hjkl   move focus       (niri/PaperWM edge handoff)
---   SUPER + CTRL       + hjkl   move the window, same handoff
---   SUPER + SHIFT      + hl     reorder columns on the tape
+--   SUPER + SHIFT      + hjkl   move the window, same handoff
+--   SUPER + CTRL       + hl     reorder columns on the tape
 --   SUPER + CTRL+SHIFT + hl     force the window onto the next monitor
 --
 --   SUPER + <n>                 workspace n on THIS monitor
@@ -13,9 +13,18 @@
 --   tap SUPER                   launcher
 --   SUPER + CTRL + <letter>     system control, straight into the launcher
 --
--- Everything reachable without leaving the home row where it plausibly can be.
+-- SHIFT means "bring the window with you" everywhere: with a direction, with a
+-- number key, with the scratchpad. It used to mean that only on the number
+-- keys, with CTRL doing it for directions -- the two are swapped now.
+--
+-- Every directional bind is on hjkl AND on the arrow keys. They are the same
+-- bind twice, so nothing has to be remembered twice; the arrows are what you
+-- reach for when one hand is on the mouse, or before hjkl is muscle memory.
+-- The one exception is the SUPER+CTRL+<letter> system-control block, which is
+-- a mnemonic list rather than a direction.
 
 local nav      = require("lib.nav")
+local bands    = require("lib.ws")
 local bar      = require("lib.bar")
 local supertap = require("lib.supertap")
 
@@ -60,47 +69,66 @@ hl.bind(mod .. " + Space", hl.dsp.exec_cmd(NOCT .. "panel-toggle launcher"),
 -- H/L walk the tape of columns, then continue onto the next monitor.
 ------------------------------------------------------------------------------
 
-hl.bind(mod .. " + H", function() nav.focus_horizontal("l") end,
-    { repeating = true, description = "Focus left / previous monitor" })
-hl.bind(mod .. " + L", function() nav.focus_horizontal("r") end,
-    { repeating = true, description = "Focus right / next monitor" })
-hl.bind(mod .. " + K", function() nav.focus_vertical("u") end,
-    { repeating = true, description = "Focus up / previous workspace" })
-hl.bind(mod .. " + J", function() nav.focus_vertical("d") end,
-    { repeating = true, description = "Focus down / next workspace" })
+-- bind_dir <chord prefix> <table of h/j/k/l -> action> <table of descriptions>
+--
+-- Binds a directional set twice, once on hjkl and once on the arrows, from one
+-- description. Writing them out separately is how the two drift apart -- the
+-- arrows had no window-moving half at all before this.
+local ARROW = { h = "left", l = "right", k = "up", j = "down" }
 
--- Arrows do the same thing, for the times your hand is already on the mouse.
-hl.bind(mod .. " + left",  function() nav.focus_horizontal("l") end, { repeating = true })
-hl.bind(mod .. " + right", function() nav.focus_horizontal("r") end, { repeating = true })
-hl.bind(mod .. " + up",    function() nav.focus_vertical("u") end,   { repeating = true })
-hl.bind(mod .. " + down",  function() nav.focus_vertical("d") end,   { repeating = true })
+local function bind_dir(prefix, actions, descriptions)
+    for key, action in pairs(actions) do
+        local opts = { repeating = true, description = descriptions[key] }
+        hl.bind(prefix .. " + " .. key:upper(), action, opts)
+        hl.bind(prefix .. " + " .. ARROW[key], action, { repeating = true })
+    end
+end
+
+bind_dir(mod, {
+    h = function() nav.focus_horizontal("l") end,
+    l = function() nav.focus_horizontal("r") end,
+    k = function() nav.focus_vertical("u") end,
+    j = function() nav.focus_vertical("d") end,
+}, {
+    h = "Focus left / previous monitor",
+    l = "Focus right / next monitor",
+    k = "Focus up / previous workspace",
+    j = "Focus down / next workspace",
+})
 
 ------------------------------------------------------------------------------
 -- Move the focused window, with the same handoff
 ------------------------------------------------------------------------------
 
-hl.bind(mod .. " + CTRL + H", function() nav.move_horizontal("l") end,
-    { repeating = true, description = "Move window left / to previous monitor" })
-hl.bind(mod .. " + CTRL + L", function() nav.move_horizontal("r") end,
-    { repeating = true, description = "Move window right / to next monitor" })
-hl.bind(mod .. " + CTRL + K", function() nav.move_vertical("u") end,
-    { repeating = true, description = "Move window up / to previous workspace" })
-hl.bind(mod .. " + CTRL + J", function() nav.move_vertical("d") end,
-    { repeating = true, description = "Move window down / to next workspace" })
+bind_dir(mod .. " + SHIFT", {
+    h = function() nav.move_horizontal("l") end,
+    l = function() nav.move_horizontal("r") end,
+    k = function() nav.move_vertical("u") end,
+    j = function() nav.move_vertical("d") end,
+}, {
+    h = "Move window left / to previous monitor",
+    l = "Move window right / to next monitor",
+    k = "Move window up / to previous workspace",
+    j = "Move window down / to next workspace",
+})
 
 -- Unconditional monitor hop, for when you don't want to think about edges.
 hl.bind(mod .. " + CTRL + SHIFT + H", hl.dsp.window.move({ monitor = "l", follow = true }),
     { description = "Send window to the monitor on the left" })
 hl.bind(mod .. " + CTRL + SHIFT + L", hl.dsp.window.move({ monitor = "r", follow = true }),
     { description = "Send window to the monitor on the right" })
+hl.bind(mod .. " + CTRL + SHIFT + left",  hl.dsp.window.move({ monitor = "l", follow = true }))
+hl.bind(mod .. " + CTRL + SHIFT + right", hl.dsp.window.move({ monitor = "r", follow = true }))
 
 ------------------------------------------------------------------------------
 -- Arranging the tape
 ------------------------------------------------------------------------------
 
 -- Reorder whole columns without changing which window is focused.
-hl.bind(mod .. " + SHIFT + H", hl.dsp.layout("swapcol l"), { description = "Swap column left" })
-hl.bind(mod .. " + SHIFT + L", hl.dsp.layout("swapcol r"), { description = "Swap column right" })
+hl.bind(mod .. " + CTRL + H", hl.dsp.layout("swapcol l"), { description = "Swap column left" })
+hl.bind(mod .. " + CTRL + L", hl.dsp.layout("swapcol r"), { description = "Swap column right" })
+hl.bind(mod .. " + CTRL + left",  hl.dsp.layout("swapcol l"))
+hl.bind(mod .. " + CTRL + right", hl.dsp.layout("swapcol r"))
 
 -- Stack / unstack windows within a column. This is PaperWM's core gesture:
 -- pull the neighbouring window into my column, or push mine back out.
@@ -140,10 +168,22 @@ hl.bind(mod .. " + SHIFT + E", hl.dsp.layout("fit visible"), { description = "Ev
 -- A resize mode, so you can adjust with hjkl instead of holding a chord.
 hl.bind(mod .. " + R", hl.dsp.submap("resize"), { description = "Resize mode" })
 hl.define_submap("resize", function()
-    hl.bind("h", hl.dsp.layout("colresize -0.02"), { repeating = true })
-    hl.bind("l", hl.dsp.layout("colresize +0.02"), { repeating = true })
-    hl.bind("k", hl.dsp.window.resize({ x = 0, y = -40, relative = true }), { repeating = true })
-    hl.bind("j", hl.dsp.window.resize({ x = 0, y =  40, relative = true }), { repeating = true })
+    -- Arrows alongside hjkl here too, so the submap is not the one place where
+    -- the habit stops working.
+    local narrower = hl.dsp.layout("colresize -0.02")
+    local wider    = hl.dsp.layout("colresize +0.02")
+    local shorter  = hl.dsp.window.resize({ x = 0, y = -40, relative = true })
+    local taller   = hl.dsp.window.resize({ x = 0, y =  40, relative = true })
+
+    hl.bind("h", narrower, { repeating = true })
+    hl.bind("l", wider,    { repeating = true })
+    hl.bind("k", shorter,  { repeating = true })
+    hl.bind("j", taller,   { repeating = true })
+
+    hl.bind("left",  narrower, { repeating = true })
+    hl.bind("right", wider,    { repeating = true })
+    hl.bind("up",    shorter,  { repeating = true })
+    hl.bind("down",  taller,   { repeating = true })
 
     hl.bind("w", hl.dsp.layout("colresize +conf"))
 
@@ -171,16 +211,17 @@ hl.bind(mod .. " + Tab", hl.dsp.exec_cmd(NOCT .. "window-switcher"), { descripti
 ------------------------------------------------------------------------------
 -- Workspaces
 --
--- `m~n` is "the n-th workspace on the monitor I'm looking at", so these mean
--- the same thing on every screen.
+-- Each key means "the n-th workspace of the monitor I am looking at", which is
+-- lib/ws.lua's job: the ids themselves are per-monitor bands (1-10, 11-20, ...)
+-- and there is no workspace selector that expresses this correctly.
 ------------------------------------------------------------------------------
 
 -- One key per workspace in the band: 1..9 then 0 for the tenth.
 for n = 1, WORKSPACE_BAND do
     local key = n % 10
-    hl.bind(mod .. " + " .. key, hl.dsp.focus({ workspace = "m~" .. n }),
+    hl.bind(mod .. " + " .. key, function() bands.switch(n) end,
         { description = "Workspace " .. n })
-    hl.bind(mod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = "m~" .. n, follow = true }),
+    hl.bind(mod .. " + SHIFT + " .. key, function() bands.move_to(n) end,
         { description = "Send window to workspace " .. n })
 end
 
@@ -296,5 +337,5 @@ hl.bind(mod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 -- Scroll the tape with SUPER+wheel, walk workspaces with SUPER+SHIFT+wheel.
 hl.bind(mod .. " + mouse_down", hl.dsp.layout("move +col"))
 hl.bind(mod .. " + mouse_up",   hl.dsp.layout("move -col"))
-hl.bind(mod .. " + SHIFT + mouse_down", hl.dsp.focus({ workspace = "m+1" }))
-hl.bind(mod .. " + SHIFT + mouse_up",   hl.dsp.focus({ workspace = "m-1" }))
+hl.bind(mod .. " + SHIFT + mouse_down", function() bands.step_focus("d") end)
+hl.bind(mod .. " + SHIFT + mouse_up",   function() bands.step_focus("u") end)
