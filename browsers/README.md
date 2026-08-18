@@ -21,13 +21,22 @@ you get that data onto the new machine.
 | `chromium/policies.json` | `/etc/chromium/policies/managed/` | Chromium |
 | `firefox/policies.json` | `/etc/firefox/policies/` | Firefox |
 | `firefox/user.js` | every profile in `~/.mozilla/firefox/` | Firefox |
-| `zen/user.js` | every profile in `~/.zen/` | Zen |
+| `zen/user.js` | every profile in `~/.config/zen/` (or `~/.zen/`) | Zen |
 
 Chromium-family policy files need root and take effect on next launch.
 Firefox-family `user.js` is read at startup and re-applies its values every
 time, so a setting changed in the UI reverts on restart — that is the point,
 but it is also why anything you want to be able to change by hand should *not*
 be listed there.
+
+Zen's profile root is **`~/.config/zen`** on `zen-browser-bin` 1.21, not `~/.zen`
+as its Firefox ancestry suggests — which is why `install.sh` tries both, and why
+the Zen half of `--browsers` had quietly never landed anything before. `find` the
+profile if you need it by hand; the directory name is random per install:
+
+```sh
+ls -d ~/.config/zen/*.*        # e.g. "yemhuyco.Default (release)"
+```
 
 Install with:
 
@@ -57,6 +66,18 @@ shortcuts, sponsored stories, snippets, the onboarding tour and the
 "More from Mozilla" panel are all things Mozilla ships enabled, and none of
 them is the browser you asked for. Search and top sites stay on because they
 are actually useful; `Locked: false` means you can still change them in the UI.
+
+**Zen — transparency.** The one place a browser has to know about the desktop.
+`bin/noct-glass` fades *every* window to ~0.9 and blurs the wallpaper behind it,
+so a terminal shows about a tenth of the image. Zen, with the "transparent zen"
+mod and its site styles, was showing nearly all of it: the same wallpaper, two
+completely different shades, side by side. `zen/user.js` tints Zen's own
+background instead, and the two alphas multiply — 0.6 there lands at ~0.53 once
+the compositor has had its turn, which is glassier than a terminal on purpose but
+recognisably the same material. The alpha is the only number in that block worth
+touching. The desktop side is deliberately left alone: the compositor cannot tell
+a window's text from its background, so fading windows further fades their text
+with them, while a browser drawing its own translucency keeps text opaque.
 
 **Not set anywhere:** default search engine, homepage, password manager
 behaviour beyond leaving it enabled, and extension allow/block lists. Those are

@@ -518,8 +518,31 @@ Then through the launcher:
 - [ ] Firefox's new tab has no sponsored shortcuts or stories.
 - [ ] Sync still works in each browser — nothing here should have disabled it.
 - [ ] After launching Firefox and Zen once, rerun `./install.sh --browsers`
-      and confirm `user.js` landed in each profile.
+      and confirm `user.js` landed in each profile. For Zen that means
+      `~/.config/zen/*.*/user.js` — **not** `~/.zen`, which does not exist on
+      `zen-browser-bin` 1.21 and is why nothing had ever landed there:
+      ```sh
+      ls -l ~/.config/zen/*.*/user.js
+      ```
 - [ ] `about:config` shows `browser.startup.page` = 3 in both.
+
+Zen's transparency is the one place a browser is tuned against the desktop, so
+it needs looking at rather than reading back — **restart Zen first**, since
+`user.js` is only read at startup:
+
+- [ ] reddit and youtube are still translucent, but now clearly darker than
+      before: about half the wallpaper showing, against a tenth for a terminal
+      beside them. Both should read as the same material at different depths.
+- [ ] The page area and the chrome around it are the *same* shade. If the page
+      is still much lighter, `zen_transparency_color` is reaching the browser
+      background but not the content stack — the `userChrome.css` line at the
+      bottom of `browsers/zen/user.js` is the fallback.
+- [ ] `about:config` shows `mod.sameerasw_zen_light_tint` = `1` as a **string**,
+      not rejected for a type mismatch. The mod's dropdowns are string prefs
+      (`mod.sameerasw_zen_animations` is `"1"` in a live profile), but an int
+      pref set from a string is silently ignored, so it is worth a look.
+- [ ] Tuning it is one number: the alpha in `zen_transparency_color`. Raise it
+      towards 1.0 to converge on the rest of the desktop.
 - [ ] **No profile data is tracked**: `git status` stays clean after a browsing
       session, and `git ls-files | grep -iE 'cookies|logins|places'` finds
       nothing.
@@ -638,7 +661,9 @@ something misbehaves:
 | Noctalia reads custom palettes from `~/.config/noctalia/palettes/<name>.json` | Documented; the exact JSON key set for a palette was taken from the docs example | `palettes/noirblaze.json` |
 | yazi's `%s` opener placeholder is still current | Carried over verbatim from your working config rather than modernised | `config/yazi/yazi.toml` |
 | Brave policy names (`BraveRewardsDisabled`, `BraveAIChatEnabled`, …) | Brave-specific policies are less stable than Chromium's; `brave://policy` is the check | `browsers/brave/policies.json` |
-| Zen reads `user.js` from profiles under `~/.zen` | Zen is a Firefox fork so this should hold, but its profile root is not documented as firmly | `install.sh` |
+| ~~Zen reads `user.js` from profiles under `~/.zen`~~ | **Disproven 2026-08-18 on zen-browser-bin 1.21.14b.** The profile root is `~/.config/zen` (`~/.zen` does not exist), so the Zen half of `--browsers` had never landed a file. `install.sh` now tries both roots | `install.sh` |
+| Setting `mod.sameerasw.*` from `user.js` reaches the Zen mod | The mod reads its settings as ordinary prefs and a live profile stores its dropdowns as strings, so the types match — but whether the mod re-reads them on a cold start rather than only when its own UI writes them is unconfirmed. Restart Zen and look | `browsers/zen/user.js` |
+| `zen_transparency_color` tints the page area and not only the chrome | It feeds `--zen-main-browser-background`, which the mod describes as the browser background; the page is transparent on top of it. If the page stays lighter, the `.browserStack > browser` rule named in `user.js` is the fallback | `browsers/zen/user.js` |
 | ~~Noctalia's `kitty` template writes `current-theme.conf`~~ | **Disproven 2026-08-18 on noctalia v5.0.0-beta.8.** It writes `themes/noctalia.conf` and *rewrites `kitty.conf`* to include it, clobbering the tracked symlink. The built-in is now disabled; a user template renders `generated-colors.conf` instead | `40-templates.toml`, `config/kitty/kitty.conf` |
 | Colour roles used by `kitty-colors.conf` (`terminal_*`, `primary`, `outline_variant`) | Verified 2026-08-18: all render to real hex, no leftover placeholders | `templates/kitty-colors.conf` |
 | A user template named after a built-in id (`kitty`, `hyprland`) does not collide with it | Verified 2026-08-18: both render while the built-in id is absent from `builtin_ids` | `40-templates.toml` |

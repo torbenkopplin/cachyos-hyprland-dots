@@ -775,22 +775,24 @@ install_policy() {  # <source> <destination dir> <destination name>
 # Firefox-family profiles have generated directory names, so they are
 # discovered rather than assumed. They do not exist until the browser has been
 # launched once.
-install_user_js() {  # <source user.js> <profiles root> <label>
-    local src=$1 root=$2 label=$3
+install_user_js() {  # <source user.js> <label> <profiles root>...
+    local src=$1 label=$2
+    shift 2
     [[ -f $src ]] || return 0
 
-    if [[ ! -d $root ]]; then
-        note "$label: no profile directory yet -- launch it once, then rerun"
-        return 0
-    fi
+    # More than one root because a browser's profile directory is not a stable
+    # thing: Zen moved from ~/.zen to ~/.config/zen, and a file written to the
+    # root the browser is not using is invisible rather than an error.
+    local found=0 root profile
+    for root in "$@"; do
+        [[ -d $root ]] || continue
+        while IFS= read -r -d '' profile; do
+            found=1
+            link "$src" "$profile/user.js"
+        done < <(find "$root" -maxdepth 1 -type d -name '*.*' -print0 2>/dev/null)
+    done
 
-    local found=0 profile
-    while IFS= read -r -d '' profile; do
-        found=1
-        link "$src" "$profile/user.js"
-    done < <(find "$root" -maxdepth 1 -type d -name '*.*' -print0 2>/dev/null)
-
-    (( found )) || note "$label: no profiles found under ${root/#$HOME/\~}"
+    (( found )) || note "$label: no profiles found -- launch it once, then rerun"
 }
 
 # ---------------------------------------------------------------------------
@@ -1023,8 +1025,13 @@ do_browsers() {
                    /etc/firefox/policies policies.json
 
     heading "Browser preferences"
-    install_user_js "$REPO/browsers/firefox/user.js" "$HOME/.mozilla/firefox" Firefox
-    install_user_js "$REPO/browsers/zen/user.js"     "$HOME/.zen"             Zen
+    install_user_js "$REPO/browsers/firefox/user.js" Firefox "$HOME/.mozilla/firefox"
+
+    # ~/.config/zen is where zen-browser-bin 1.21 keeps profiles -- confirmed on
+    # this machine, where the ~/.zen this used to write to does not exist at all,
+    # so the Zen half of --browsers had never actually landed. ~/.zen is kept as
+    # a second candidate for older builds and the flatpak.
+    install_user_js "$REPO/browsers/zen/user.js" Zen "$HOME/.config/zen" "$HOME/.zen"
 }
 
 # ---------------------------------------------------------------------------
