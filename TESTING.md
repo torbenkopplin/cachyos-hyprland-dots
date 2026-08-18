@@ -1,9 +1,17 @@
 # Post-install checklist
 
-Everything in this repo was written against the Hyprland 0.55 Lua API source,
-the scrolling-layout docs and the Noctalia v5 IPC/config reference — but none of
-it has run on a live session yet. This is the list of things to confirm on the
-CachyOS partition, roughly in dependency order. Tick as you go.
+Most of this repo was written against the Hyprland Lua API source, the
+scrolling-layout docs and the Noctalia v5 IPC/config reference rather than
+against a running system. Some of it has since been confirmed on a live session
+— what has, and what that changed, is recorded in
+[Known-uncertain details](#known-uncertain-details) with a date. This is the
+list of things to confirm on the CachyOS partition, roughly in dependency
+order. Tick as you go.
+
+The parts that turned out to be wrong were all *silent*: a dispatcher that
+answers `ok` and does nothing, a launcher provider killed at a deadline with no
+error shown, two idle daemons racing. So prefer the checks that read back a
+value over the ones that just look at the screen.
 
 Anything that fails: the fix is almost always in the file named in the
 right-hand column.
@@ -50,7 +58,13 @@ shape of `window.layout`.
 - [ ] On an **empty** workspace, `SUPER+J`/`K` still change workspace.
 - [ ] Nothing **wraps** — at the last workspace `SUPER+J` does nothing, it does
       not jump back to the first.
-- [ ] `SUPER+CTRL+<hjkl>` does all of the above dragging the window along.
+- [ ] `SUPER+SHIFT+<hjkl>` does all of the above dragging the window along.
+      (This moved off `CTRL`, which now reorders columns.)
+- [ ] Every one of the checks above behaves identically on the **arrow keys**
+      with the same modifiers — they are bound from the same table, so a
+      difference means a bind went missing rather than a behaviour differing.
+- [ ] `SUPER+CTRL+H`/`L` swaps this column with its neighbour, without changing
+      which window is focused.
 - [ ] With a **floating** window focused, `SUPER+hjkl` still behaves sanely.
 
 > If edge detection misfires, dump what the layout actually reports:
@@ -104,10 +118,28 @@ N*10+1 … N*10+10, and each band carries its own scroll direction.
       in `WSBANDS` with your real monitor names and ids (`hyprctl monitors`).
 - [ ] Without a `host.lua`, Hyprland still starts — the fallback is a single
       band. Confirm this before relying on the pcall.
-- [ ] `hyprctl workspaces` shows one band of 10 per monitor.
+- [ ] `hyprctl workspacerules` shows one band of 10 per monitor. (`hyprctl
+      workspaces` lists only the ones that *exist* — workspaces here are
+      dynamic, so an empty one is not there at all. That is the intended
+      behaviour, not a missing rule.)
 - [ ] `SUPER+2` goes to the second workspace **on the monitor you are looking
-      at**, whichever that is.
+      at**, whichever that is. On the second monitor that is id 12, not 2 —
+      check with `hyprctl activeworkspace`.
+- [ ] `SUPER+SHIFT+2` sends the window there and follows it.
+- [ ] `SUPER+J` past the **last** workspace of a band does nothing, and
+      `SUPER+K` past the first does nothing. The clamp is what keeps a
+      workspace step from landing on another monitor's numbers.
 - [ ] A workspace never migrates to a monitor outside its band.
+
+> Both of the workspace selectors that *look* like they would do this are
+> traps: `m~n` is not valid syntax in 0.56 (the dispatcher answers `ok` and
+> nothing happens) and `m±1` walks only the workspaces that already exist. If
+> the number keys ever go dead again, that is the first thing to check —
+> `lib/ws.lua` does the arithmetic instead, and it can be exercised directly:
+> ```sh
+> hyprctl dispatch '(function() require("lib.ws").switch(3)
+>   return hl.dsp.exec_cmd("true") end)()'
+> ```
 - [ ] With a portrait monitor configured `direction = "down"`, that band
       genuinely scrolls vertically while a landscape band scrolls right —
       this is the whole reason for the band model over a flat list.
@@ -123,7 +155,12 @@ device ids visible**; the payloads go to a side map in `$XDG_RUNTIME_DIR`:
 - [ ] `noct-bluetooth list`
 - [ ] `noct-network list`
 - [ ] `noct-power list`
-- [ ] `noct-theme list`
+- [ ] `noct-theme list` — and it marks the active scheme without asking the
+      running shell for it (`grep -c 'noctalia msg' bin/noct-theme` counts only
+      the `act` path; see the two-second rule below)
+- [ ] Every one of those returns in **well under two seconds**:
+      `for p in "noct-audio list sinks" "noct-bluetooth list" "noct-network list" \
+      "noct-power list" "noct-theme list"; do /usr/bin/time -f "%e $p" sh -c "$p" >/dev/null; done`
 - [ ] `cat "$XDG_RUNTIME_DIR"/noct-*.map` — one `title <TAB> payload` per result
 - [ ] Two devices with the *same* name both stay selectable (the second gets a
       ` (2)` suffix). Only testable if you have a duplicate; skip otherwise.
@@ -137,15 +174,32 @@ Then through the launcher:
 - [ ] `/bt` lists paired devices; connect and disconnect both work; "Scan for
       devices" finds something new and reopens the list.
 - [ ] `/net` lists the active connection first, then saved profiles, then Wi-Fi
-      in range.
+      in range — and it appears **immediately**, because it reads nmcli's
+      cached scan. "Rescan" is an entry in that list; picking it re-runs the
+      scan and reopens the list.
 - [ ] Connecting to a **new, secured** Wi-Fi network opens a kitty window with
       `nmcli --ask` and the passphrase is not echoed.
 - [ ] `/power` switches profile and toggles night light.
 - [ ] `SUPER+CTRL+O/I/B/N/P/T` each open the launcher already filtered.
 
-> If a provider shows nothing at all, the launcher swallowed a shell error.
-> Run its `command` by hand first. If it says "not installed", see the
-> prerequisites in README.md.
+> **A provider that shows "No results found" has usually been killed, not
+> failed.** Noctalia gives `command` about two seconds and then SIGTERMs it;
+> the only trace is in the log. Turn it up and reproduce:
+> ```sh
+> noctalia msg log-level-set debug
+> # open the provider, then:
+> grep dmenu ~/.cache/noctalia/noctalia.log | tail
+> #   [WRN] [dmenu] [theme] command failed (exit 143)   <- 143 = SIGTERM
+> noctalia msg log-level-set info
+> ```
+> The two ways to overrun are calling `noctalia msg` while listing (a deadlock:
+> the shell is blocked waiting for the provider) and anything that blocks on
+> hardware or the network. Both are documented at the top of
+> `bin/noct-common.sh`. To see where a provider is actually stuck, run it under
+> `bash -x` from a temporary dmenu entry and read the trace.
+>
+> If instead it says "not installed", the backend package is missing — see
+> [docs/install.md](docs/install.md).
 
 ## 7. Launcher keys — `00-shell.toml`
 
@@ -159,9 +213,15 @@ Then through the launcher:
 ## 8. Theming — `30-theme.toml` + `40-templates.toml`
 
 - [ ] `noctalia theme --list-templates` lists the built-in ids used in
-      `40-templates.toml`: `kitty`, `gtk3`, `gtk4`, `qt`, `kcolorscheme`,
-      `btop`. Drop any that do not exist — the ids were taken from CachyOS's
-      shipped config, not confirmed against a running binary.
+      `40-templates.toml`: `gtk3`, `gtk4`, `qt`, `kcolorscheme`, `btop`.
+      (Verified against noctalia v5.0.0-beta.8; all five exist.)
+- [ ] `builtin_ids` does **not** contain `kitty`. The built-in rewrites
+      `kitty.conf`, which is a tracked symlink — see the note in
+      `config/kitty/README.md`. Colours come from the `kitty` *user* template.
+- [ ] Before adding any built-in id, check where it writes. An id whose output
+      path is a file this repo tracks will edit the checkout itself. `starship`
+      and the community `yazi` template are the ones to look at twice, since
+      this repo tracks `starship.toml` and `yazi.toml`.
 - [ ] Change the wallpaper (`/wall` in the launcher). The bar and panels
       recolour.
 - [ ] `~/.config/hypr/generated/colors.lua` now exists and contains real hex
@@ -215,14 +275,23 @@ Then through the launcher:
       `~/.config/kitty/generated-glass.conf` both exist after the first scheme
       change, and contain real numbers.
 - [ ] A new kitty window is translucent, with the wallpaper blurred behind it.
+- [ ] **A terminal and a browser side by side show the same amount of
+      wallpaper.** They used to compound — kitty applied its level, the
+      compositor applied another on top — and the terminal came out visibly
+      darker. With `window` and `terminal` equal (the default),
+      `generated-glass.conf` should say `background_opacity 1.00`.
 - [ ] **A GTK app (nautilus) and a Qt app are frosted too** — this is the point
       of driving it from the compositor rather than per-app.
 - [ ] Text is legible at the default level. If not, raise `window` in
       `glass.conf`; the compositor fades glyphs along with the background.
 - [ ] mpv/imv/gimp/obs stay **fully opaque** (the opt-out list in rules.lua).
-- [ ] Switching to noirblaze via `/theme` changes the terminal level to 0.80
-      (`noct-glass show` confirms it) without you doing anything else.
-- [ ] `SUPER+SHIFT+G` cycles the level; a new terminal shows the change.
+- [ ] Switching scheme via `/theme` changes the levels to whatever
+      `glass.conf` lists for it (`noct-glass show` confirms) without you doing
+      anything else.
+- [ ] `SUPER+SHIFT+G` cycles the level and **terminals already open change with
+      everything else** — noct-glass sends kitty SIGUSR1 after writing. If they
+      do not, check that `pkill -USR1 -x kitty` reaches them.
+- [ ] Stepping to `1.00` leaves nothing translucent, terminals included.
 - [ ] At level `1.00`, `glass.lua` has `enabled = false` for blur.
 - [ ] Changing scheme afterwards clears the manual override.
 - [ ] Hyprland does not error on `generated/glass.lua` after a `hyprctl reload`.
@@ -233,9 +302,21 @@ Then through the launcher:
 
 ## 8d. kitty and fish
 
-- [ ] kitty starts with no config errors (`kitty --debug-config` if unsure).
+- [ ] kitty starts with no config errors. There is no `--debug-config` flag in
+      kitty 0.48; bad config lines go to stderr at startup, so
+      `kitty sh -c exit 2>&1` is the check.
 - [ ] `ctrl+f` still opens the search kitten.
+- [ ] The font really is JetBrainsMono Nerd Font, not a fallback that merely
+      looks like one: `fc-match "JetBrainsMono Nerd Font"` names a
+      `JetBrainsMonoNerdFont-*.ttf`. The family name has no space in
+      "JetBrainsMono"; the spaced spelling only resolves by falling through
+      fontconfig's matching rules.
 - [ ] Colours match the active scheme, and change when you switch scheme.
+- [ ] `~/.config/kitty/generated-colors.conf` exists and holds real hex values,
+      not `{{ }}` placeholders.
+- [ ] `git status` is clean after a scheme change. If `config/kitty/kitty.conf`
+      shows as modified, Noctalia's built-in `kitty` template is enabled and is
+      editing the repo — see `config/kitty/README.md`.
 - [ ] On a **fresh** machine, before Noctalia has rendered a palette, kitty
       still starts — the two `include`s point at files that do not exist yet
       and kitty should warn rather than fail.
@@ -246,7 +327,10 @@ Then through the launcher:
 - [ ] `cat`, `ls` and `lt` work — these are aliased to `bat` and `eza`, and
       `cat` in particular was `batcat` on Debian, so a wrong package name here
       shows up as "command not found" on every use.
-- [ ] `update` runs `pacman -Syu` (the alias branches on `/etc/arch-release`).
+- [ ] `sin`, `sinaur`, `sfind`, `srem`, `supd`, `supg` exist as aliases for the
+      matching `shelly` subcommands, and `update` is `shelly upgrade`. On a
+      machine without shelly none of them exist and `update` falls back to
+      `pacman -Syu` — the block is guarded on the binary, not the distro.
 - [ ] `fisher list` shows `jorgebucaran/fisher` and `jorgebucaran/nvm.fish`.
 - [ ] `nvm --version` works **in fish** (this is nvm.fish, not the bash one).
 - [ ] `node --version` works in a shell where no nvm version is selected —
@@ -304,7 +388,22 @@ Then through the launcher:
 - [ ] `eslint --version` and `mmdc --version` work (npm globals in
       `~/.local/bin`).
 - [ ] `nvm --version` works after sourcing it in a new shell.
-- [ ] Rerunning `./install.sh` is quiet and idempotent — no new backups.
+- [ ] Rerunning `./install.sh` is quiet and idempotent — no new backups, and
+      `--packages` says "already installed: N package(s)" rather than handing
+      the whole list to a package manager again.
+- [ ] On CachyOS, `--packages --dry-run` says **`would: shelly install
+      standard …`**. On plain Arch, or with shelly removed, the same line says
+      `pacman`. Both paths must work; shelly authenticates through polkit, so
+      it is the pacman path that runs in a bare TTY.
+- [ ] `systemctl --user is-enabled hypridle` says **disabled** after
+      `--packages`. Two idle daemons is the failure this prevents; see §11.
+- [ ] `--wallpapers` reports **"per-monitor sections match the connected
+      monitors"**. A warning here means `60-wallpaper.toml` names connectors this
+      machine does not have, and those screens will silently fall back to the
+      global `directory` — rename the sections to match `hyprctl monitors`.
+- [ ] After adding a file to the repo, rerun `./install.sh` before expecting it
+      to work. Linking is per file, so a new template or script is not in
+      `~/.config` until it has been linked.
 
 ## 10. Browsers
 
@@ -327,44 +426,76 @@ The point of the whole setup — worth testing deliberately:
 
 - [ ] A background app finishing a task does **not** steal focus or scroll the
       tape away from what you are reading.
-- [ ] A fullscreen video keeps the screen awake; an ordinary window does not.
 - [ ] Moving the mouse does not change which monitor is active.
+
+### Idle and locking
+
+Exactly one thing may own this. Noctalia does; `hypridle` must not be running
+alongside it.
+
+- [ ] `systemctl --user is-active hypridle` says **inactive**, and
+      `pgrep hypridle` finds nothing.
+- [ ] After a config reload the log registers our three behaviours:
+      `grep 'registered idle behavior' ~/.cache/noctalia/noctalia.log | tail -3`
+      → `lock timeout=600s`, `screen-off timeout=900s`,
+      `lock-and-suspend timeout=1800s`.
+- [ ] A **fullscreen** video keeps the screen awake; an ordinary window does not.
+- [ ] A video playing in a **windowed** browser tab also keeps it awake — that
+      one depends on the browser holding a Wayland idle inhibitor rather than
+      on any rule here, so it is the case worth actually sitting through.
+- [ ] A focused, windowed mpv keeps it awake even when paused
+      (`idle_inhibit = focus`).
+- [ ] `SUPER+CTRL+P` → Caffeine holds it awake for anything else, and the
+      shortcut in the control centre shows it as on.
+
+### The login screen (only after `./install.sh --login`)
+
+- [ ] `systemctl is-enabled greetd` says enabled and
+      `systemctl is-enabled plasmalogin` says disabled.
+- [ ] `/etc/greetd/config.toml` points `command` at a path that exists
+      (`command -v noctalia-greeter-session`).
+- [ ] **Reboot.** The greeter comes up, the Hyprland (uwsm) session is
+      selectable, and logging in lands in this setup.
+- [ ] `SUPER+,` → Security → Noctalia Greeter → **Sync Now**, then reboot: the
+      greeter shows the current wallpaper and palette.
+- [ ] If it does not come up: `ctrl+alt+F2`, log in, and
+      `sudo systemctl disable greetd && sudo systemctl enable --now plasmalogin`
+      puts the old one back. Confirm you can do this *before* trusting it.
 
 ---
 
-## Open question for a future session: nav.lua vs wsnav.sh
+## Settled: nav.lua, and what it turned out `wsnav.sh` was really doing
 
-**Read this before changing anything about directional navigation.**
+Two implementations of directional navigation existed — `lib/nav.lua` here, and
+`~/repos/dots/.../scripts/wsnav.sh`, the proven one. This was written up as an
+open question because `nav.lua` had never run on a live session. It has now.
 
-Two implementations of the same behaviour exist, and the one in use here is
-the *unproven* one:
+**The layout reading in `nav.lua` was right.** `column.index` and
+`index_in_column` are 0-based, `window.layout` is populated for every tiled
+window on a scrolling workspace, and `hl.get_workspace_windows(<id>)` takes a
+numeric id. Directional focus, the monitor handoff at the ends of the tape, and
+the window-dragging variants all behave.
 
-| | `config/hypr/lib/nav.lua` (in use) | `~/repos/dots/.../scripts/wsnav.sh` (proven) |
-|---|---|---|
-| How | in-process Lua, reads the scrolling layout's own `window.layout` — `column.index`, `index_in_column`, `#column.windows` | bash + `hyprctl` + `jq`, compares window centre coordinates |
-| Cost per keypress | none — no process spawn | 2–4 processes |
-| Precision | exact: the layout's own bookkeeping | inferred from geometry |
-| Proven? | **no** — never run on a live session | **yes** — daily driver |
-| Workspace model | `m~n` selectors, monitor-relative | explicit per-monitor bands, computed live |
+**What was wrong was the workspace half, and `wsnav.sh` had already solved it.**
+Its per-monitor band arithmetic was not an implementation detail of doing this
+in bash — it was load-bearing, because the selectors that look like they say
+"the n-th workspace of this monitor" do not work:
 
-`nav.lua` was chosen for being cheaper and reading the layout's real data
-structure rather than guessing from pixels. That is the better design *if the
-assumptions hold*. They are unverified:
+| Selector | What it does |
+|---|---|
+| `m~n` | nothing; not valid syntax in 0.56, and the dispatcher still answers `ok` |
+| `m±1` | walks only the workspaces that currently *exist* on the monitor — usually one |
 
-- `column.index` and `index_in_column` are **0-based** (read from
-  `LuaWindow.cpp`, not observed).
-- `window.layout` is populated for every tiled window on a scrolling workspace.
-- `hl.get_workspace_windows(<id>)` accepts a numeric workspace id.
-- Focus changes are synchronous, so the address comparison in `focus_moved()`
-  sees the result.
+So the arithmetic moved into `lib/ws.lua`, in-process: read the focused
+monitor, find its band in `WSBANDS` by connector name, dispatch the absolute
+id, clamp at the band edges. Same behaviour as `wsnav.sh`, no `jq`, no process
+spawn per keypress.
 
-**If any of that turns out wrong**, `wsnav.sh` already works and is a drop-in:
-copy it to `config/hypr/scripts/`, and replace the four `nav.*` bindings in
+`wsnav.sh` remains a working fallback if `window.layout` ever changes shape:
+copy it to `config/hypr/scripts/`, and replace the `nav.*` bindings in
 `conf/binds.lua` with `hl.dsp.exec_cmd(wsnav .. " focus up|down")` and
-`" movecol left|right"`. Note it also needs `jq`, which is already in the
-package list for yazi.
-
-Section 2 above is the test that decides this.
+`" movecol left|right"`. It needs `jq`, which is already in the package list
+for yazi.
 
 ---
 
@@ -375,22 +506,29 @@ something misbehaves:
 
 | Thing | Uncertainty | Where |
 |---|---|---|
-| `column.index` / `index_in_column` are 0-based | Read from the C++ source (`LuaWindow.cpp`), not observed | `lib/nav.lua` |
+| ~~`column.index` / `index_in_column` are 0-based~~ | **Verified 2026-08-18** on a live session, along with the rest of the `window.layout` reading | `lib/nav.lua` |
 | Noctalia panel layer namespaces | Taken from Noctalia's own blur layer rule | `lib/bar.lua` |
 | `[keybinds]` chord names (`ctrl+k`, `iso_left_tab`) | Format documented, these exact names not confirmed | `00-shell.toml` |
 | dmenu `prefix` is a bare word | Docs contradict themselves — the config reference says bare (`"ssh"` → `/ssh`), one example page shows `"/cmd"` | `20-launcher.toml` |
 | `control-center` widget id is hyphenated while others are snake_case | Matches upstream doc titles, which are genuinely inconsistent | `10-bar.toml` |
-| `hl.get_workspace_windows(<id>)` accepts a numeric id | Documented as taking a workspace selector | `lib/nav.lua` |
+| ~~`hl.get_workspace_windows(<id>)` accepts a numeric id~~ | **Verified 2026-08-18** | `lib/nav.lua` |
+| ~~`m~n` selects the n-th workspace of the focused monitor~~ | **Disproven 2026-08-18 on Hyprland 0.56.2.** Not valid syntax; the dispatcher answers `ok` and nothing happens, which is why every number key was dead. `lib/ws.lua` does band arithmetic instead | `lib/ws.lua`, `conf/binds.lua` |
+| Noctalia gives a dmenu provider ~2 seconds | **Measured 2026-08-18**: a provider that runs longer is SIGTERMed (exit 143) and the launcher shows "No results found". Undocumented, so it could change — re-measure with a `sleep 3` provider if lists start emptying | `bin/noct-common.sh` |
+| Hyprland pauses idle notifications while a client holds a Wayland idle inhibitor | Protocol behaviour, and the layer the windowed-browser-video case rests on. The two window rules are the belt and braces | `conf/rules.lua`, `70-idle.toml` |
+| `shelly install standard/aur --no-confirm` is non-interactive enough for a script | It authenticates through **polkit**, so it needs an agent; in a bare TTY it fails and the pacman path takes over. Both paths are exercised by `--dry-run` | `install.sh` |
+| `noctalia-greeter-session` is the greetd entry point | From upstream's README; the packaged path is resolved with `command -v` rather than hardcoded | `install.sh` |
 | Gesture action `scroll_move` | Documented, untested | `conf/input.lua` |
-| Built-in template ids (`kitty`, `qt`, `kcolorscheme`, …) | Taken from CachyOS's shipped config; verify with `noctalia theme --list-templates` | `40-templates.toml` |
+| Built-in template ids (`qt`, `kcolorscheme`, …) | Taken from CachyOS's shipped config; verify with `noctalia theme --list-templates` | `40-templates.toml` |
 | A `post_hook` is run through a shell (so `${VAR:-default}` expands) | Docs say hooks are rendered by the template engine then executed; shell semantics assumed | `40-templates.toml` |
 | `hyprctl reload` picks up a newly created `generated/colors.lua` | Hyprland reloads on config change; whether it watches `require`d files is unconfirmed, hence the explicit reload | `40-templates.toml` |
-| Every package name resolves on CachyOS | Not checkable from the authoring machine; `noctalia`, `satty` and the browser AUR names are the likeliest to differ | `install.sh` |
+| Every package name resolves on CachyOS | **Verified 2026-08-18**: `--packages` completed and all 52 names are installed from the repos — the AUR fallback was never reached | `install.sh` |
 | Noctalia reads custom palettes from `~/.config/noctalia/palettes/<name>.json` | Documented; the exact JSON key set for a palette was taken from the docs example | `palettes/noirblaze.json` |
 | yazi's `%s` opener placeholder is still current | Carried over verbatim from your working config rather than modernised | `config/yazi/yazi.toml` |
 | Brave policy names (`BraveRewardsDisabled`, `BraveAIChatEnabled`, …) | Brave-specific policies are less stable than Chromium's; `brave://policy` is the check | `browsers/brave/policies.json` |
 | Zen reads `user.js` from profiles under `~/.zen` | Zen is a Firefox fork so this should hold, but its profile root is not documented as firmly | `install.sh` |
-| Noctalia's `kitty` template writes `current-theme.conf` | Inferred from CachyOS's shipped kitty.conf, which includes exactly that filename under a `BEGIN_KITTY_THEME` marker | `config/kitty/kitty.conf` |
+| ~~Noctalia's `kitty` template writes `current-theme.conf`~~ | **Disproven 2026-08-18 on noctalia v5.0.0-beta.8.** It writes `themes/noctalia.conf` and *rewrites `kitty.conf`* to include it, clobbering the tracked symlink. The built-in is now disabled; a user template renders `generated-colors.conf` instead | `40-templates.toml`, `config/kitty/kitty.conf` |
+| Colour roles used by `kitty-colors.conf` (`terminal_*`, `primary`, `outline_variant`) | Verified 2026-08-18: all render to real hex, no leftover placeholders | `templates/kitty-colors.conf` |
+| A user template named after a built-in id (`kitty`, `hyprland`) does not collide with it | Verified 2026-08-18: both render while the built-in id is absent from `builtin_ids` | `40-templates.toml` |
 | `fisher` exists as a package | If not, install it by its documented one-liner and rerun; the installer warns rather than failing | `install.sh` |
 | `colors_changed` fires on a scheme change, not only a wallpaper change | Documented as "after the theme palette is resolved"; if it only fires for wallpapers, call `noct-glass apply` from `noct-theme act` instead | `50-glass.toml` |
 | Wallhaven result counts hold over time | Measured 2026-08-15; the 21:9 Dragon Ball supply was 4 and can only grow | `wallpapers.conf` |
