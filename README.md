@@ -117,6 +117,7 @@ browsers/          policies and user.js for Brave, Chromium, Firefox, Zen
 install.sh         linking, packages, browsers, wallpapers, login screen
 docs/              keymap, design notes, theming, install
 TESTING.md         post-install checklist — start here on first boot
+tests/             the test suite behind `noct-check`; tests/README.md
 ```
 
 To change almost anything, start in **`config/hypr/conf/options.lua`**.

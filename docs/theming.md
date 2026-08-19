@@ -234,9 +234,12 @@ compositor cannot tell glyphs from background and fades both, kitty fades only
 the background. Glassiness bought through `terminal` costs no contrast at all.
 
 Zen still reads its stylesheet at startup, so `browser` needs the browser
-restarted — one window's worth of the same problem. `noct-check zen-page`
-measures the page area on screen and says so plainly when the running browser
-and the file disagree.
+restarted — one window's worth of the same problem. `noct-check zen-sheet`
+checks the generated stylesheet is at the alpha the levels imply and still
+out-specifies the transparency mod's rule, and `noct-check browser-glass`
+launches each of the four browsers fresh and measures how much of the wallpaper
+an ordinary web page lets through, so the four can be compared with each other
+rather than described one at a time.
 
 `blur.ignore_opacity` is on. Without it Hyprland scales the blur by the
 window's own alpha, so a 0.9 window gets a tenth of the blur and the effect

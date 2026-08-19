@@ -22,11 +22,12 @@ right-hand column.
 
 Everything in this file needs a human. `bin/noct-check` is the part that does
 not: one command, and it fails loudly for each thing that used to fail silently.
+The framework behind it is in [`tests/`](tests/README.md).
 
 ```sh
 noct-check          # the checks that do not touch the screen
-noct-check --all    # plus glass-visible, which flickers the display and restores it
-noct-check --list   # the names, so you can run just one
+noct-check --all    # plus the ones that open windows and flicker the display
+noct-check --list   # the names, and what each one asserts
 ```
 
 | check | what it caught |
@@ -34,20 +35,48 @@ noct-check --list   # the names, so you can run just one
 | `session-path` | the launcher providers all answering "No results found" — which is also what a healthy provider with nothing to report looks like |
 | `session-env` | the fix for the above — **both** doors onto the session PATH, each exercised the way its reader would. `~/.config/uwsm/env` is sourced with `/bin/sh`; `~/.config/environment.d/` is run through systemd's own generator. Both from a deliberately bare environment, because running the generator from an ordinary shell hands it a PATH that already contains the directory and it passes however the file is written |
 | `provider-resolve`, `provider-run` | a provider that cannot be found, dies, is slow, or leaks a MAC address into the visible line |
+| `deps-manifest` | `tree-sitter-cli` never having been in `install.sh` — on a machine that already had it installed by hand, so nothing was ever wrong here. Nothing in this repo *names* it: the neovim config is its own repository. See `tests/deps.tsv` |
+| `deps-installed` | a machine that has not been set up as far as it thinks it has |
+| `deps-declared` | the manifest rotting: a new `command -v` guard in `bin/` fails this until the tool is written down with a package and a reason |
 | `glass-config`, `glass-live` | the config on disk and the running session disagreeing, unnoticed, for a whole session |
 | `glass-legible` | text quietly going grey. Contrast alone does not catch it — the compositor lifts the background while it dims the glyphs, so the *ratio* survives while everything visibly fades. This measures the ink too |
 | `zen-sheet` | the generated stylesheet losing a specificity fight to the transparency mod, silently, so the page keeps somebody else's wash |
 | `keyword-inert` | `hyprctl keyword` being a silent no-op under the Lua parser, so an A/B test written with it measures nothing and passes |
 | `glass-visible` | the frosted glass being present in the config and absent on the screen — 3 levels of 255 |
 | `kitty-live` | a terminal that ignores a new opacity until it is restarted, which decides whether `terminal` may differ from `window` at all |
+| `kitty-appearance` | fontconfig silently substituting a font that is not installed, which is the most likely reason two machines with the same config do not look the same. Also records the measured cell size, so "the text is a different size over there" becomes a number |
+| `browser-glass` | how much of the wallpaper reaches your eye through an ordinary web page, in **each** of the four browsers, and whether they agree with each other to within a focus step |
 | `blur-stacks` | a floating window sampling past the window it sits on. Also caught `xray` being accepted as a window rule and ignored — it is a layer rule |
-| `zen-page` | end to end: the browser's page area measured on screen, against the level it was configured with |
 | `column-hop` | `SUPER+CTRL+H/L` handing a column off to the next *workspace* instead of the next *monitor*, which put a workspace move on the horizontal keys |
 | `monitor-hop` | `SUPER+CTRL+SHIFT+<hjkl>` silently doing nothing, because no monitor lay in the direction asked for — and then the obvious fix silently doing nothing too, because the dispatcher fails without raising and a `pcall` around it returns true |
 
-The last four are the `--all` set: they drive the display to two extremes and put
-it back, and three of them open a throwaway window (floated and centred by the
-`noct-probe` rule in `conf/rules.lua`, so nothing you were working in moves).
+The `--all` set drives the display to two extremes and puts it back, and every
+one of them opens **new** windows to measure — a fresh terminal, a fresh browser
+on a throwaway profile. That is not politeness about your workspace: a terminal
+you already had open is running the opacity it was started with, and a browser
+reads `user.js` and `chrome/userChrome.css` exactly once, at launch. Measuring
+what is already on screen answers a question about the past.
+
+### When both machines pass and one of them looks better
+
+That is not a question a threshold can answer, so the suite records its
+measurements as well as its verdicts:
+
+```sh
+noct-check --all --record                                # where it looks right
+git add tests/baselines/*.json && git commit
+
+noct-check --all --compare tests/baselines/<host>.json   # where it does not
+```
+
+The answer is the list of measurements that moved and by how much — the font
+that got substituted, the terminal sitting at a different effective opacity, the
+wallpaper forty levels darker. Facts that are *expected* to differ between
+machines (scale, GPU, wallpaper brightness, compositor version) are recorded
+too, reported when they differ, and never counted as failures: they are usually
+the explanation for everything else.
+
+### Localising a PATH failure
 
 Two files set that PATH, and which one is read depends on how the session
 started: `config/uwsm/env` when uwsm starts the compositor (the intended route,

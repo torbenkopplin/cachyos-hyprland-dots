@@ -3,6 +3,23 @@
 Done in this pass — kept for a moment so it can be checked off against the real
 desktop, then delete:
 
+- [x] the checks are a framework rather than a file: `tests/` has a harness, a
+      probe library, a measurement library and a baseline library, and
+      `bin/noct-check` is only the runner. Three things came out of it —
+      every live check now opens a **new** window to measure (an old one is
+      running the config it started with, not the config on disk); every check
+      records **numbers**, so `--record` on one machine and `--compare` on
+      another says exactly which measurement moved; and `tests/deps.tsv`
+      declares every external command with the `install.sh` list that installs
+      it, which is what found `tree-sitter-cli` missing
+- [x] `tree-sitter-cli` is in `install.sh` (`PKGS_DEV`). It had never been
+      there — nothing in this repo names it, because the neovim config is its
+      own repository — and this machine had it installed by hand, so there was
+      nothing to notice
+- [x] all four browsers are measured, not just Zen: `noct-check browser-glass`
+      launches each one fresh on a throwaway profile, photographs an ordinary
+      web page in it, and reports the effective opacity, the page's text
+      contrast, and how far apart the four are
 - [x] borders with more of a hacker vibe: the focused window's border is a 45°
       gradient from the palette (`primary` → `tertiary`), everything unfocused
       drops to a 15% hairline, and corners go 8 → 2 so a window reads as a frame
@@ -82,11 +99,14 @@ desktop, then delete:
       startup, and both are in place now (`~/.config/zen/*/chrome/userChrome.css`,
       generated). Then compare a page with a window *in the same focus state*:
       click into the terminal and back. They should read as one material.
-- [ ] Then say which way to take `browser` in `glass.conf`. It is 0.88 against a
-      window of 0.90 — the two read as the same material and the transparency mod
-      is contributing a whisper. 0.83 gives the glassy look back and puts them a
-      focus step apart, which is what you were looking at before. There is no
-      value that does both; `noct-glass apply` plus a Zen restart switches.
+- [ ] Then say which way to take `browser` in `glass.conf`. It is 0.55 against a
+      window of 0.85. **Measured 2026-08-19** with `noct-check browser-glass`,
+      which launches all four browsers fresh and photographs an ordinary web
+      page in each: they all composite at 0.85 and are 0.00 apart, so on real
+      pages nothing is out of step today. `browser` only shows where a page
+      paints nothing itself — i.e. on the pages the transparency mod
+      transparentises — so it is a choice about *those* pages rather than about
+      the browser as a whole. `noct-glass apply` plus a Zen restart switches.
 - [ ] Say which of these numbers to move, if any: `ROUNDING = 2`
       (`conf/options.lua`), `capsule_radius = 12` (`10-bar.toml`), `browser`
       above, and `blur.brightness = 0.65` (`bin/noct-glass`) — the last one is
