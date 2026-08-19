@@ -14,13 +14,18 @@
 # so a page and a terminal would read as one material -- see docs/theming.md. The
 # static zen-sheet check went with the stylesheet it guarded.
 #
-# So this check measures and no longer arbitrates. It used to fail when the four
-# browsers were more than a focus step apart; that assertion was retired the same
-# day, because a deliberately translucent Zen is exactly the spread it was
-# written to catch and a gate on it could only fail by design. What survives is
-# every number it took, plus the two findings that are still true: a browser
-# cannot be more opaque than the compositor makes it, and page text has to stay
-# readable.
+# So this check measures per browser and compares nothing across them. It used to
+# fail when the four were more than a focus step (0.06) apart; that assertion was
+# retired the same day, because a deliberately translucent Zen is exactly the
+# spread it was written to catch and a gate on it could only fail by design. The
+# threshold, the spread and its diagnostic are all gone rather than demoted --
+# there is no focus dim to measure against either, since inactive_opacity went to
+# 1.0 with the rest of the compositor level.
+#
+# What survives is every number it took per browser, and three findings that are
+# still true: a browser cannot be more opaque than the compositor makes it; no
+# browser OTHER than Zen should be translucent by itself, because nothing here
+# arranges that; and page text has to stay readable.
 #
 # Every measurement here is taken on a browser this suite started itself,
 # against a throwaway profile. See tests/lib/probe.sh for why -- the short
@@ -29,18 +34,6 @@
 
 noct_register browser-glass  live check_browser_glass \
     "how translucent each installed browser actually is, measured on a page it painted"
-
-# Printed for scale, not enforced. Two surfaces further apart than this read as
-# two materials rather than one, and the number is not taste: the compositor dims
-# an UNFOCUSED window by this much (write_hypr in bin/noct-glass), so two windows
-# further apart than it look exactly like the same window in two different focus
-# states -- which is precisely the "zen when active looks like kitty when
-# inactive" report that started all of this.
-#
-# It was the parity threshold until 2026-08-19. It is now context in an info
-# line, so that a reader can tell a spread that means something from a spread
-# that is rounding.
-BROWSER_FOCUS_STEP=${BROWSER_FOCUS_STEP:-0.06}
 
 # ---------------------------------------------------------------------------
 # browser-glass
@@ -60,8 +53,9 @@ BROWSER_FOCUS_STEP=${BROWSER_FOCUS_STEP:-0.06}
 # backdrop, so the contrast between them is the page's own contrast scaled by
 # the opacity. This is what "not always pretty" is, put on a scale.
 #
-# And then the spread across them, as information: they are no longer expected to
-# agree, because one of them is translucent by itself on purpose.
+# One number per browser and no comparison between them: they are not expected to
+# agree, because one of them is translucent by itself on purpose and the rest are
+# deliberately not.
 # ---------------------------------------------------------------------------
 
 check_browser_glass() {
@@ -186,28 +180,16 @@ check_browser_glass() {
         return
     fi
 
-    # The spread, reported and not judged. Retired as an assertion 2026-08-19:
-    # Zen is deliberately translucent by itself, so the four are not meant to
-    # agree, and a gate here could only fail on the intended state.
-    #
-    # Deliberately not a `metric` either. A metric is compared against the
-    # baseline within a tolerance, which is the same gate wearing a different
-    # hat -- it would turn every --compare on a machine with the Zen mod
-    # installed into a drift report about a decision that was made on purpose.
-    local lo hi spread
+    # The range the four came out over, for the pass line. Not a spread against a
+    # threshold: that comparison was the retired assertion, and with Zen
+    # deliberately translucent and the other three deliberately not, a number for
+    # "how far apart they are" measures the intended difference and nothing else.
+    # What each browser is on its own is the useful fact, and every one of them
+    # already got a metric and two info lines above.
+    local lo hi
     read -r lo hi <<<"$(printf '%s\n' "${measured[@]}" | awk '{ v = $2
         if (NR == 1 || v < min) min = v
         if (NR == 1 || v > max) max = v } END { printf "%.2f %.2f", min, max }')"
-    spread=$(awk -v a="$lo" -v b="$hi" 'BEGIN { printf "%.2f", b - a }')
-
-    info "$(printf 'spread across %d measured browser(s): %s to %s = %s (the focus step, for scale, is %s)' \
-                   "${#measured[@]}" "$lo" "$hi" "$spread" "$BROWSER_FOCUS_STEP")"
-
-    if awk -v s="$spread" -v m="$BROWSER_FOCUS_STEP" 'BEGIN { exit !(s > m) }'; then
-        info "which is more than a focus step, so at least one of them reads as its own"
-        info "material. Expected while Zen has the transparency mod on; for any other"
-        info "browser it means something in that browser is fading pages too."
-    fi
 
     if (( ${#problems[@]} == 0 )); then
         pass browser-glass "${#measured[@]} browser(s) measured, composing between ${lo} and ${hi}"

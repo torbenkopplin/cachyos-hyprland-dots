@@ -44,7 +44,7 @@ noct-check --list   # the names, and what each one asserts
 | `glass-visible` | the frosted glass being present in the config and absent on the screen — 3 levels of 255 |
 | `kitty-live` | a terminal that ignores a new opacity until it is restarted, which decides whether `terminal` may differ from `window` at all |
 | `kitty-appearance` | fontconfig silently substituting a font that is not installed, which is the most likely reason two machines with the same config do not look the same. Also records the measured cell size, so "the text is a different size over there" becomes a number |
-| `browser-glass` | how much of the wallpaper reaches your eye through an ordinary web page, in **each** of the four browsers. Reports the spread between them without asserting anything about it — Zen is deliberately translucent by itself, so they are not meant to agree. A browser *other* than Zen coming in well under the compositor's level is still a finding — see §10 |
+| `browser-glass` | how much of the wallpaper reaches your eye through an ordinary web page, in **each** of the four browsers. Nothing is compared between them — Zen is deliberately translucent by itself and the other three deliberately are not. **A browser other than Zen coming in under the compositor's level is a finding**, and that is what keeps the other three effect-free — see §10 |
 | `blur-stacks` | a floating window sampling past the window it sits on. Also caught `xray` being accepted as a window rule and ignored — it is a layer rule |
 | `column-hop` | `SUPER+CTRL+H/L` handing a column off to the next *workspace* instead of the next *monitor*, which put a workspace move on the horizontal keys |
 | `monitor-hop` | `SUPER+CTRL+SHIFT+<hjkl>` silently doing nothing, because no monitor lay in the direction asked for — and then the obvious fix silently doing nothing too, because the dispatcher fails without raising and a `pcall` around it returns true |
@@ -747,14 +747,16 @@ All of this needs **Zen restarted at least once** since the change, because
       (61,56,57) against an interior of (31,29,30). The generated stylesheet used
       to paint over it; nothing does now, so if it bothers you the fix is a
       hand-written `userChrome.css`, which this repo deliberately leaves room for.
-- [ ] `noct-check browser-glass` passes, and reports Zen as the outlier without
-      calling it a fault. The parity assertion was **retired on 2026-08-19** —
-      a deliberately translucent Zen was exactly the spread it was written to
-      catch, so it could only have failed on the intended state. The spread is
-      still printed, with the 0.06 focus step alongside it for scale. What can
-      still fail: a browser measuring *above* the compositor's level (impossible,
-      so the measurement is wrong), a browser other than Zen measuring well under
-      it, or page text under 4.5:1.
+- [ ] `noct-check browser-glass` passes, and notes Zen as translucent without
+      calling it a fault. The parity assertion was **retired on 2026-08-19** and
+      the spread removed with it — a deliberately translucent Zen was exactly what
+      it was written to catch, and there is no focus dim left to compare against
+      anyway. What can still fail: a browser measuring *above* the compositor's
+      level (impossible, so the measurement is wrong), **a browser other than Zen
+      measuring under it**, or page text under 4.5:1.
+- [ ] Brave, Chromium and Firefox are **opaque**, and measure at the compositor's
+      `window`. They get no effect of their own and nothing here gives them one;
+      the check above is what would catch it if one did.
 - [ ] **No profile data is tracked**: `git status` stays clean after a browsing
       session, and `git ls-files | grep -iE 'cookies|logins|places'` finds
       nothing.

@@ -387,16 +387,30 @@ same price the `browser` level was invented to avoid paying.
 four browsers were more than 0.06 apart — the compositor's own focus step. A Zen
 that is translucent by itself is exactly the spread that assertion was written to
 catch, so it would have failed on the intended state forever. **The assertion is
-retired.** The check still measures every browser and still prints the spread with
-the focus step beside it, and it still fails on the three things that remain
-faults: a browser measuring *more* opaque than the compositor makes it, which is
-impossible and means the measurement is wrong; a browser other than Zen coming in
-well under it, which nothing here arranges; and page text under 4.5:1.
+retired, and the spread is gone with it** rather than demoted to a warning: with
+one browser deliberately translucent and three deliberately not, a number for how
+far apart they are measures the intended difference and nothing else. The 0.06 had
+stopped meaning anything in any case — `inactive_opacity` went to 1.0 with the
+rest of the compositor level, so there is no focus dim left to compare against.
 
-The spread is deliberately not recorded as a metric either. A metric is compared
-against the baseline within a tolerance, which is the same gate wearing a
-different hat — it would turn every `--compare` on a machine with the mod
-installed into a drift report about a decision made on purpose.
+It is not a baseline metric either, for the same reason. A metric is compared
+against a recorded value within a tolerance, which is the same gate wearing a
+different hat: it would turn every `--compare` on a machine with the mod installed
+into a drift report about a decision made on purpose.
+
+What the check still does is measure each browser on its own and fail on three
+things, all still true:
+
+- a browser measuring *more* opaque than the compositor makes it — impossible, so
+  the measurement is wrong
+- **any browser other than Zen** measuring well under it, because nothing here
+  arranges that and nothing should
+- page text under 4.5:1
+
+That middle one is the standing invariant, and it is the only thing enforcing it:
+Zen is the one browser allowed an effect of its own, from its own mod, and the
+other three get exactly what every opaque app gets, which at `window = 1.0` is
+nothing at all.
 
 `blur.ignore_opacity` is on. Without it Hyprland scales the blur by the
 window's own alpha, so a 0.9 window gets a tenth of the blur and the effect

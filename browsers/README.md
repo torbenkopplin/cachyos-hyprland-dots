@@ -87,6 +87,14 @@ translucent at whatever the mod paints, matched to nothing, and it will not read
 as the same material as a terminal. Installing and enabling the mod is yours to
 do; no file here can.
 
+**Zen is the only one, and that is a rule rather than an accident.** Brave,
+Chromium and Firefox get no effect of their own — no transparency prefs, no
+stylesheet, nothing in their policy files that touches how they paint. At the
+shipped `window = 1.0` the compositor is not fading them either, so what they get
+is nothing at all. `noct-check browser-glass` is what enforces it: any browser
+*other* than Zen measuring under the compositor's level is a finding, because
+nothing here arranges that and nothing should.
+
 Both prefs are stated rather than omitted, and that is not the same thing:
 `user.js` only *sets* prefs, so a deleted line leaves whatever `prefs.js` already
 recorded rather than restoring the default.

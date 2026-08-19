@@ -166,14 +166,16 @@ desktop, then delete:
       dropped is the *match* — no `browser` level, no generated stylesheet, so Zen
       is translucent at whatever the mod paints and at nothing this repo chose.
       `user.js` is read only at startup, so a restart is what applies it.
-- [x] **`noct-check browser-glass` no longer asserts parity.** Retired rather than
-      exempted: it measured the spread across the four browsers and failed above
-      0.06, and a deliberately translucent Zen is exactly that spread, so the gate
-      could only fire on the intended state. The number is still printed, with the
-      focus step beside it for scale, and it is deliberately *not* a metric —
-      a baseline tolerance would be the same gate under another name. Still fails
-      on the three real faults: more opaque than the compositor allows, a
-      non-Zen browser well under it, or page text below 4.5:1.
+- [x] **`noct-check browser-glass` no longer asserts parity, and the spread is
+      gone.** Retired rather than exempted: it failed when the four browsers were
+      more than 0.06 apart, and a deliberately translucent Zen is exactly that, so
+      the gate could only fire on the intended state. Removed rather than demoted
+      to a warning — the 0.06 was the compositor's focus dim, which is itself gone
+      at `inactive_opacity = 1.0`. Not kept as a metric either: a baseline
+      tolerance is the same gate under another name. Still fails on the three real
+      faults: more opaque than the compositor allows, **any browser but Zen** under
+      it, or page text below 4.5:1. That middle one is what keeps the other three
+      effect-free.
 - [ ] **Re-record the baseline.** `tests/baselines/cachyos-x8664.json` is from
       01:17 on 2026-08-19, before `window` went 0.85 → 1.0, so all four
       `browser.*.effective_opacity` values still say 0.85 and `glass-config`'s
