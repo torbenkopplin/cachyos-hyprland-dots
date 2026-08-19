@@ -336,9 +336,19 @@ PKGS_SYSTEM=(
 #   fzf + bat  -> fzf-lua and its previewer
 #   ripgrep    -> grep backend
 #   nodejs/npm -> mason needs it for tsgo, eslint and lemminx
+#
+# tree-sitter-cli is the one to be careful about, and it is the reason
+# tests/deps.tsv exists at all. nvim-treesitter shells out to `tree-sitter` to
+# build a parser from a grammar, but the neovim config is its own repository --
+# cloned by --nvim, not vendored here -- so NOTHING in this repo names the
+# dependency. It was missing from this list for as long as this list has
+# existed, on a machine that happened to have it installed by hand, and the
+# only symptom on a fresh one is a treesitter error that talks about the
+# grammar. `noct-check deps-manifest` is what makes that impossible to repeat.
 PKGS_DEV=(
     neovim git base-devel
     nodejs npm
+    tree-sitter-cli
     ripgrep fd fzf bat
     curl wget unzip
 )

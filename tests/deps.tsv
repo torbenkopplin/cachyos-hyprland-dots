@@ -1,0 +1,100 @@
+# deps.tsv -- every external command this setup depends on, and what installs it.
+#
+# Why this file exists
+# --------------------
+# tree-sitter-cli was missing from install.sh for as long as install.sh has
+# existed, and nothing said so. It could not: nothing in this repository names
+# it. The neovim config is a separate repository, cloned by `install.sh --nvim`,
+# and nvim-treesitter shells out to `tree-sitter` to build a parser. So the
+# dependency was real, the machine it was developed on had it, and a fresh
+# machine got a neovim that silently could not build parsers.
+#
+# A scan of this repository cannot find a dependency this repository does not
+# mention. A hand-written list can, and this is it. `noct-check deps` checks it
+# from three directions at once:
+#
+#   1. every command here is installed by install.sh, in the list named
+#   2. every command here is actually present on this machine
+#   3. every `command -v X` and `need X` guard in bin/ and tests/ appears here
+#
+# (3) is what stops this file rotting: add a guard for a new tool and the suite
+# fails until the tool is written down, with a package and a reason.
+#
+# Format: command <TAB> package <TAB> install.sh list <TAB> scope <TAB> why
+#
+#   list    the PKGS_* array in install.sh that must name the package, or "-"
+#           for things that come with the base system and are never installed
+#   scope   core      the setup is broken without it, and the check fails
+#           optional  a machine may legitimately not have it (the four
+#                     browsers, the tools only the test suite needs), and the
+#                     check reports it without failing
+
+# --- compositor and session ------------------------------------------------
+hyprctl	hyprland	PKGS_DESKTOP	core	the compositor's control socket; every bind check and every geometry lookup goes through it
+uwsm	uwsm	PKGS_DESKTOP	core	options.lua sets LAUNCH_PREFIX = "uwsm app -- ", so without it every app bind fails
+noctalia	noctalia	PKGS_LIKELY_AUR	core	the shell: bar, launcher, notifications, idle
+hyprpicker	hyprpicker	PKGS_DESKTOP	optional	colour picker bind
+hyprlock	hyprlock	PKGS_DESKTOP	optional	fallback lock screen; Noctalia owns idle, this is the one you call by hand
+notify-send	libnotify	PKGS_DESKTOP	core	every bin/noct-* script reports what it did with it
+nautilus	nautilus	PKGS_DESKTOP	core	options.lua FILE_MANAGER
+wl-copy	wl-clipboard	PKGS_DESKTOP	core	clipboard binds
+brightnessctl	brightnessctl	PKGS_DESKTOP	core	the brightness keys
+playerctl	playerctl	PKGS_DESKTOP	core	the media keys, and the bar's player widget
+
+# --- terminal and shell ----------------------------------------------------
+kitty	kitty	PKGS_DESKTOP	core	options.lua TERMINAL, and the only window that can be translucent by itself
+fish	fish	PKGS_SHELL	core	kitty.conf sets it as the shell
+starship	starship	PKGS_PROMPT	core	the prompt, named directly by the fish config
+eza	eza	PKGS_PROMPT	core	backs ls/lt in the fish config
+bat	bat	PKGS_DEV	core	backs cat in the fish config, and fzf-lua's previewer
+fastfetch	fastfetch	PKGS_SHELL	optional	the greeting in the fish config
+
+# --- launcher providers ----------------------------------------------------
+# Each of these is guarded with `need` in bin/noct-*: a provider whose backend
+# is absent lists "not installed" rather than failing, which is why their
+# absence is quiet enough to need a check.
+pactl	libpulse	PKGS_SYSTEM	core	/aout and /ain
+nmcli	networkmanager	PKGS_SYSTEM	core	/net
+bluetoothctl	bluez-utils	PKGS_SYSTEM	core	/bt
+powerprofilesctl	power-profiles-daemon	PKGS_SYSTEM	core	/power
+
+# --- editor ----------------------------------------------------------------
+nvim	neovim	PKGS_DEV	core	conf/env.lua EDITOR, and what aerc composes in
+git	git	PKGS_DEV	core	install.sh clones the neovim config with it
+tree-sitter	tree-sitter-cli	PKGS_DEV	core	nvim-treesitter shells out to it to build a parser from a grammar. Nothing in THIS repo names it -- the neovim config is its own repository, cloned by --nvim -- which is exactly why it was missing from install.sh until 2026-08-19 and nothing noticed
+node	nodejs	PKGS_DEV	core	mason installs tsgo, eslint and lemminx with it
+npm	npm	PKGS_DEV	core	install.sh installs the global packages with it
+rg	ripgrep	PKGS_DEV	core	fzf-lua's grep backend
+fd	fd	PKGS_DEV	core	fzf-lua's file backend
+fzf	fzf	PKGS_DEV	core	fzf-lua
+
+# --- files and previews ----------------------------------------------------
+yazi	yazi	PKGS_YAZI	optional	the file manager bind
+ffmpeg	ffmpeg	PKGS_YAZI	optional	yazi's video previews
+7z	7zip	PKGS_YAZI	optional	yazi's archive previews
+chafa	chafa	PKGS_YAZI	optional	yazi's image previews in a terminal
+jq	jq	PKGS_YAZI	core	every check that reads hyprctl -j, and noct-wallfetch
+magick	imagemagick	PKGS_YAZI	core	yazi's previews, and every measurement this suite takes off the screen
+
+# --- browsers --------------------------------------------------------------
+# All four are optional: a machine may legitimately not have one, and the
+# browser checks skip the ones that are absent rather than failing.
+firefox	firefox	PKGS_BROWSERS	optional	options.lua BROWSER
+zen-browser	zen-browser-bin	PKGS_BROWSERS	optional	the daily driver, and the only browser with translucency of its own
+brave	brave-bin	PKGS_BROWSERS	optional	configured by policy
+chromium	chromium	PKGS_BROWSERS	optional	the clean-engine browser
+
+# --- applications ----------------------------------------------------------
+aerc	aerc	PKGS_APPS	optional	mail
+signal-desktop	signal-desktop	PKGS_APPS	optional	messaging
+satty	satty	PKGS_LIKELY_AUR	optional	screenshot annotation
+
+# --- what the test suite itself needs --------------------------------------
+# grim is not optional even though nothing in the desktop uses it: it is the
+# only way to tell a 3-level frosted effect from a 17-level one, and without it
+# every visual check in this suite skips and the suite goes quiet rather than
+# going red.
+grim	grim	PKGS_DESKTOP	core	every measurement starts with a screenshot
+fc-match	fontconfig	-	core	kitty-appearance asks it what font kitty would ACTUALLY be handed; a substituted font is the most likely reason two machines do not match
+lspci	pciutils	-	optional	the environment check records the GPU with it, because the blur is a shader and two vendors' shaders are not the same shader
+stty	coreutils	-	core	the kitty probe reports the grid it was given with it
