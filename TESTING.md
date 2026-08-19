@@ -40,12 +40,11 @@ noct-check --list   # the names, and what each one asserts
 | `deps-declared` | the manifest rotting: a new `command -v` guard in `bin/` fails this until the tool is written down with a package and a reason |
 | `glass-config`, `glass-live` | the config on disk and the running session disagreeing, unnoticed, for a whole session |
 | `glass-legible` | text quietly going grey. Contrast alone does not catch it — the compositor lifts the background while it dims the glyphs, so the *ratio* survives while everything visibly fades. This measures the ink too |
-| `zen-sheet` | the generated stylesheet losing a specificity fight to the transparency mod, silently, so the page keeps somebody else's wash |
 | `keyword-inert` | `hyprctl keyword` being a silent no-op under the Lua parser, so an A/B test written with it measures nothing and passes |
 | `glass-visible` | the frosted glass being present in the config and absent on the screen — 3 levels of 255 |
 | `kitty-live` | a terminal that ignores a new opacity until it is restarted, which decides whether `terminal` may differ from `window` at all |
 | `kitty-appearance` | fontconfig silently substituting a font that is not installed, which is the most likely reason two machines with the same config do not look the same. Also records the measured cell size, so "the text is a different size over there" becomes a number |
-| `browser-glass` | how much of the wallpaper reaches your eye through an ordinary web page, in **each** of the four browsers, and whether they agree with each other to within a focus step |
+| `browser-glass` | how much of the wallpaper reaches your eye through an ordinary web page, in **each** of the four browsers, and whether they agree with each other to within a focus step. One browser out of step means something inside it is making pages translucent — see §10 |
 | `blur-stacks` | a floating window sampling past the window it sits on. Also caught `xray` being accepted as a window rule and ignored — it is a layer rule |
 | `column-hop` | `SUPER+CTRL+H/L` handing a column off to the next *workspace* instead of the next *monitor*, which put a workspace move on the horizontal keys |
 | `monitor-hop` | `SUPER+CTRL+SHIFT+<hjkl>` silently doing nothing, because no monitor lay in the direction asked for — and then the obvious fix silently doing nothing too, because the dispatcher fails without raising and a `pcall` around it returns true |
@@ -499,15 +498,15 @@ Then through the launcher:
 
 ## 8c. Frosted glass — `bin/noct-glass`
 
-- [ ] `noct-glass show` prints **three** levels (`window`, `terminal`,
-      `browser`), each with a **decimal point**, not a comma.
+- [ ] `noct-glass show` prints **two** levels (`window`, `terminal`), each with a
+      **decimal point**, not a comma.
       (awk formats per locale; the script pins `LC_ALL=C` to prevent `0,90`,
       which Hyprland would refuse to parse. Worth re-checking if you ever edit
       the script.)
-- [ ] `~/.config/hypr/generated/glass.lua`,
-      `~/.config/kitty/generated-glass.conf` and
-      `~/.config/zen/*/chrome/userChrome.css` all exist after the first scheme
-      change, and contain real numbers.
+- [ ] `~/.config/hypr/generated/glass.lua` and
+      `~/.config/kitty/generated-glass.conf` both exist after the first scheme
+      change, and contain real numbers. Those are the only two files `noct-glass`
+      writes; it stopped generating a Zen stylesheet on 2026-08-19.
 - [ ] A new kitty window is translucent, with the wallpaper blurred behind it.
 - [ ] **You can make out the wallpaper through a window.** `noct-check
       glass-visible` is the check; the eye is not, because the failure mode here
@@ -524,11 +523,13 @@ Then through the launcher:
       also, unavoidably, what makes two windows over different parts of the
       image differ. There is no setting that gives both; this repo now buys the
       wallpaper and pays in uniformity.
-- [ ] **A terminal and a browser side by side show the same amount of
-      wallpaper**, in the *same* focus state. They used to compound — kitty
-      applied its level, the compositor applied another on top — so the value
-      written for each app is level / window. With `window` and `terminal` equal
-      (the default), `generated-glass.conf` should say `background_opacity 1.00`.
+- [ ] **A terminal is glassier than a browser, and that is now the intent.** A
+      browser gets `window` and nothing else; kitty gets `terminal` on top, which
+      it applies to its background without touching its text. They used to
+      compound — kitty applied its level, the compositor applied another over it
+      — so what is written for kitty is `terminal / window`. With `window` and
+      `terminal` equal, `generated-glass.conf` should say
+      `background_opacity 1.00`.
 - [ ] **A GTK app (nautilus) and a Qt app are frosted too** — this is the point
       of driving it from the compositor rather than per-app.
 - [ ] Text is legible at the default level. If not, raise `window` in
@@ -540,8 +541,8 @@ Then through the launcher:
 - [ ] `SUPER+SHIFT+G` cycles the level and every window changes with it. What
       changes live is the **compositor's** level, which is the only one that
       applies to windows already open: kitty re-reads colours on SIGUSR1 but not
-      `background_opacity` (measured — see the table), and Zen reads its
-      stylesheet at startup. Both catch up on their next window.
+      `background_opacity` unless `dynamic_background_opacity` is on, which it
+      is (measured — see the table).
 - [ ] Any of this can be measured rather than eyeballed, and `noct-check
       glass-visible` is that measurement wrapped up: it drives the window to
       1.00 (its own colour), then to 0.02 (very nearly the backdrop), and reads
@@ -685,54 +686,39 @@ Then through the launcher:
       ```
 - [ ] `about:config` shows `browser.startup.page` = 3 in both.
 
-Zen's transparency is the one place a browser is tuned against the desktop, so
-it needs looking at rather than reading back — **restart Zen first**, since
-`user.js` is only read at startup:
+Zen's transparency was the one place a browser was tuned against the desktop.
+**It was dropped on 2026-08-19** — see
+[theming](docs/theming.md#what-was-tried-with-zen-and-dropped) for why. What
+needs checking now is that the revert actually took, which needs **Zen restarted
+at least once** since that date, because `user.js` is only read at startup:
 
-- [ ] `<profile>/chrome/userChrome.css` exists and says **Generated by
-      noct-glass** at the top. It is not tracked and not linked: `noct-glass`
-      writes it into every profile carrying a `user.js`, deriving the alpha from
-      `browser` in `glass.conf`. `./install.sh --browsers` runs it; so does any
-      scheme change.
+- [ ] `<profile>/chrome/userChrome.css` does **not** exist, or exists and does
+      *not* say "Generated by noct-glass". Nothing writes it any more, and a
+      leftover one would go on being read:
       ```sh
-      head -2 ~/.config/zen/*/chrome/userChrome.css
-      noct-glass show          # window / terminal / browser
+      head -2 ~/.config/zen/*/chrome/userChrome.css   # want: no such file
       ```
-- [ ] The page area is actually tinted, which is worth *measuring* rather than
-      eyeballing — the failure mode is silent. Capture a flat part of the page at
-      two compositor opacities (§8c has the arithmetic): if the page's own alpha
-      comes out at **0**, unchanged between the two, the stylesheet is not winning
-      and you are looking at the transparency mod's own 10% wash. That is what
-      happened first time round: the mod paints the same element with `!important`
-      from a `:has()`-wrapped selector at specificity 0-3-1, which beats a plain
-      `:root .browserStack > browser` at 0-2-1. The generated sheet uses an id
-      selector (1-1-1) and a tripled `:root` (0-4-1) for that reason.
-- [ ] No **lighter frame** around the window. Zen leaves an 8px margin around its
-      browser container unpainted, and the blurred wallpaper arrives there at full
-      strength -- measured on all four edges at (61,56,57) against an interior of
-      (31,29,30). The generated sheet paints the chrome root as well as the page
-      for that reason. Scan an edge if it comes back:
-      ```sh
-      grim -g "<window x>,<window y> 140x500" /tmp/edge.png   # then read the
-      # first 10 pixels of a row: they should match the interior, not the wallpaper
-      ```
-- [ ] A page and a **window in the same focus state** read as the same shade:
-      reddit next to a focused terminal, then click into the terminal and compare
-      again. `browser` sits 0.02 under `window`, deliberately inside the 0.06 the
-      compositor takes off an unfocused window — a browser sitting a full step
-      below reads as *a window in the other focus state*, which is the exact
-      symptom that got this changed.
-- [ ] The page area and the chrome around it are the same shade. Both come from
-      the same generated file — the chrome from the `--zen-main-browser-background`
-      variable, the page from the `.browserStack > browser` rule — so a mismatch
-      means one of the two selectors has stopped matching.
-- [ ] `about:config` shows `mod.sameerasw.zen_bg_color_enabled` = **false**. It
-      has to be: with it on, the mod defines that variable further down the tree,
-      where inheritance from `:root` cannot reach past it, and the generated value
-      silently loses.
-- [ ] Tuning is one number, `browser` in `glass.conf`, and then `noct-glass
-      apply` plus a Zen restart. 0.90 makes a page identical to a window; 0.83
-      gives the glassy look back and puts the two a focus step apart.
+- [ ] `about:config` shows `zen.widget.linux.transparency` = **false** and
+      `browser.tabs.allow_transparent_browser` = **false**. Both are set by
+      `browsers/zen/user.js` at every startup. They are set to `false` rather
+      than omitted on purpose: a `user.js` only ever *sets* prefs, so dropping
+      the line would have left the old `true` in `prefs.js` forever.
+- [ ] The **"transparent zen" mod is disabled** (`about:preferences` → Zen Mods)
+      and the **"Zen Internet" extension** is removed or disabled. No file in
+      this repo can do either, so this is the manual half of the revert.
+- [ ] A page reads as the **same shade as any other window in the same focus
+      state** — reddit next to a focused nautilus, say. Not next to a terminal:
+      kitty is deliberately 0.30 glassier than everything else, so a browser
+      matching a *terminal* would now be the symptom rather than the goal.
+- [ ] No **lighter frame** around the Zen window. That was Zen leaving an 8px
+      margin around its browser container unpainted, so the blurred wallpaper
+      arrived there at full strength — measured at (61,56,57) against an interior
+      of (31,29,30). With the window opaque to itself there is nothing behind it
+      to show through, so this should simply be gone. If it is back, the mod is
+      still on.
+- [ ] `noct-check browser-glass` passes: all four browsers within 0.06 of each
+      other, at the compositor's own `window` level. That is the measurement that
+      says the revert landed, and it is the one to run instead of squinting.
 - [ ] **No profile data is tracked**: `git status` stays clean after a browsing
       session, and `git ls-files | grep -iE 'cookies|logins|places'` finds
       nothing.
@@ -843,7 +829,7 @@ something misbehaves:
 | ~~A capsule outline draws when `capsule_border` is set~~ | **Disproven 2026-08-18.** The colour applies to nothing on its own; the only width available is `border_width`, which outlines the *bar* — and with an invisible bar that draws a full-width line above and below the capsules. Left unset | `10-bar.toml` |
 | ~~Two windows at the same glass level look the same~~ | **Disproven 2026-08-18 by measurement.** With `blur.xray`, each window samples the wallpaper behind itself; at `size 8 / passes 2` the backdrops behind two kitty windows differed by 24-41 of 255 and the windows read 4-6 levels apart, at an identical measured own-alpha of 1.00. `size 32 / passes 4` with `brightness 0.65` and `vibrancy 0.05` brings that to 2 levels | `bin/noct-glass`, `conf/look.lua` |
 | ~~`capsule_fill` and `capsule_opacity` style a bar capsule group~~ | **Disproven 2026-08-18 on v5.0.0-beta.8.** Both are accepted, appear in `config export merged`, and are ignored for group capsules, which draw as opaque `surface_variant` — verified by setting the fill to `#ff0000` and watching nothing turn red. Radius, padding and thickness do apply. The keys are left out of `10-bar.toml` rather than left in lying | `10-bar.toml` |
-| ~~`:root .browserStack > browser` overrides the transparency mod~~ | **Disproven 2026-08-18 by measurement.** The mod paints that element `!important` from `:root:has([mod-sameerasw_zen_light_tint="1"]) …`, specificity 0-3-1 against 0-2-1 — so the page kept the mod's 10% wash and measured an own alpha of 0. The generated sheet now uses `#main-window …` (1-1-1) plus a tripled `:root` (0-4-1) | `bin/noct-glass` |
+| ~~`:root .browserStack > browser` overrides the transparency mod~~ | **Disproven 2026-08-18 by measurement.** The mod paints that element `!important` from `:root:has([mod-sameerasw_zen_light_tint="1"]) …`, specificity 0-3-1 against 0-2-1 — so the page kept the mod's 10% wash and measured an own alpha of 0. Beaten with `#main-window …` (1-1-1) plus a tripled `:root` (0-4-1) — and **moot since 2026-08-19**: having to win a specificity fight against somebody else's extension, silently, every time it changes its selector, is one of the reasons the whole approach was dropped | historical |
 | Noctalia gives a dmenu provider ~2 seconds | **Measured 2026-08-18**: a provider that runs longer is SIGTERMed (exit 143) and the launcher shows "No results found". Undocumented, so it could change — re-measure with a `sleep 3` provider if lists start emptying | `bin/noct-common.sh` |
 | Hyprland pauses idle notifications while a client holds a Wayland idle inhibitor | Protocol behaviour, and the layer the windowed-browser-video case rests on. The two window rules are the belt and braces | `conf/rules.lua`, `70-idle.toml` |
 | `shelly install standard/aur --no-confirm` is non-interactive enough for a script | It authenticates through **polkit**, so it needs an agent; in a bare TTY it fails and the pacman path takes over. Both paths are exercised by `--dry-run` | `install.sh` |
@@ -858,10 +844,11 @@ something misbehaves:
 | yazi's `%s` opener placeholder is still current | Carried over verbatim from your working config rather than modernised | `config/yazi/yazi.toml` |
 | Brave policy names (`BraveRewardsDisabled`, `BraveAIChatEnabled`, …) | Brave-specific policies are less stable than Chromium's; `brave://policy` is the check | `browsers/brave/policies.json` |
 | ~~Zen reads `user.js` from profiles under `~/.zen`~~ | **Disproven 2026-08-18 on zen-browser-bin 1.21.14b.** The profile root is `~/.config/zen` (`~/.zen` does not exist), so the Zen half of `--browsers` had never landed a file. `install.sh` now tries both roots | `install.sh` |
-| Setting `mod.sameerasw.*` from `user.js` reaches the Zen mod | The mod reads its settings as ordinary prefs and a live profile stores its dropdowns as strings, so the types match — but whether the mod re-reads them on a cold start rather than only when its own UI writes them is unconfirmed. Restart Zen and look | `browsers/zen/user.js` |
-| ~~`zen_transparency_color` is the way to tint Zen~~ | **Superseded 2026-08-18.** It works -- measured, a 0.75 pref composited as 0.82 on reddit -- but it is a number copied by hand into a browser config, and it defines the background variable on an element below `:root`, so a stylesheet cannot override it from above. The pref is off and `noct-glass` writes the level instead | `bin/noct-glass`, `browsers/zen/user.js` |
+| ~~Setting `mod.sameerasw.*` from `user.js` reaches the Zen mod~~ | Never resolved, and **no longer asked as of 2026-08-19**: those prefs are out of `browsers/zen/user.js` along with the rest of the transparency work. If you ever go back to driving a Zen mod from a pref, this is still unconfirmed | historical |
+| ~~`zen_transparency_color` is the way to tint Zen~~ | **Superseded 2026-08-18, then moot 2026-08-19.** It works — measured, a 0.75 pref composited as 0.82 on reddit — and it defines the background variable on an element below `:root`, so a stylesheet cannot override it from above. Replaced by a generated stylesheet, and then nothing tints Zen at all | historical |
+| A page tinted to match a window is invisible on the pages you actually visit | **Measured 2026-08-19** with `noct-check browser-glass`: all four browsers composited at 0.85, 0.00 apart, on an ordinary page. A tint under the page area only shows where the page paints nothing itself, and almost none do — which is why the `browser` level was worth so much less than the config made it look, and was dropped | historical |
 | ~~kitty applies `background_opacity` on a config reload~~ | **Disproven 2026-08-18 on the live session.** With `generated-glass.conf` at 0.94 and a fresh `SIGUSR1`, running kitties still composited at 1.00 — colours reload, opacity does not. That is why `glass.conf` keeps `terminal` equal to `window`: a terminal-specific level leaves two shades of terminal until every window has been restarted | `bin/noct-glass`, `glass.conf` |
-| Firefox resolves a symlinked `userChrome.css` before relative `@import`s | Reported behaviour, not tested here — an import next to a repo-linked sheet would look in the repo rather than the profile, and fail silently. Avoided rather than confirmed: `noct-glass` writes one whole file with no imports | `bin/noct-glass` |
+| ~~Firefox resolves a symlinked `userChrome.css` before relative `@import`s~~ | Reported behaviour, never tested here — an import next to a repo-linked sheet would look in the repo rather than the profile, and fail silently. Avoided rather than confirmed, and **moot since 2026-08-19**: nothing generates a stylesheet any more. Worth remembering before ever linking one out of this repo | historical |
 | ~~Noctalia's `kitty` template writes `current-theme.conf`~~ | **Disproven 2026-08-18 on noctalia v5.0.0-beta.8.** It writes `themes/noctalia.conf` and *rewrites `kitty.conf`* to include it, clobbering the tracked symlink. The built-in is now disabled; a user template renders `generated-colors.conf` instead | `40-templates.toml`, `config/kitty/kitty.conf` |
 | Colour roles used by `kitty-colors.conf` (`terminal_*`, `primary`, `outline_variant`) | Verified 2026-08-18: all render to real hex, no leftover placeholders | `templates/kitty-colors.conf` |
 | A user template named after a built-in id (`kitty`, `hyprland`) does not collide with it | Verified 2026-08-18: both render while the built-in id is absent from `builtin_ids` | `40-templates.toml` |

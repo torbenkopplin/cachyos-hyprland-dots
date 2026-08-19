@@ -89,8 +89,9 @@ Colours come from the wallpaper:
 
 `/theme` (`M + CTRL + T`) switches between that, ten built-in palettes, and
 your own — **noirblaze** ships here, ported from the neovim colourscheme.
-Frosted glass follows the scheme, and both terminals and browsers end up
-showing exactly the same amount of wallpaper.
+Frosted glass follows the scheme: every window gets it from the compositor, and
+a terminal gets a good deal more of it from kitty, which is the one window that
+can fade its background without fading its text.
 
 Idle has one owner (Noctalia): lock at 10 minutes, screen off at 15, suspend at
 30, and anything playing video holds all three off.

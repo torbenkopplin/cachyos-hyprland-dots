@@ -176,13 +176,15 @@ override. Levels live in `config/noctalia/glass.conf`.
 [design.md](design.md#why-the-blur-is-small) for why that is not a question the
 eye can answer.
 
-Three knobs, and **all are stated as what you see**:
+Two knobs, and **both are stated as what you see**:
 
 | Knob | Means | Applies to |
 |---|---|---|
 | `window` | how opaque an ordinary window is | Hyprland's `active_opacity` — **every window**, including GTK and Qt apps with no transparency of their own. Fades text with the background; the compositor cannot tell one from the other |
 | `terminal` | how opaque a **terminal** ends up | kitty's own `background_opacity`, which fades only the background and leaves text fully opaque |
-| `browser` | how opaque a browser **page** ends up | a stylesheet in the Zen profile, for the page area the transparency mod and the "Zen Internet" extension leave transparent |
+
+A browser is not on that list, deliberately — see
+[what was tried with Zen](#what-was-tried-with-zen-and-dropped) below.
 
 They used to compound, and that was the bug behind "one is darker than the
 other": kitty applied `terminal`, the compositor then applied `window` on top,
@@ -199,12 +201,14 @@ An unfocused window is dimmed by 0.06 (`inactive_opacity`). So an app sitting
 0.06 below `window` looks *exactly like a window in the other focus state* — the
 symptom is "the browser when focused looks like the terminal when it isn't, but
 not the other way around". Anything meant to read as the same material has to sit
-well inside that 0.06, which is why `browser` is 0.58 against a `window` of 0.60.
+well inside that 0.06.
 
-The consequence is worth saying out loud: a browser page cannot be both
-noticeably glassier than a terminal *and* indistinguishable from one. Two
-hundredths under makes them the same material; a tenth under buys the glassier
-look and puts them a focus step apart. One number, in `glass.conf`.
+That is the whole reason `terminal` at 0.55 against a `window` of 0.85 is a
+deliberate *contrast* rather than a failed match: at 0.30 below it is nowhere
+near the focus step, so a terminal reads as its own material rather than as a
+mis-focused window. Anything that wants to read as *the same* material has a
+much smaller budget than it looks like it has, and that is what the Zen
+experiment ran out of.
 
 ### Why the levels are as low as 0.60
 
@@ -233,13 +237,52 @@ That is what lets `terminal` sit far below `window`, which is the point: the
 compositor cannot tell glyphs from background and fades both, kitty fades only
 the background. Glassiness bought through `terminal` costs no contrast at all.
 
-Zen still reads its stylesheet at startup, so `browser` needs the browser
-restarted — one window's worth of the same problem. `noct-check zen-sheet`
-checks the generated stylesheet is at the alpha the levels imply and still
-out-specifies the transparency mod's rule, and `noct-check browser-glass`
-launches each of the four browsers fresh and measures how much of the wallpaper
-an ordinary web page lets through, so the four can be compared with each other
+A browser reads its profile at startup and never again, so anything set in
+`browsers/*/user.js` needs the browser restarted. `noct-check browser-glass`
+launches each of the four fresh and measures how much of the wallpaper an
+ordinary web page lets through, so the four can be compared with each other
 rather than described one at a time.
+
+### What was tried with Zen, and dropped
+
+Zen is the one browser that can make its own window and page backgrounds
+transparent, with the [transparent zen](https://github.com/sameerasw/transparent-zen)
+mod and the "Zen Internet" extension. Between 2026-08-18 and 2026-08-19 this repo
+tried to make that match the desktop: a third level, `browser`, in `glass.conf`,
+divided by the window opacity and written into a generated
+`chrome/userChrome.css` in each Zen profile.
+
+It worked in the sense that the numbers came out right — `browser-glass` measured
+all four browsers composing at 0.85, 0.00 apart — and it did not work in the sense
+that mattered, which is what it looked like to use. **Dropped 2026-08-19.** What
+it cost to keep:
+
+- The match only ever applied where a page painted *nothing itself*. Ordinary
+  pages paint an opaque background, so on almost everything you actually visit
+  the tint was invisible and the browser was simply at `window` like every other
+  app. The tuning applied to a minority of pages.
+- It needed a specificity fight with somebody else's stylesheet. The mod paints
+  the page area `!important` from a 0-3-1 selector, so the generated sheet had to
+  reach 1-1-1 and a tripled `:root` to win — and would have lost silently, with
+  nothing to report, the next time the mod changed its selector.
+- Four moving parts had to stay aligned for one number to mean anything: the mod,
+  the extension, two Zen prefs and a generated file, none of them ours, all read
+  once at startup.
+- The focus step above left almost no room. A page a tenth under `window` reads as
+  a mis-focused window; a page two hundredths under is indistinguishable from one,
+  at which point the transparency is buying nothing.
+
+So `browser` is gone, `write_zen` is gone, the generated stylesheet is gone, and
+`browsers/zen/user.js` now sets `browser.tabs.allow_transparent_browser` and
+`zen.widget.linux.transparency` to **false** rather than leaving them out — a
+`user.js` only ever *sets* prefs, so a deleted line would have left the old value
+in `prefs.js` and the transparency would have stayed on forever.
+
+**Two things to turn off by hand,** because no file here can: in Zen, disable the
+"transparent zen" mod (`about:preferences` → Zen Mods) and remove or disable the
+"Zen Internet" extension. Then restart it. `noct-check browser-glass` will tell
+you whether anything is still translucent beyond the compositor's level, and any
+browser more than 0.06 from the others fails it.
 
 `blur.ignore_opacity` is on. Without it Hyprland scales the blur by the
 window's own alpha, so a 0.9 window gets a tenth of the blur and the effect
@@ -267,16 +310,8 @@ does today: nothing fades except surfaces an app draws translucent itself.
 pixels — mpv, imv, gimp, obs, hyprpicker. You cannot judge a photo or pick a
 colour through 10% of your wallpaper.
 
-Two consequences worth knowing:
+One consequence worth knowing:
 
-- **Zen's level is generated, not tracked.** A profile directory is named
-  randomly per install, so no template can render into it and no symlink can be
-  planned for it — `noct-glass` finds the profiles that carry a `user.js` and
-  writes the whole of `chrome/userChrome.css` there. It writes the whole file
-  rather than one that imports a generated half, because Firefox resolves a
-  symlinked sheet to its real path before resolving relative `@import`s, and the
-  import would then quietly look inside this repo. An existing sheet that is not
-  ours is reported and left alone.
 - **Neovim inside a transparent kitty.** Your `noirblaze.lua` paints `Normal`
   with `bg = #121212`, so the editor stays opaque against kitty's translucent
   background. `bg = "none"` fixes it — a change in *your nvim repo*, not this
