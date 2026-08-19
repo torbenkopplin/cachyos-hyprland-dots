@@ -35,8 +35,9 @@
 #                    success.
 #   deps-manifest    tree-sitter-cli was never in install.sh, on a machine that
 #                    already had it installed by hand.
-#   browser-glass    three of the four browsers cannot be translucent by
-#                    themselves, so they sit at a level nobody chose for them.
+#   browser-glass    a browser cannot be translucent by itself unless something
+#                    inside it is arranging that, and one that is reads as a
+#                    different material from every window beside it.
 #
 # Two things it does that a checklist cannot
 # ------------------------------------------

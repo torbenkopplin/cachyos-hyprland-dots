@@ -180,9 +180,9 @@ noct_glass_set() {  # <level>
     sleep 1
 }
 
-# noct_glass_levels -- "window terminal browser" from the config in force.
+# noct_glass_levels -- "window terminal" from the config in force.
 noct_glass_levels() {
-    "$NOCT_GLASS" show 2>/dev/null | awk '{print $2, $4, $6}'
+    "$NOCT_GLASS" show 2>/dev/null | awk '{print $2, $4}'
 }
 
 # ---------------------------------------------------------------------------
@@ -273,16 +273,16 @@ noct_measure_surface() {
 #
 #   * If `s` is 1 during the calibration captures, `own` is C itself and the
 #     ratio comes out as s x w -- the EFFECTIVE opacity, everything included.
-#     That is the kitty case, and not by luck: noct-glass collapses terminal
-#     and browser onto the window level whenever an override is in force, and
-#     kitty re-reads background_opacity on the SIGUSR1 that follows. So while
-#     this suite is holding the level, kitty is at 1.00 by construction.
+#     That is the kitty case, and not by luck: noct-glass collapses the terminal
+#     level onto the window level whenever an override is in force, and kitty
+#     re-reads background_opacity on the SIGUSR1 that follows. So while this
+#     suite is holding the level, kitty is at 1.00 by construction.
 #
 #   * If `s` does not move -- because the application read its configuration
 #     once, at startup, and this suite has not restarted it -- then `own`
 #     already contains `s`, it cancels, and the ratio comes out as w alone: the
 #     COMPOSITOR level and nothing about the application. That is every
-#     Firefox-family browser, which reads userChrome.css exactly once.
+#     Firefox-family browser, which reads its profile exactly once.
 #
 # Both are useful and neither is the other. The caller knows which case it is
 # in and names the result accordingly; noct_alpha_own below is how the second

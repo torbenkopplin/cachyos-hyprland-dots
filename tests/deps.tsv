@@ -80,7 +80,7 @@ magick	imagemagick	PKGS_YAZI	core	yazi's previews, and every measurement this su
 # All four are optional: a machine may legitimately not have one, and the
 # browser checks skip the ones that are absent rather than failing.
 firefox	firefox	PKGS_BROWSERS	optional	options.lua BROWSER
-zen-browser	zen-browser-bin	PKGS_BROWSERS	optional	the daily driver, and the only browser with translucency of its own
+zen-browser	zen-browser-bin	PKGS_BROWSERS	optional	the daily driver, and the one browser that CAN be translucent by itself -- which is why browser-glass measures all four rather than assuming
 brave	brave-bin	PKGS_BROWSERS	optional	configured by policy
 chromium	chromium	PKGS_BROWSERS	optional	the clean-engine browser
 

@@ -30,8 +30,8 @@ never in `install.sh`, on a machine that already had it.
 
 **Every live measurement gets a brand new window.** Nothing here measures a
 terminal or a browser you already had open. kitty reads its opacity at startup
-and on SIGUSR1; a Firefox-family browser reads `user.js` and
-`chrome/userChrome.css` exactly once, at startup. So a window that has been
+and on SIGUSR1; a Firefox-family browser reads `user.js` exactly once, at
+startup. So a window that has been
 open for a while is evidence about the past, not about the files on disk. It
 also carries your scrollback and your tabs, which average into any measurement
 taken off it. See [`lib/probe.sh`](lib/probe.sh).

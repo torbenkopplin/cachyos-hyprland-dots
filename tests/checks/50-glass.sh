@@ -67,13 +67,12 @@ check_glass_config() {
     require_file glass-config "$HYPR_GLASS"  "run 'noct-glass apply'" || return
     require_file glass-config "$KITTY_GLASS" "run 'noct-glass apply'" || return
 
-    local levels win term browser
+    local levels win term
     levels=$(noct_glass_levels) || { fail glass-config "noct-glass show failed"; return; }
-    read -r win term browser <<<"$levels"
+    read -r win term <<<"$levels"
 
-    metric glass.window   "$win"     0.01
-    metric glass.terminal "$term"    0.01
-    metric glass.browser  "$browser" 0.01
+    metric glass.window   "$win"  0.01
+    metric glass.terminal "$term" 0.01
     metric blur.size       "$(lua_num size)"       0.5
     metric blur.passes     "$(lua_num passes)"     0.5
     metric blur.brightness "$(lua_num brightness)" 0.02
@@ -92,7 +91,7 @@ check_glass_config() {
         fail glass-config "kitty background_opacity is $ko, should be $want_ko for terminal $term / window $win"
         return
     fi
-    pass glass-config "generated files agree with glass.conf (window $win  terminal $term  browser $browser)"
+    pass glass-config "generated files agree with glass.conf (window $win  terminal $term)"
 }
 
 check_glass_live() {
