@@ -23,9 +23,6 @@ you get that data onto the new machine.
 | `firefox/user.js` | every profile in `~/.mozilla/firefox/` | Firefox |
 | `zen/user.js` | every profile in `~/.config/zen/` (or `~/.zen/`) | Zen |
 
-Zen also gets a `chrome/userChrome.css`, which is **not** in this directory: it
-carries the frosted-glass level and is generated per profile by `bin/noct-glass`.
-
 Chromium-family policy files need root and take effect on next launch.
 Firefox-family `user.js` is read at startup and re-applies its values every
 time, so a setting changed in the UI reverts on restart — that is the point,
@@ -70,22 +67,21 @@ shortcuts, sponsored stories, snippets, the onboarding tour and the
 them is the browser you asked for. Search and top sites stay on because they
 are actually useful; `Locked: false` means you can still change them in the UI.
 
-**Zen — transparency.** The one place a browser has to know about the desktop.
-`bin/noct-glass` fades *every* window to ~0.9 and blurs the wallpaper behind it,
-so a terminal shows about a tenth of the image. Zen, with the "transparent zen"
-mod and the "Zen Internet" extension, was showing nearly all of it: the same
-wallpaper, two completely different shades, side by side.
+**Zen — transparency, switched off.** No browser here knows about the desktop.
+`bin/noct-glass` fades *every* window through the compositor and blurs the
+wallpaper behind it, and a browser gets that and nothing more — the same as a
+GTK app, and for the same reason: it paints its own background.
 
-`zen/user.js` only *enables* that transparency. The shade is the `browser` level
-in `~/.config/noctalia/glass.conf`, which `noct-glass` divides by the compositor's
-own window opacity and writes into `chrome/userChrome.css` in each profile — so
-the browser and the rest of the desktop are numbers in one file rather than a
-value copied by hand into a browser config. Nothing here tracks that stylesheet;
-see [theming](../docs/theming.md#frosted-glass) for why it has to be generated and
-what the level has to beat to read as the same material.
+Zen is the one browser that *can* do more, with the "transparent zen" mod and
+the "Zen Internet" extension, and `zen/user.js` used to switch that on and tint
+what it left transparent from a generated `chrome/userChrome.css`. Both are gone;
+the prefs are now explicitly `false`, which is not the same as absent — `user.js`
+only sets prefs, so a deleted line leaves the old value in `prefs.js` and the
+transparency would have stayed on. See
+[theming](../docs/theming.md#frosted-glass) for what was tried and why it was
+dropped, and for the two things to disable inside Zen itself.
 
-Both the prefs and the stylesheet are read at startup, so changing either needs
-Zen restarted.
+`user.js` is read at startup, so changing it needs Zen restarted.
 
 **Not set anywhere:** default search engine, homepage, password manager
 behaviour beyond leaving it enabled, and extension allow/block lists. Those are

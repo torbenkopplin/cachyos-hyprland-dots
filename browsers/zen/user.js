@@ -37,47 +37,27 @@ user_pref("widget.dmabuf.force-enabled", true);
 // --- Downloads -------------------------------------------------------------
 user_pref("browser.download.useDownloadDir", false);
 
-// --- Customisation ---------------------------------------------------------
-user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);
+// --- Transparency: deliberately off ----------------------------------------
+//
+// Zen can draw its own window and page backgrounds transparent -- that is what
+// the "transparent zen" mod (sameerasw) and the "Zen Internet" extension are
+// for -- and this repo used to switch it on and then tint what it left
+// transparent, from a `browser` level in ~/.config/noctalia/glass.conf written
+// into a generated chrome/userChrome.css. That was given up on 2026-08-19; the
+// reasoning is in docs/theming.md. A browser now gets exactly what every other
+// window gets from the compositor and nothing else.
+//
+// Both are set to `false` rather than simply left out, and the difference
+// matters: user.js only ever *sets* prefs. Deleting a line does not restore the
+// default -- it leaves whatever prefs.js already recorded, so a profile that had
+// transparency switched on would silently keep it forever.
+//
+// This does not uninstall the mod or the extension. Nothing a file can do will:
+// see docs/theming.md for the two things to turn off by hand.
+user_pref("browser.tabs.allow_transparent_browser", false);
+user_pref("zen.widget.linux.transparency", false);
 
-// --- Transparency, matched to the desktop's frosted glass -------------------
-//
-// Two independent things are at work here, and they were landing at very
-// different shades:
-//
-//   * The desktop. bin/noct-glass sets Hyprland's window opacity for EVERY
-//     window -- 0.90 by default, per scheme in ~/.config/noctalia/glass.conf,
-//     and `noct-glass show` says which is in force -- and the compositor blurs
-//     the wallpaper behind whatever is left. A terminal or a GTK app therefore
-//     shows about a tenth of the wallpaper: a dark surface with a hint of the
-//     image in it.
-//
-//   * Zen. The "transparent zen" mod (sameerasw) plus the "Zen Internet"
-//     extension make the browser surface AND most page backgrounds transparent,
-//     so reddit and youtube showed nearly all of the wallpaper -- much lighter
-//     than every window beside them.
-//
-// The prefs below only *enable* that. The shade itself is the `browser` level in
-// glass.conf, which noct-glass divides by the window opacity and writes into
-// chrome/noct-glass.css in this profile -- so the browser and the rest of the
-// desktop are two numbers in one file rather than a value copied by hand into a
-// browser config. noct-glass writes the whole of that file; nothing in this repo
-// tracks it, because its only content is a number derived from glass.conf.
-//
-// Both are read at startup, so a change here or there needs Zen restarted.
-user_pref("browser.tabs.allow_transparent_browser", true);
-user_pref("zen.widget.linux.transparency", true);
+// Not part of that, and staying: Hyprland already dims an unfocused window
+// (inactive_opacity, 0.06 below the active level), so Zen greying itself out on
+// top of that is the same cue applied twice.
 user_pref("zen.view.grey-out-inactive-windows", false);
-
-// Deliberately OFF, and not a leftover. With it on, the mod defines
-// --zen-main-browser-background on an element below :root, and a variable set
-// further down the tree cannot be reached by inheritance from above -- so the
-// generated stylesheet would lose to it. Off, the mod leaves the variable alone
-// and the generated value applies.
-user_pref("mod.sameerasw.zen_bg_color_enabled", false);
-
-// The mod's own page tint, left on Flip (1) rather than Remove (2). The generated
-// stylesheet overrides it, so this is purely the fallback for a profile where that
-// file is missing: a 10% dark wash under a dark scheme is a far better failure
-// mode than a fully transparent page.
-user_pref("mod.sameerasw_zen_light_tint", "1");

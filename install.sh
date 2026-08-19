@@ -1057,18 +1057,6 @@ do_browsers() {
     # so the Zen half of --browsers had never actually landed. ~/.zen is kept as
     # a second candidate for older builds and the flatpak.
     install_user_js "$REPO/browsers/zen/user.js" Zen "$HOME/.config/zen" "$HOME/.zen"
-
-    # Zen's frosted-glass level is a stylesheet rather than a pref, and it is
-    # generated from ~/.config/noctalia/glass.conf rather than tracked -- so it is
-    # noct-glass that writes it, into the profiles the user.js above just marked.
-    # Without this a fresh machine gets the prefs and no backdrop, and pages come
-    # out lighter than every window beside them until the next scheme change.
-    if command -v noct-glass >/dev/null 2>&1; then
-        say "generating Zen's glass stylesheet"
-        run noct-glass apply
-    else
-        note "noct-glass not on PATH yet -- run './install.sh' first, then 'noct-glass apply'"
-    fi
 }
 
 # ---------------------------------------------------------------------------
