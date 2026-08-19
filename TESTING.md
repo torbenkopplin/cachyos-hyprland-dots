@@ -49,6 +49,7 @@ noct-check --list   # the names, and what each one asserts
 | `column-hop` | `SUPER+CTRL+H/L` handing a column off to the next *workspace* instead of the next *monitor*, which put a workspace move on the horizontal keys |
 | `monitor-hop` | `SUPER+CTRL+SHIFT+<hjkl>` silently doing nothing, because no monitor lay in the direction asked for — and then the obvious fix silently doing nothing too, because the dispatcher fails without raising and a `pcall` around it returns true |
 | `nav-axis` | `SUPER+hjkl` walking the wrong structure on a band that scrolls **down**. Neither hop check noticed, because neither asks anything about `J`/`K`. Derives the tape axis from where two probe windows actually land, so it needs no entry in `WSBANDS` to be right |
+| `bar-hot-edge` | the bar not answering the pointer, and the bar getting stuck on. Measured in **pixels**, because hiding the bar leaves its layer mapped at the same geometry and alpha — the obvious reading says nothing. Diffs the whole strip as an image and asks what **percentage** of it changed, which is the only form that survived three layout changes: a single centre patch and five spread patches both assumed where the content was, and both called a working bar broken when it moved |
 
 The `--all` set drives the display to two extremes and puts it back, and every
 one of them opens **new** windows to measure — a fresh terminal, a fresh browser
@@ -257,24 +258,74 @@ to watch for is the launcher also opening after ordinary chords.
       the same.
 - [ ] A **notification** appearing does *not* reveal the bar.
 - [ ] Changing workspace does *not* reveal the bar.
-- [ ] `SUPER+B` pins it on; `SUPER+B` again releases it back to following panels.
+- [ ] `SUPER+B` pins it on; `SUPER+B` again releases it back to following panels
+      and the pointer. Both presses are forced, so this doubles as a **resync**:
+      if the bar is ever stuck, two presses of this key end it.
 - [ ] The bar renders **above** a fullscreen window (`layer = "overlay"`).
 
-The form is one centred cluster of capsules on an invisible bar, made of the same
-material as the panels this shell opens:
+### The pointer, as the mouse way in
 
-- [x] There is **no slab**: no fill and no border behind the capsules, so the
-      wallpaper runs unbroken around them.
-- [x] Everything is in the **centre**. `start` and `end` are empty; a summoned HUD
-      should be one thing you look at rather than three things in the corners of
-      an ultrawide.
-- [x] Four capsules — navigation (workspaces + title), time, media, status —
-      adjacent, so the cluster has seams where the meaning changes. Media is
-      separate because it comes and goes with playback, and is absent entirely
-      when nothing is playing.
-- [x] A capsule is the same material as a **popup card**: open the control centre
-      next to the bar and compare. Both are `surface_variant` at radius 12. That
-      is not configurable — see the table — it is what a group capsule draws.
+- [ ] Pushing the mouse to the **top edge** of either monitor reveals the bar;
+      moving away retracts it. `noct-check bar-hot-edge` measures this.
+- [ ] Moving the pointer **onto the bar** does not make it vanish — there is
+      hysteresis, `HOT_EDGE_KEEP_PX` in `lib/bar.lua`, which has to clear
+      `margin_edge` + `thickness`.
+- [ ] With the bar **pinned**, moving the pointer to the edge and away leaves it
+      up: the pin wins over the edge.
+- [ ] `BAR_HOT_EDGE = false` in `conf/options.lua` removes the poll entirely and
+      the bar is keyboard-only again. The check skips rather than fails.
+
+**Do not judge any of this by `hyprctl layers`.** With `auto_hide = false`, hiding
+the bar changes neither the layer's geometry nor its alpha, and the surface stays
+mapped — it reports `xywh: 1090 250 3420 30, a: 1` either way, because Noctalia
+simply stops drawing it. The only honest signal is the pixels:
+
+```sh
+grim -g "2700,252 200x26" /tmp/bar.png && magick /tmp/bar.png -resize 1x1 txt:
+```
+
+Noctalia's own `auto_hide` is **not** a proximity reveal, which is why the edge is
+polled in `lib/bar.lua` instead: measured on 5.0.0-beta.8 with `auto_hide`
+confirmed true by `config export merged`, the bar collapses to a strip at the
+screen edge and stays collapsed with the pointer parked inside it, on `top` and on
+`overlay`, with and without reserved space. Worth re-testing with a hand on a real
+mouse — the pointer was warped and then nudged with synthetic relative motion — and
+if it does reveal, the poll can go.
+
+The form is **three separate capsules** — navigation at the start, clock in the
+centre, status at the end, with nothing drawn between them:
+
+- [x] **Three shapes, not one strip.** Sample across the bar: the capsules read
+      around 50 (`surface_variant`) and the gaps read whatever window is behind.
+      A continuous reading the whole way across means the bar surface is being
+      drawn and `background_opacity` is not 0.
+- [x] **No resolution is baked in.** Capsules size to their content and the lanes
+      place them by proportion, so this is the one form that survives a laptop
+      being plugged into an unfamiliar monitor. Anything using `margin_ends` to
+      shrink the shape does not — it is absolute pixels shared by every screen.
+- [x] **It does not match the panels, and cannot.** A capsule is opaque
+      `surface_variant`: set `capsule_fill = "#ff0000"` with
+      `capsule_opacity = 0.30`, reload, and it is pixel-identical at 53,53,55.
+      `shadow` and `contact_shadow` are ignored the same way. Glass is available
+      only on the bar *surface*, and that surface is always full width.
+- [x] The navigation capsule **hugs its title** (`min_length = 0`). It used to
+      reserve a fixed 260px so a centred cluster would not slide; with the capsules
+      in start/centre/end lanes the clock and status are anchored and cannot move,
+      so only this capsule's right edge grows. `max_length` still truncates.
+
+- [x] There is **no media widget in any lane**, and that is rule three below
+      applied to the bar itself. A browser tab is both the focused window and the media source, so
+      it restated `active_window` verbatim: measured on the 1060px portrait bar,
+      "Reddit - The heart of the internet" appeared twice, three capsules apart,
+      filling most of the width to say one thing. It cannot be configured smaller
+      (`max_length` will not go below 40) and has no art-only mode (at 0 it draws
+      the art plus a literal ellipsis), so `group:media` came out of the lane. The
+      group and `[widget.media]` are both still in the file — put `"group:media"`
+      back in `center` to restore it. Now-playing is in the control centre.
+- [x] The `capsule_group` blocks are **unreferenced** now that the lanes list
+      widgets, and that is not an error — validate passes. They are kept as the
+      record of which widgets belong together, and as the revert path to the
+      capsule form.
 - [x] The cluster does not **slide** when you change windows: `active_window` has
       `min_length` = `max_length`, so its box is a fixed width whatever the title.
 - [x] `noctalia config validate` passes. `capsule_group` entries are keyed by

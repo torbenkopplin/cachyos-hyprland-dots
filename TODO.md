@@ -165,6 +165,35 @@ desktop, then delete:
       `WSBANDS` — a laptop has no entry for a monitor it has never been plugged
       into. `noct-check nav-axis` is the regression net; verified that it fails
       against the pre-fix file.
+- [x] **The bar answers the mouse, and no longer sticks.** Two stuck mechanisms
+      fixed in `lib/bar.lua`: the open-panel set is reconciled against
+      `hl.get_layers()` before every decision, so a missed `layer.closed` cannot
+      strand an address and pin the bar up for the session; and `SUPER+B` now
+      forces, making it a resync as well as a toggle. The pointer at the top edge
+      reveals it — polled with `hl.timer` + `hl.get_cursor_pos()`, with hysteresis
+      so it does not vanish as you reach for it. `noct-check bar-hot-edge` covers
+      it; verified that it fails with the poll disabled.
+- [x] **`capsule_radius = 12` vs `ROUNDING = 2` — answered by not answering.** The
+      capsules stay at 12 because that is what a Noctalia popup card is, and the
+      bar is shell furniture rather than a window. What was actually wrong with the
+      bar was redundancy, not radius: the media capsule restated the window title
+      verbatim. See TESTING.md §4.
+- [x] **The bar is three separate capsules, pushed to start/centre/end.** Settled
+      2026-08-20 after building and looking at every alternative. It does NOT match
+      the panels' glass, and that is a measured dead end rather than a gap: a
+      capsule is drawn opaque whatever `capsule_fill`/`capsule_opacity` say, and
+      the only surface that takes an opacity is the bar itself, which has no width
+      key and always spans the monitor.
+      **Why not a small glass island:** `margin_ends` is the only width lever, it is
+      absolute pixels and shared, so 1200 gives a nice 1064px island on the 3440px
+      screen and collapses the 1080px one to nothing. `"25%"` is not a percentage
+      (flat 88px). `monitor = "DP-3"` validates and is ignored. A second
+      `[bar.<name>]` block does work and can carry its own margins, but inherits
+      nothing and would hard-code a pixel width to one screen — the same trap
+      `WSBANDS` is for a laptop. The capsule form has no resolution in it at all.
+- [ ] **If the capsules should ever be glass**, the only routes left are Noctalia
+      honouring `capsule_opacity` (it accepts and ignores it today) or a theme-level
+      surface alpha. Worth a look when Noctalia moves past 5.0.0-beta.8.
 - [ ] **Pixel checks misjudge a rotated monitor.** `noct_window_geom`
       (`tests/lib/probe.sh`) clips the patch against the monitor's `width` and
       `height` as `hyprctl monitors` reports them — 1920x1080 for `HDMI-A-1` —

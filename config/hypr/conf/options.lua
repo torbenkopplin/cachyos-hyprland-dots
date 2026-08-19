@@ -97,6 +97,13 @@ SUPER_TAP_MS      = 250 -- max press-to-release time still counted as a "tap"
 -- Reveal the bar while a Noctalia panel is open, hide it again on close.
 BAR_FOLLOWS_PANELS = true
 
+-- Reveal the bar when the pointer reaches the top edge of a monitor -- the mouse
+-- way in, for when a hand is already off the keyboard. This is a polled cursor
+-- read in lib/bar.lua rather than a Noctalia setting, because Noctalia's own
+-- `auto_hide` turned out not to be a proximity reveal at all; the measurement is
+-- in that file's header. Off means the bar is keyboard-only again.
+BAR_HOT_EDGE = true
+
 ------------------------------------------------------------------------------
 -- Look
 ------------------------------------------------------------------------------

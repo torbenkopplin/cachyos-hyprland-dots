@@ -1,17 +1,27 @@
 ## Noctalia -- the bar.
 ##
-## Design: there is no bar while you work. It appears for two reasons only:
+## Design: there is no bar while you work. It appears for three reasons:
 ##
 ##   1. a Noctalia panel opened (launcher, control centre, clipboard, session,
 ##      window switcher);
-##   2. you pressed SUPER+B to pin it.
+##   2. you pressed SUPER+B to pin it;
+##   3. you pushed the pointer at the top edge.
 ##
-## Both are driven from the compositor by config/hypr/lib/bar.lua, which
-## watches layer.opened / layer.closed and issues bar-show / bar-hide.
+## All three are driven from the compositor by config/hypr/lib/bar.lua, which
+## watches layer.opened / layer.closed for the panels and polls the cursor for the
+## edge. The pointer reveal was added 2026-08-19 as the mouse backup to a
+## keyboard-first setup.
 ##
-## auto_hide is OFF on purpose. Noctalia's own auto-hide is pointer-proximity
-## based, and it would retract the bar again the moment we revealed it for a
-## keyboard-opened launcher. With auto_hide off, bar-hide/bar-show are absolute
+## auto_hide is OFF, and not for the reason it used to be. The old note here said
+## Noctalia's auto-hide is pointer-proximity based and would fight a
+## keyboard-opened bar. The first half is not true: measured on 5.0.0-beta.8 with
+## auto_hide confirmed true by `config export merged`, the bar collapses to a strip
+## at the screen edge and stays collapsed with the pointer parked inside it -- on
+## `top` and on `overlay`, with and without reserved space. Whatever it gates, it
+## is not proximity, so it buys nothing here and lib/bar.lua does the edge itself.
+##
+## The second half still stands as a rule, though: only ONE thing may have an
+## opinion about this surface. With auto_hide off, bar-show / bar-hide are absolute
 ## and the state is exactly what lib/bar.lua last asked for.
 ##
 ## reserve_space is off too, so the bar never claims an exclusive zone:
@@ -21,20 +31,43 @@
 ## Because it is summoned rather than lived with, it is worth putting real
 ## information on it -- this is a HUD, not decoration.
 ##
-## Form: one centred cluster, built like a Noctalia popup
-## ------------------------------------------------------
-## The bar surface itself is invisible -- no fill, no border, no slab welded to
-## the screen edge. What you see are capsules, and they are deliberately the same
-## material as the panels this shell opens: measured off the live control centre,
-## a Noctalia popup is `surface` at essentially full opacity with a radius of 12
-## and `surface_variant` cards inside it. So the capsules take those numbers
-## rather than the window geometry, and the bar reads as part of the shell it
-## belongs to rather than as part of the tape underneath it.
+## Form: three separate capsules, pushed apart
+## -------------------------------------------
+## Navigation at the start, the clock in the centre, status at the end, each in
+## its own capsule with nothing drawn between them. The bar surface itself is
+## invisible -- `background_opacity = 0.0` -- so what you see is three islands
+## over the wallpaper, not a strip with content on it.
 ##
-## Everything sits in the CENTRE lane. start and end are empty on purpose: a
-## summoned HUD wants to be one thing you look at, not three things at the far
-## corners of an ultrawide. The window title is given a fixed width so the cluster
-## does not slide sideways as you change windows.
+## This is the third form in a day and the reasoning is worth keeping, because
+## every alternative is ruled out by something measured rather than by taste.
+##
+##   Three opaque capsules, adjacent, centred. The original. Read as one clump
+##   with seams, and the media capsule restated the window title verbatim.
+##
+##   One full-width glass shape. Tried, and it is the only way to get the panels'
+##   material: `[shell.panel] transparency_mode = "glass"` made the panels
+##   translucent, and the bar surface is the only thing here that takes an
+##   opacity. It looked right and it is not what was wanted -- a continuous strip
+##   spanning 3440px, with the content either huddled in the middle or stretched
+##   to the corners.
+##
+##   One glass shape, but SMALLER. This is the one that cannot be built. There is
+##   no width key on a bar; `margin_ends` is the only lever, it is absolute pixels,
+##   and it is shared by every monitor. At 1200 the 3440px bar becomes a pleasant
+##   1064px island and the 1080px portrait bar collapses to w = 0. "25%" is not a
+##   percentage -- it rendered as a flat 88px on both. `monitor = "DP-3"` passes
+##   validation and is then ignored: the bar drew on both screens anyway. A second
+##   `[bar.<name>]` block DOES work and can carry its own margin_ends, but it
+##   inherits nothing -- around twenty styling keys and the whole lane list would
+##   have to be duplicated and kept in sync -- and it would hard-code a pixel width
+##   to one particular screen, which is exactly the trap `WSBANDS` already is for a
+##   machine that gets plugged into unfamiliar monitors.
+##
+## So: separate shapes, which means capsules, which means opaque. A capsule cannot
+## be glass (see below), and that is the price. What it buys is a form with no
+## resolution baked into it at all -- capsules size to their content and the lanes
+## place them by proportion, so this looks the same on an ultrawide, on the
+## portrait panel, and on a laptop that has never been seen before.
 ##
 ## The blur comes from the layer rule in conf/hypr/conf/rules.lua, whose
 ## ignore_alpha = 0.5 is what keeps the *transparent* part of the bar from being
@@ -44,7 +77,7 @@
 position = "top"
 
 auto_hide                = false   # see above -- lib/bar.lua owns visibility
-smart_auto_hide          = false
+smart_auto_hide          = false   # ditto; not a proximity reveal either
 show_on_workspace_switch = false   # workspace changes must not flash the bar
 reserve_space            = false   # no exclusive zone: full-height windows
 layer                    = "overlay"  # visible even over a fullscreen window
@@ -60,10 +93,17 @@ thickness          = 30
 margin_edge  = 10
 margin_ends  = 10
 
-## The bar surface itself is not drawn: no fill, no border, no corners to speak
-## of. Everything visible is a capsule. (The radius is set anyway, to the popup
-## radius, so that turning the fill back on gives you one panel-shaped island
-## rather than a slab.)
+## The bar surface IS the shape, as of 2026-08-19, and it is the same material as
+## the panels this shell opens -- which is the whole point of the change.
+##
+## 0.76 is measured, not chosen. With `[shell.panel] transparency_mode = "glass"`
+## the launcher's body rendered at grey 41 over a backdrop measuring 115, and the
+## palette's `surface` is #121212 = 18, so
+##
+##   alpha = (41 - 115) / (18 - 115) = 0.76
+##
+## Re-measure it if you change transparency_mode: open the launcher, sample its
+## body and the same patch with it closed, and solve that again.
 background_opacity   = 0.0
 border_width         = 0
 concave_edge_corners = false
@@ -72,11 +112,16 @@ radius_top_right     = 12
 radius_bottom_left   = 12
 radius_bottom_right  = 12
 
-## Capsules are the visible surfaces, and a GROUP capsule is drawn as opaque
-## `surface_variant` no matter what you ask for: `capsule_fill` and
-## `capsule_opacity` are read, reported by `config export merged`, and then
-## ignored for groups -- verified by setting the fill to #ff0000 and watching
-## nothing turn red. They are left out here rather than left in lying.
+## Capsules are the visible surfaces, and they are opaque whether you like it or
+## not. A GROUP capsule is drawn as `surface_variant` no matter what is asked for:
+## `capsule_fill` and `capsule_opacity` are read, reported by
+## `config export merged`, and then ignored -- set to #ff0000 at 0.30, reloaded,
+## and the capsule came out pixel-identical at 53,53,55. `shadow` and
+## `contact_shadow` go the same way.
+##
+## That is the whole reason this bar does not match the panels' glass. It is not an
+## oversight and it is not tuneable from here; it would need Noctalia to honour the
+## keys it already accepts, or a theme-level surface alpha.
 ##
 ## That is not a compromise, as it happens. #323232 opaque is exactly what a
 ## Noctalia popup's cards are made of -- sampled off the running control centre,
@@ -88,13 +133,19 @@ radius_bottom_right  = 12
 ## What does apply to a group capsule is the geometry: radius, padding, and
 ## thickness as a fraction of the bar's own height, so the capsule sits inside it
 ## with air around rather than filling it edge to edge.
+## `shadow` and `contact_shadow` join capsule_fill on the list of keys that are
+## read and then ignored for a group capsule: set true, reloaded, and the capsules
+## came out pixel-identical over a dark window. Left false rather than left in
+## looking like they do something.
 capsule              = true
 capsule_padding      = 10
 capsule_radius       = 12
 capsule_thickness    = 0.8
 
-## padding is the bar's own inner inset, which the capsules would otherwise sit
-## inside twice over. Spacing between the three islands is widget_spacing.
+## padding is the bar's inner inset and, with no capsules, the only thing keeping
+## the widgets off the glass edge. Set to the corner radius on purpose: at 12 the
+## end-most icon clears the corner's arc, at 8 it grazes it, at 0 it touches. It
+## insets horizontally without shrinking the glyphs -- checked at 8 and 14.
 padding        = 0
 widget_spacing = 10
 
@@ -102,20 +153,35 @@ shadow          = false
 hover_highlight = true
 font_weight     = 500
 
-## Lanes name capsule groups rather than widgets; a "group:<id>" entry with no
-## matching capsule_group below is dropped with a warning at load.
+## Lanes hold "group:<id>", and a group is a CONTAINER -- that is what draws each
+## capsule. Lanes also accept bare widget ids, and that is worth knowing because it
+## is the difference between the two forms: with groups the bar reads 49-60 grey
+## where they are and the backdrop in between (three shapes), with bare widget ids
+## it draws no containers at all (one shape, or none). Groups here, deliberately.
 ##
-## Four capsules rather than one long pill: each groups a concern, and media is
-## separate because it comes and goes with playback rather than being state you
-## always have. They sit next to each other in the centre lane, so the whole thing
-## reads as one cluster with seams where the meaning changes.
+## A "group:<id>" naming no capsule_group below is dropped with a warning at load.
+## An unreferenced capsule_group is fine and validate passes -- which is why
+## `media` can keep its group without appearing anywhere.
+##
+## `media` is deliberately in no lane, and that is rule 3 below applied to the bar
+## itself -- nothing may state what something else already states. A browser tab is
+## both the focused window and the media source, so the media widget spent its
+## width restating `active_window` verbatim: measured on the portrait bar, "Reddit
+## - The heart of the internet" appeared twice, filling most of 1060px to say one
+## thing.
+##
+## There is no way to configure that away. `max_length` will not go below 40
+## (validate: "below minimum 40"), so it cannot be shortened to a stub, and the
+## widget has no art-only mode -- at 0 it renders the album art plus a literal
+## ellipsis. So it comes out of the lanes instead. Now-playing lives in the control
+## centre, SUPER+A; add "media" to a lane to bring it back.
 ##
 ## Widget ids are arbitrary -- `type` is what names the widget -- which is how
 ## `date` below can be a second clock. Upstream's own type spelling is
 ## inconsistent on purpose: most are snake_case, "control-center" is not.
-start  = []
-center = ["group:navigation", "group:time", "group:media", "group:status"]
-end    = []
+start  = ["group:navigation"]
+center = ["group:time"]
+end    = ["group:status"]
 
 ## Where you are, and what you are looking at -- in that order of importance,
 ## which the colours below reinforce.
@@ -188,7 +254,13 @@ length = 12
 ## status icons sideways every time you changed window. A fixed box does not.
 [widget.active_window]
 display      = "text_only"
-min_length   = 260
+## The capsule hugs the title now. This used to be min_length = max_length = 260,
+## a fixed box so a centred cluster would not slide sideways as you changed
+## windows -- but the capsules sit in start/centre/end lanes since 2026-08-20, so
+## the clock and the status icons are anchored and cannot move. All that grows is
+## this capsule's right edge, which is where a title belongs anyway. max_length
+## still truncates so one long title cannot push into the clock.
+min_length   = 0
 max_length   = 260
 title_scroll = "on_hover"
 color        = "on_surface_variant"
