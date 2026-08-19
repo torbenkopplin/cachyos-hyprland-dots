@@ -21,26 +21,25 @@
 #                cost is that the compositor cannot separate a window's text
 #                from its background, so text fades with it.
 #
-#   terminal  -> how opaque a *terminal* ends up. kitty is one of the two windows
+#   terminal  -> how opaque a *terminal* ends up. kitty is the only window here
 #                that can be translucent on its own, so its background would
 #                otherwise be hit twice -- once by kitty, once by the
-#                compositor -- and a terminal next to a browser at the same
-#                nominal level came out visibly darker. Set them equal (the
-#                default) and the two match exactly.
+#                compositor -- and a terminal next to any other window at the
+#                same nominal level came out visibly darker.
 #
-#   browser   -> how opaque a browser *page* ends up. Zen with the transparency
-#                mod is the other one: its page area is transparent, so the
-#                blurred wallpaper arrives at full strength unless something
-#                tints it, which is why an untinted page read so much lighter
-#                than every window beside it.
+# So the value written for the terminal is not the level itself, it is
+# terminal / window: the compositor is already applying `window` to that surface,
+# and this is the factor that turns it into the level you asked for. At
+# terminal = window that is 1.0 -- kitty adds nothing of its own and looks like
+# every other window.
 #
-# So the value written for each is not the level itself, it is level / window: the
-# compositor is already applying `window` to that surface, and this is the factor
-# that turns it into the level you asked for. At terminal = window that is 1.0 --
-# kitty adds nothing of its own and looks like every other window.
+# A browser is not a special case. It gets `window`, like every other app that
+# paints its own background. There was a third level here that tinted Zen's page
+# area for the transparency mod; it was given up on 2026-08-19 and the reasoning
+# is in docs/theming.md.
 #
-# Set window = 1.0 in glass.conf for app-translucency only; the two app levels then
-# reach their apps unmodified and nothing else is touched at all.
+# Set window = 1.0 in glass.conf for app-translucency only; `terminal` then
+# reaches kitty unmodified and nothing else is touched at all.
 
 set -uo pipefail
 
@@ -65,13 +64,6 @@ OVERRIDE_FILE="$STATE_HOME/noctalia/glass-override"
 
 KITTY_OUT="$CONFIG_HOME/kitty/generated-glass.conf"
 HYPR_OUT="$CONFIG_HOME/hypr/generated/glass.lua"
-
-# Zen keeps profiles under ~/.config/zen on zen-browser-bin 1.21 and under ~/.zen
-# on older builds. The profile directory name is random per install, so this is
-# the one output that has to be found rather than named -- which is also why it
-# cannot be a Noctalia template.
-ZEN_ROOTS=("$CONFIG_HOME/zen" "$HOME/.zen")
-ZEN_SHEET="userChrome.css"
 
 # opaque -> light -> default -> heavy, and the middle two have to bracket the
 # level in glass.conf or the cycle is useless: `cycle` looks the current level
@@ -121,9 +113,9 @@ setting() {
     printf '%s' "$fallback"
 }
 
-# level <window|terminal|browser> -- the visible opacity of a surface.
+# level <window|terminal> -- the visible opacity of a surface.
 level() {
-    setting "$1" 0.90   # all three default alike, i.e. every surface matches
+    setting "$1" 0.90   # both default alike, i.e. every surface matches
 }
 
 window_level() {
@@ -141,8 +133,8 @@ window_level() {
 #
 # kitty's own opacity multiplies with the compositor's, so the value written
 # here is the factor that takes `window` to `terminal` -- 1.0 when they are
-# equal, which is the default and the point: a terminal and a browser side by
-# side then show the wallpaper through them to exactly the same degree.
+# equal, in which case a terminal and any other window side by side show the
+# wallpaper through them to exactly the same degree.
 write_kitty() {
     local factor
     factor=$(awk -v t="$1" -v w="$2" 'BEGIN {
@@ -161,120 +153,6 @@ write_kitty() {
 # kitty only supplies what is left over to reach $1.
 background_opacity $factor
 EOF
-}
-
-# write_zen <browser level> <window level>
-#
-# Same division as kitty, into a stylesheet instead of a config file: Zen with the
-# transparency mod draws its page area transparent, so this is what gives it a
-# backdrop. Two rules, because the chrome and the page are separate elements and a
-# window showing two shades of itself looks worse than either.
-#
-# This writes the whole of userChrome.css rather than a file it imports, and that
-# is deliberate: Firefox resolves a *symlinked* userChrome.css to its real path
-# before resolving relative @imports, so a sheet linked out of this repo would go
-# looking for the generated half next to the repo file instead of in the profile.
-# Nothing would say so -- the import would simply not load. One generated file has
-# no such question to get wrong.
-#
-# Written to every profile carrying a user.js, which is the marker install.sh
-# leaves on the profiles this repo manages -- and only if the userChrome.css there
-# is ours or absent. A hand-written one is left alone and reported, never
-# clobbered.
-#
-# There is no live reload for this: Zen reads its stylesheets at startup. Writing
-# it from here anyway is the point -- the value then always matches glass.conf
-# rather than being a number copied by hand into a browser config.
-write_zen() {
-    local factor marker
-    factor=$(awk -v b="$1" -v w="$2" 'BEGIN {
-        if (w < 0.05) w = 0.05
-        f = b / w
-        if (f > 1) f = 1
-        if (f < 0) f = 0
-        printf "%.2f", f
-    }')
-    marker="Generated by noct-glass"
-
-    local root profile out
-    for root in "${ZEN_ROOTS[@]}"; do
-        [[ -d $root ]] || continue
-        for profile in "$root"/*/; do
-            [[ -f "${profile}user.js" ]] || continue
-
-            out="${profile}chrome/$ZEN_SHEET"
-            if [[ -e $out ]] && ! grep -q "$marker" "$out" 2>/dev/null; then
-                printf 'noct-glass: leaving your own %s alone\n' "$out" >&2
-                continue
-            fi
-
-            mkdir -p "${profile}chrome"
-            cat >"$out" <<CSS
-/* $marker. Do not edit -- change \`browser\` in
- * ~/.config/noctalia/glass.conf and run \`noct-glass apply\`.
- *
- * browser $1 / window $2: the compositor already fades this window to $2, so Zen
- * supplies what is left over to reach $1. A page that keeps some background of
- * its own stacks on top of this and lands slightly darker.
- *
- * Zen reads this at startup, so a change here needs the browser restarted. It
- * needs toolkit.legacyUserProfileCustomizations.stylesheets, which
- * browsers/zen/user.js sets, and it does nothing at all unless the transparency
- * mod has made the browser transparent in the first place.
- *
- * WHY THE SELECTORS LOOK LIKE THAT
- * The transparency mod paints the same element, with !important, from
- *
- *   :root:has([mod-sameerasw_zen_light_tint="1"]) .browserStack > browser
- *
- * which is specificity 0-3-1. Between two !important user rules, specificity is
- * what decides -- and a plain \`:root .browserStack > browser\` is 0-2-1, so it
- * loses and the page keeps the mod's 10% wash. Measured: the page area came out
- * with an own alpha of 0, unchanged under two different compositor opacities.
- * The id selector below is 1-1-1 and settles it; the tripled :root is 0-4-1 and
- * covers the case where the window's id is not what we expect. Both are needed
- * because an unknown selector in a comma list would invalidate the whole rule.
- *
- * The variable is set here rather than through the mod's own preference, which
- * defines it further down the tree where inheritance cannot reach past it -- so
- * user.js leaves that preference off.
- */
-
-:root {
-  --zen-main-browser-background: light-dark(
-    rgba(245, 245, 245, $factor),
-    rgba(18, 18, 18, $factor)
-  ) !important;
-}
-
-/* Zen leaves an 8px margin around its browser container, unpainted -- so the
- * blurred wallpaper arrived there at full strength and drew a lighter frame
- * around every window. Measured on all four edges. Painting the chrome root
- * fills it with the same tint as everything else, whatever the gap is made of. */
-:root,
-#main-window {
-  background-color: light-dark(
-    rgba(245, 245, 245, $factor),
-    rgba(18, 18, 18, $factor)
-  ) !important;
-}
-
-#main-window .browserStack > browser {
-  background-color: light-dark(
-    rgba(245, 245, 245, $factor),
-    rgba(18, 18, 18, $factor)
-  ) !important;
-}
-
-:root:root:root .browserStack > browser {
-  background-color: light-dark(
-    rgba(245, 245, 245, $factor),
-    rgba(18, 18, 18, $factor)
-  ) !important;
-}
-CSS
-        done
-    done
 }
 
 write_hypr() {
@@ -312,9 +190,9 @@ write_hypr() {
 --
 -- active/inactive_opacity apply to EVERY window, which is what frosts GTK and
 -- Qt apps that have no transparency of their own. Text fades with them: the
--- compositor cannot tell a window's glyphs from its background. kitty and Zen
--- are the two that also draw their own translucency; noct-glass divides the
--- two out so every surface ends up at the same visible level.
+-- compositor cannot tell a window's glyphs from its background. kitty is the
+-- one window that also draws its own translucency; noct-glass divides the two
+-- out so a terminal ends up at the level glass.conf asks for.
 
 hl.config({
     decoration = {
@@ -365,35 +243,29 @@ hl.config({
 EOF
 }
 
-# levels -- "<window> <terminal> <browser>", and nothing else. Reading the
-# configuration must not have side effects: `show` used to call apply(), so
-# asking what the levels were rewrote three files, reloaded Hyprland and
-# signalled every kitty. A check that has to disturb the thing it measures is
-# not a check.
+# levels -- "<window> <terminal>", and nothing else. Reading the configuration
+# must not have side effects: `show` used to call apply(), so asking what the
+# levels were rewrote the generated files, reloaded Hyprland and signalled every
+# kitty. A check that has to disturb the thing it measures is not a check.
 levels() {
-    local win term browser
+    local win term
     win=$(window_level)
     term=$(level terminal)
-    browser=$(level browser)
 
     # SUPER+SHIFT+G is "make the desktop more or less glassy", not "make
-    # everything except the terminal and the browser more or less glassy" -- so
-    # while a manual override is in effect they track it too. Without this,
-    # stepping to fully opaque would leave translucent windows on screen.
-    if [[ -f $OVERRIDE_FILE ]]; then
-        term=$win
-        browser=$win
-    fi
+    # everything except the terminal more or less glassy" -- so while a manual
+    # override is in effect the terminal tracks it too. Without this, stepping to
+    # fully opaque would leave translucent windows on screen.
+    [[ -f $OVERRIDE_FILE ]] && term=$win
 
-    printf '%s %s %s' "$win" "$term" "$browser"
+    printf '%s %s' "$win" "$term"
 }
 
 apply() {
-    local win term browser
-    read -r win term browser <<<"$(levels)"
+    local win term
+    read -r win term <<<"$(levels)"
 
     write_kitty "$term" "$win"
-    write_zen "$browser" "$win"
     write_hypr "$win"
 
     # Hyprland reloads on config change, but generated/glass.lua is reached
@@ -409,7 +281,7 @@ apply() {
     # of them had been restarted.
     pkill -USR1 -x kitty >/dev/null 2>&1
 
-    printf 'window %s  terminal %s  browser %s\n' "$win" "$term" "$browser"
+    printf 'window %s  terminal %s\n' "$win" "$term"
 }
 
 # ---------------------------------------------------------------------------
@@ -442,7 +314,7 @@ case "${1:-apply}" in
     show)
         # Read-only on purpose -- see levels().
         # shellcheck disable=SC2046
-        printf 'window %s  terminal %s  browser %s\n' $(levels)
+        printf 'window %s  terminal %s\n' $(levels)
         ;;
     *) usage ;;
 esac
