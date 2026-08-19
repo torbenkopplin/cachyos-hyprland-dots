@@ -1,7 +1,7 @@
 {
   "host": "cachyos-x8664",
   "recorded": "2026-08-19T01:17:52Z",
-  "summary": { "pass": 18, "fail": 0, "skip": 2 },
+  "summary": { "pass": 17, "fail": 0, "skip": 2 },
   "results": [
     { "check": "session-path", "status": "pass", "message": "/home/torben/.local/bin is on the shell's PATH" },
     { "check": "session-env", "status": "pass", "message": "both PATH files put /home/torben/.local/bin on the session's PATH" },
@@ -11,7 +11,7 @@
     { "check": "environment", "status": "pass", "message": "recorded 14 facts about this machine" },
     { "check": "provider-resolve", "status": "pass", "message": "every provider binary resolves under the session PATH" },
     { "check": "provider-run", "status": "pass", "message": "every provider answers under the session PATH (slowest 368ms)" },
-    { "check": "glass-config", "status": "pass", "message": "generated files agree with glass.conf (window 0.85  terminal 0.55  browser 0.55)" },
+    { "check": "glass-config", "status": "pass", "message": "generated files agree with glass.conf (window 0.85  terminal 0.55)" },
     { "check": "glass-live", "status": "pass", "message": "the session matches generated/glass.lua" },
     { "check": "keyword-inert", "status": "pass", "message": "hyprctl keyword is refused, as expected under the Lua config" },
     { "check": "glass-visible", "status": "pass", "message": "the wallpaper reads through a new terminal" },
@@ -19,7 +19,6 @@
     { "check": "blur-stacks", "status": "pass", "message": "a floating window samples the window beneath it" },
     { "check": "kitty-live", "status": "pass", "message": "kitty re-reads background_opacity on SIGUSR1" },
     { "check": "kitty-appearance", "status": "pass", "message": "JetBrainsMono Nerd Font at 12.0pt, 10.10x22.75 px per cell" },
-    { "check": "zen-sheet", "status": "pass", "message": "every managed profile has our sheet at alpha 0.65, out-specifying the mod" },
     { "check": "browser-glass", "status": "pass", "message": "4 browser(s) composite within 0.06 of each other, at 0.85-0.85" },
     { "check": "monitor-hop", "status": "skip", "message": "only one monitor -- nothing to hop to" },
     { "check": "column-hop", "status": "skip", "message": "only one monitor -- nothing to hand off to" }
@@ -44,7 +43,6 @@
     "providers.slowest_ms": { "value": 368, "tolerance": 600 },
     "glass.window": { "value": 0.85, "tolerance": 0.01 },
     "glass.terminal": { "value": 0.55, "tolerance": 0.01 },
-    "glass.browser": { "value": 0.55, "tolerance": 0.01 },
     "blur.size": { "value": 8, "tolerance": 0.5 },
     "blur.passes": { "value": 2, "tolerance": 0.5 },
     "blur.brightness": { "value": 1.00, "tolerance": 0.02 },
@@ -62,7 +60,6 @@
     "kitty.cell_width": { "value": 10.10, "tolerance": 0.6 },
     "kitty.cell_height": { "value": 22.75, "tolerance": 1.0 },
     "monitor.scale": { "value": 1 },
-    "browser.sheet_alpha": { "value": 0.65, "tolerance": 0.01 },
     "browser.zen.effective_opacity": { "value": 0.85, "tolerance": 0.04 },
     "browser.zen.page_contrast": { "value": 11.11, "tolerance": 1.5 },
     "browser.firefox.effective_opacity": { "value": 0.85, "tolerance": 0.04 },
