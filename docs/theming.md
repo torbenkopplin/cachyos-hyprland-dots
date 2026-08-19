@@ -167,10 +167,12 @@ mid-task. It is a real preference rather than an oversight — turn it on in
 
 ## Frosted glass
 
-On by default, tied to the scheme, and done in the compositor.
-`bin/noct-glass` runs from Noctalia's `colors_changed` hook, so the level
-follows whatever `/theme` selects. **`SUPER+SHIFT+G`** cycles as a temporary
-override. Levels live in `config/noctalia/glass.conf`.
+On by default, tied to the scheme, and — since 2026-08-19 — the **terminal and
+nothing else**. `bin/noct-glass` runs from Noctalia's `colors_changed` hook, so
+the level follows whatever `/theme` selects. **`SUPER+SHIFT+G`** cycles the whole
+desktop through it as a temporary override. Levels live in
+`config/noctalia/glass.conf`, and one machine's own answer in an untracked
+`glass.local.conf` beside it.
 
 `noct-check glass-visible` measures whether any of it reaches the screen — see
 [design.md](design.md#why-the-blur-is-small) for why that is not a question the
@@ -180,11 +182,74 @@ Two knobs, and **both are stated as what you see**:
 
 | Knob | Means | Applies to |
 |---|---|---|
-| `window` | how opaque an ordinary window is | Hyprland's `active_opacity` — **every window**, including GTK and Qt apps with no transparency of their own. Fades text with the background; the compositor cannot tell one from the other |
-| `terminal` | how opaque a **terminal** ends up | kitty's own `background_opacity`, which fades only the background and leaves text fully opaque |
+| `window` | how opaque an ordinary window is | Hyprland's `active_opacity` — **every window**. Fades text with the background; the compositor cannot tell one from the other. **Shipped at 1.0**, i.e. it fades nothing |
+| `terminal` | how opaque a **terminal** ends up | kitty's own `background_opacity`, which fades only the background and leaves text fully opaque. **Shipped at 0.55**, and the whole of the effect |
 
-A browser is not on that list, deliberately — see
+A browser is not on that list, deliberately, and there is no third level coming
+— but Zen is translucent anyway, by itself and outside these knobs entirely. See
 [what was tried with Zen](#what-was-tried-with-zen-and-dropped) below.
+
+### Why the compositor level was given up
+
+`window` was 0.85 for most of 2026-08-19 and is 1.0 now. Nothing was measured
+wrong; what changed is what the measurement was worth.
+
+The compositor is the only thing that can frost a GTK or Qt app, because those
+draw an opaque background and have no opacity of their own. It is also the only
+thing it can do for them: it cannot separate glyphs from background, so their
+text fades by exactly the same factor. `noct-check glass-legible` puts a number
+on it — at `window = 0.60` the ink measured 78% of the scheme's foreground and
+read as washed out at a perfectly legal 5.3:1. At 0.85 it is 85%. At 1.0 it is
+100%.
+
+Installed on a work machine, that turned out to be the wrong trade: an editor, a
+spreadsheet and a chat window whose text sits at 85% of its colour over a moving
+photo is a cost paid all day for an effect you stop noticing in a minute. So
+those apps are opaque now, on purpose, and the terminal — where translucency
+costs nothing, because kitty fades only its background — keeps all of it.
+
+**What it costs, stated plainly:** "everything matching" is gone. A GTK app is
+opaque and a terminal is at 0.55, and they do not read as the same material.
+There is no way to make them without fading somebody's text.
+
+Two consequences that are easy to trip over:
+
+- **The focus dim goes with it.** `noct-glass` drops an unfocused window 0.06
+  below `window`, and at 1.0 it does not — dimming the unfocused ones would put
+  back exactly what the setting removes. The focus cue is the border instead: a
+  gradient on the focused window, a hairline on everything else.
+- **The blur stays on, for the terminal.** It is switched off only when *both*
+  levels are opaque. Deciding that on `window` alone left a translucent kitty
+  sitting over a sharp, unblurred wallpaper — transparency without the frost.
+
+`SUPER+SHIFT+G` still cycles `1.00 → 0.75 → 0.60 → 0.50` across the whole
+desktop, so the old look is one keypress away when you want it, and gone again on
+the next scheme change.
+
+### One machine's own levels
+
+`glass.conf` is tracked, so a level in it is a level on **every** machine that
+pulls. The right level is not a property of the setup, though — it is a property
+of the screen in front of you. So there is a second file, and it is not in the
+repo:
+
+```sh
+cp config/noctalia/glass.local.conf.example ~/.config/noctalia/glass.local.conf
+```
+
+Absent by default, which means "use the tracked levels". Present, it wins
+outright — **both** of its keys before **either** of `glass.conf`'s, so a bare
+`window` set locally beats a per-scheme `window` in the tracked file. Without
+that ordering, a machine that had said "no compositor transparency here" would
+get it back the moment you switched to the one scheme that overrides it.
+
+`noct-glass show` prints `[glass.local.conf]` when it is in play, and
+`noct-check glass-config` says so too, so "why do the two machines look
+different" has an answer you can read off rather than deduce.
+
+This and `~/.config/hypr/host.lua` are the only two files that are allowed to
+differ per machine. Anything else that differs is a difference worth committing —
+see [install.md](install.md#two-machines).
 
 They used to compound, and that was the bug behind "one is darker than the
 other": kitty applied `terminal`, the compositor then applied `window` on top,
@@ -197,26 +262,30 @@ So what `noct-glass` writes for an app is never the level, it is `level / window
 
 ### The focus step is what "the same" has to beat
 
+Only when the compositor is fading anything at all — at the shipped `window =
+1.0` there is no step, and this is the reasoning to come back to if you ever lower
+it again.
+
 An unfocused window is dimmed by 0.06 (`inactive_opacity`). So an app sitting
 0.06 below `window` looks *exactly like a window in the other focus state* — the
 symptom is "the browser when focused looks like the terminal when it isn't, but
 not the other way around". Anything meant to read as the same material has to sit
 well inside that 0.06.
 
-That is the whole reason `terminal` at 0.55 against a `window` of 0.85 is a
+That is the whole reason `terminal` at 0.55 against a `window` of 0.85 was a
 deliberate *contrast* rather than a failed match: at 0.30 below it is nowhere
 near the focus step, so a terminal reads as its own material rather than as a
 mis-focused window. Anything that wants to read as *the same* material has a
 much smaller budget than it looks like it has, and that is what the Zen
 experiment ran out of.
 
-### Why the levels are as low as 0.60
+### Why `terminal` is as low as 0.55
 
 Because the lift — how much brighter a translucent window is than an opaque one —
 is `(backdrop − the window's own colour) × (1 − opacity)`, and on a dark palette
 over a blurred photo the first bracket is small. Measured here: the window's own
 colour is 29 of 255 and the backdrop reaches 72, so there are 43 levels to
-divide. At `window = 0.90` that is a lift of 4; at 0.80, 9; at 0.60, 17.
+divide. At an opacity of 0.90 that is a lift of 4; at 0.80, 9; at 0.60, 17.
 
 Which means the frosted look is far more sensitive to the level than it looks
 like it should be, and that the range where it reads as glass at all starts lower
@@ -225,13 +294,20 @@ the backdrop directly — but it is capped at what the wallpaper actually is.
 
 ### What applies live, and what waits for a restart
 
-The compositor's `window` level, always — and `terminal` too, since 2026-08-19.
-kitty read `background_opacity` once at startup and ignored it forever after,
-which is why `terminal` used to be pinned equal to `window`: any difference left
-you with two shades of terminal until the last old window closed.
+Both levels, since 2026-08-19 — and that is what makes the current arrangement
+possible at all. kitty read `background_opacity` once at startup and ignored it
+forever after, which is why `terminal` used to be pinned equal to `window`: any
+difference left you with two shades of terminal until the last old window closed.
 `dynamic_background_opacity yes` in `kitty.conf` lifts that, and `noct-check
 kitty-live` measures a probe window actually following a change on `SIGUSR1`
 rather than taking it on trust.
+
+That check is also the one to distrust when the screen is locked. It photographs
+a white probe, and a lock screen photographs as something else entirely: locked,
+it measured 138.9 before and after and reported that kitty ignores `SIGUSR1`
+(it does not — unlocked, the same run measured 157.5 → 255.0). Both pixel checks
+now notice that a window they forced to full white opacity did not come back near
+255, and skip instead of concluding.
 
 That is what lets `terminal` sit far below `window`, which is the point: the
 compositor cannot tell glyphs from background and fades both, kitty fades only
@@ -272,17 +348,55 @@ it cost to keep:
   a mis-focused window; a page two hundredths under is indistinguishable from one,
   at which point the transparency is buying nothing.
 
-So `browser` is gone, `write_zen` is gone, the generated stylesheet is gone, and
-`browsers/zen/user.js` now sets `browser.tabs.allow_transparent_browser` and
-`zen.widget.linux.transparency` to **false** rather than leaving them out — a
-`user.js` only ever *sets* prefs, so a deleted line would have left the old value
-in `prefs.js` and the transparency would have stayed on forever.
+So `browser` is gone, `write_zen` is gone, and the generated stylesheet is gone.
+Nothing here has a level for a browser or writes a line of CSS into a profile,
+and that half is not coming back.
 
-**Two things to turn off by hand,** because no file here can: in Zen, disable the
-"transparent zen" mod (`about:preferences` → Zen Mods) and remove or disable the
-"Zen Internet" extension. Then restart it. `noct-check browser-glass` will tell
-you whether anything is still translucent beyond the compositor's level, and any
-browser more than 0.06 from the others fails it.
+### Zen's own transparency is back on, unmatched
+
+Later the same day the two prefs went back to **`true`**. Dropping the *match*
+was right; switching Zen's own transparency off along with it was a second
+decision riding on the first, and it cost the browser an effect that works
+perfectly well on its own terms. The mod was never the problem — the attempt to
+put a number on it was.
+
+`browsers/zen/user.js` sets `browser.tabs.allow_transparent_browser` and
+`zen.widget.linux.transparency` to `true`, and states them rather than leaving
+them out, which matters in this direction as much as the other: a `user.js` only
+ever *sets* prefs, so a deleted line leaves whatever `prefs.js` already recorded
+instead of restoring a default.
+
+**Those two prefs are the thing to check when the mod looks broken.** They decide
+whether the window has an alpha channel at all. The mod and the extension are
+CSS, and an `rgba()` background needs something behind it to show through — so
+with the prefs false the mod paints against Zen's own opaque backdrop and looks
+like it was never installed. Reinstalling it does not help, because `user.js`
+re-applies its values at every startup and each restart undoes the reinstall.
+That is the whole loop of the symptom, and it is worth recognising rather than
+debugging twice. `about:config` is the definitive read; `prefs.js` will not show
+either pref while it sits at its default.
+
+**What you get, stated plainly:** whatever the mod and the extension paint. Not a
+level, not a number in `glass.conf`, not anything matched to kitty's 0.55 or to
+`window`. Zen is the one window on this desktop whose translucency is decided by
+software this repo does not own, and it will read as its own material next to
+everything else. That is the price of having the effect at all, and it is the
+same price the `browser` level was invented to avoid paying.
+
+**One consequence in the suite.** `noct-check browser-glass` used to fail when the
+four browsers were more than 0.06 apart — the compositor's own focus step. A Zen
+that is translucent by itself is exactly the spread that assertion was written to
+catch, so it would have failed on the intended state forever. **The assertion is
+retired.** The check still measures every browser and still prints the spread with
+the focus step beside it, and it still fails on the three things that remain
+faults: a browser measuring *more* opaque than the compositor makes it, which is
+impossible and means the measurement is wrong; a browser other than Zen coming in
+well under it, which nothing here arranges; and page text under 4.5:1.
+
+The spread is deliberately not recorded as a metric either. A metric is compared
+against the baseline within a tolerance, which is the same gate wearing a
+different hat — it would turn every `--compare` on a machine with the mod
+installed into a drift report about a decision made on purpose.
 
 `blur.ignore_opacity` is on. Without it Hyprland scales the blur by the
 window's own alpha, so a 0.9 window gets a tenth of the blur and the effect
@@ -303,8 +417,11 @@ wallpaper out of existence with it: lift 3, which is nothing. The setting is
 `size 8 / passes 2` at `brightness 1.0`, and it buys back the photo at the cost
 of that uniformity. See [design notes](design.md#why-the-blur-is-small).
 
-Set `window = 1.0` for app-translucency only, which is what `~/repos/dots`
-does today: nothing fades except surfaces an app draws translucent itself.
+`window = 1.0` — the shipped value — is app-translucency only: nothing fades
+except surfaces an app draws translucent itself, which in practice means kitty.
+`terminal = 1.0` on top of it is a desktop with no translucency anywhere at all,
+and is the one line to put in `glass.local.conf` on a machine where none of this
+is wanted.
 
 `conf/rules.lua` has an **opt-out** list for windows whose job is accurate
 pixels — mpv, imv, gimp, obs, hyprpicker. You cannot judge a photo or pick a

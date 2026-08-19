@@ -7,14 +7,20 @@
 # through the compositor and a browser is a window. Nothing in a browser has to
 # agree to that and nothing can opt out of it.
 #
-# Nothing should be translucent BEYOND that any more, and that is the change
-# this check is now written around. Zen can make its own page area transparent
-# -- the "transparent zen" mod plus zen.widget.linux.transparency -- and until
-# 2026-08-19 this repo switched that on and tinted the result from a `browser`
-# level in glass.conf. It was given up on: see docs/theming.md. So a browser
-# measuring well under the compositor's own level is now a finding rather than
-# the expected case, and the static zen-sheet check that guarded the generated
-# stylesheet went with the stylesheet.
+# Zen is translucent beyond that, on purpose. The "transparent zen" mod plus
+# zen.widget.linux.transparency make it draw its own window and page area
+# transparent, and browsers/zen/user.js switches those prefs on. What this repo
+# gave up on 2026-08-19 is TINTING the result to a `browser` level in glass.conf
+# so a page and a terminal would read as one material -- see docs/theming.md. The
+# static zen-sheet check went with the stylesheet it guarded.
+#
+# So this check measures and no longer arbitrates. It used to fail when the four
+# browsers were more than a focus step apart; that assertion was retired the same
+# day, because a deliberately translucent Zen is exactly the spread it was
+# written to catch and a gate on it could only fail by design. What survives is
+# every number it took, plus the two findings that are still true: a browser
+# cannot be more opaque than the compositor makes it, and page text has to stay
+# readable.
 #
 # Every measurement here is taken on a browser this suite started itself,
 # against a throwaway profile. See tests/lib/probe.sh for why -- the short
@@ -22,16 +28,19 @@
 # at startup, so a running one is evidence about the past.
 
 noct_register browser-glass  live check_browser_glass \
-    "every installed browser is translucent to the degree the config intends"
+    "how translucent each installed browser actually is, measured on a page it painted"
 
-# Two surfaces further apart than this read as two materials rather than one.
+# Printed for scale, not enforced. Two surfaces further apart than this read as
+# two materials rather than one, and the number is not taste: the compositor dims
+# an UNFOCUSED window by this much (write_hypr in bin/noct-glass), so two windows
+# further apart than it look exactly like the same window in two different focus
+# states -- which is precisely the "zen when active looks like kitty when
+# inactive" report that started all of this.
 #
-# The number is not taste. The compositor dims an UNFOCUSED window by 0.06
-# (write_hypr in bin/noct-glass), so any two windows more than 0.06 apart look
-# exactly like the same window in two different focus states -- which is
-# precisely the "zen when active looks like kitty when inactive" report that
-# started all of this.
-BROWSER_SPREAD_MAX=${BROWSER_SPREAD_MAX:-0.06}
+# It was the parity threshold until 2026-08-19. It is now context in an info
+# line, so that a reader can tell a spread that means something from a spread
+# that is rounding.
+BROWSER_FOCUS_STEP=${BROWSER_FOCUS_STEP:-0.06}
 
 # ---------------------------------------------------------------------------
 # browser-glass
@@ -51,7 +60,8 @@ BROWSER_SPREAD_MAX=${BROWSER_SPREAD_MAX:-0.06}
 # backdrop, so the contrast between them is the page's own contrast scaled by
 # the opacity. This is what "not always pretty" is, put on a scale.
 #
-# And then the assertion that matters: do they all read as the same material?
+# And then the spread across them, as information: they are no longer expected to
+# agree, because one of them is translucent by itself on purpose.
 # ---------------------------------------------------------------------------
 
 check_browser_glass() {
@@ -152,13 +162,15 @@ check_browser_glass() {
         if awk -v r="$ratio" -v w="$win" 'BEGIN { exit !(r > w + 0.08) }'; then
             problems+=("$b measured $ratio, above the compositor's own $win -- that is not possible, so the measurement is wrong")
         elif awk -v r="$ratio" -v w="$win" 'BEGIN { exit !(r < w - 0.08) }'; then
-            # Below the window level means something INSIDE the browser is
-            # making pages translucent as well. Nothing in this repo does that
-            # any more, so it is a leftover: for Zen, the "transparent zen" mod
-            # or the "Zen Internet" extension still enabled in the real profile,
-            # or zen.widget.linux.transparency still true in prefs.js.
-            problems+=("$b composites at $ratio, well under the compositor's $win -- something in the browser is making pages translucent too")
-            [[ $b == zen ]] && problems+=("  for Zen that is the transparency mod or the Zen Internet extension -- see docs/theming.md")
+            # Below the window level means something INSIDE the browser is making
+            # pages translucent as well. For Zen that is the intended state and
+            # the whole reason parity was retired; for the other three nothing
+            # here arranges it, so it is still worth reporting.
+            if [[ $b == zen ]]; then
+                info "$b composites at $ratio, under the compositor's $win -- expected: the transparency mod makes its own pages translucent"
+            else
+                problems+=("$b composites at $ratio, well under the compositor's $win -- something in the browser is making pages translucent too, and nothing here arranges that for $b")
+            fi
         fi
 
         awk -v c="$contrast" 'BEGIN { exit !(c < 4.5) }' \
@@ -174,41 +186,34 @@ check_browser_glass() {
         return
     fi
 
-    # Parity. This is the assertion the complaint is actually about.
+    # The spread, reported and not judged. Retired as an assertion 2026-08-19:
+    # Zen is deliberately translucent by itself, so the four are not meant to
+    # agree, and a gate here could only fail on the intended state.
+    #
+    # Deliberately not a `metric` either. A metric is compared against the
+    # baseline within a tolerance, which is the same gate wearing a different
+    # hat -- it would turn every --compare on a machine with the Zen mod
+    # installed into a drift report about a decision that was made on purpose.
     local lo hi spread
     read -r lo hi <<<"$(printf '%s\n' "${measured[@]}" | awk '{ v = $2
         if (NR == 1 || v < min) min = v
         if (NR == 1 || v > max) max = v } END { printf "%.2f %.2f", min, max }')"
     spread=$(awk -v a="$lo" -v b="$hi" 'BEGIN { printf "%.2f", b - a }')
-    metric browser.spread "$spread" 0.03
 
-    info "$(printf 'spread across %d measured browser(s): %s to %s = %s (want <= %s)' \
-                   "${#measured[@]}" "$lo" "$hi" "$spread" "$BROWSER_SPREAD_MAX")"
+    info "$(printf 'spread across %d measured browser(s): %s to %s = %s (the focus step, for scale, is %s)' \
+                   "${#measured[@]}" "$lo" "$hi" "$spread" "$BROWSER_FOCUS_STEP")"
 
-    local wide=0
-    awk -v s="$spread" -v m="$BROWSER_SPREAD_MAX" 'BEGIN { exit !(s > m) }' && wide=1
+    if awk -v s="$spread" -v m="$BROWSER_FOCUS_STEP" 'BEGIN { exit !(s > m) }'; then
+        info "which is more than a focus step, so at least one of them reads as its own"
+        info "material. Expected while Zen has the transparency mod on; for any other"
+        info "browser it means something in that browser is fading pages too."
+    fi
 
-    if (( ${#problems[@]} == 0 && ! wide )); then
-        pass browser-glass "${#measured[@]} browser(s) composite within $BROWSER_SPREAD_MAX of each other, at ${lo}-${hi}"
+    if (( ${#problems[@]} == 0 )); then
+        pass browser-glass "${#measured[@]} browser(s) measured, composing between ${lo} and ${hi}"
         return
     fi
 
-    if (( wide )); then
-        fail browser-glass "the browsers are $spread apart -- more than the $BROWSER_SPREAD_MAX that reads as one material"
-    else
-        fail browser-glass "${#problems[@]} finding(s) about how the browsers composite"
-    fi
+    fail browser-glass "${#problems[@]} finding(s) about how the browsers composite"
     local p; for p in "${problems[@]}"; do info "$p"; done
-
-    (( wide )) || return
-    info ""
-    info "A browser that paints an opaque page can only be as translucent as the"
-    info "compositor makes it, and the compositor has one level for every window. So a"
-    info "spread means one browser is ALSO translucent by itself. Nothing in this repo"
-    info "arranges that any more, so it is something left on inside the browser:"
-    info ""
-    info "  Zen   the \"transparent zen\" mod, the \"Zen Internet\" extension, or"
-    info "        zen.widget.linux.transparency still true from before 2026-08-19."
-    info "        browsers/zen/user.js sets it false at every startup, so a Zen that"
-    info "        has been restarted since should not be able to show this."
 }

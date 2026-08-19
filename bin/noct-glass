@@ -4,7 +4,8 @@
 #   noct-glass apply           work out the levels for the active scheme, apply
 #   noct-glass set <0.0-1.0>   override the window level until the next change
 #   noct-glass cycle           step through opaque / light / default / heavy
-#   noct-glass show            print the levels currently in effect
+#   noct-glass show            print the levels currently in effect, and which
+#                              file they came from
 #
 # `apply` is wired to Noctalia's colors_changed hook in 50-glass.toml, so
 # switching scheme from /theme (or the settings GUI, or IPC) lands the matching
@@ -16,30 +17,34 @@
 # opaque. Two levels feed that, and both are stated as what you actually see:
 #
 #   window    -> decoration.active_opacity / inactive_opacity, i.e. EVERY
-#                window. This is what makes GTK and Qt apps frosted, since
-#                they draw an opaque background and offer no way not to. The
-#                cost is that the compositor cannot separate a window's text
-#                from its background, so text fades with it.
+#                window. The compositor cannot separate a window's text from its
+#                background, so this fades both. Shipped at 1.0 since
+#                2026-08-19: no compositor transparency at all.
 #
 #   terminal  -> how opaque a *terminal* ends up. kitty is the only window here
-#                that can be translucent on its own, so its background would
-#                otherwise be hit twice -- once by kitty, once by the
-#                compositor -- and a terminal next to any other window at the
-#                same nominal level came out visibly darker.
+#                that can be translucent on its own, and the only one that fades
+#                its background WITHOUT fading its text. Shipped at 0.55, and
+#                the whole of the effect now.
 #
 # So the value written for the terminal is not the level itself, it is
 # terminal / window: the compositor is already applying `window` to that surface,
 # and this is the factor that turns it into the level you asked for. At
-# terminal = window that is 1.0 -- kitty adds nothing of its own and looks like
-# every other window.
+# window = 1.0 that division is by one, so `terminal` reaches kitty untouched.
+#
+# Why it is that way round: every step of glassiness taken through `window`
+# costs contrast, and every step taken through `terminal` costs none. Glass on
+# a GTK or Qt app can only be bought by fading its text, and that was not worth
+# it on a machine you work on -- so those apps are opaque, on purpose, and the
+# terminal keeps the effect. Measured, and the reasoning is in glass.conf.
 #
 # A browser is not a special case. It gets `window`, like every other app that
 # paints its own background. There was a third level here that tinted Zen's page
 # area for the transparency mod; it was given up on 2026-08-19 and the reasoning
 # is in docs/theming.md.
 #
-# Set window = 1.0 in glass.conf for app-translucency only; `terminal` then
-# reaches kitty unmodified and nothing else is touched at all.
+# Two files, and the second one is not in the repo: glass.conf is tracked and
+# applies everywhere, glass.local.conf is this machine's own and wins. Set
+# `terminal = 1.0` there for a desktop with no translucency anywhere at all.
 
 set -uo pipefail
 
@@ -60,6 +65,15 @@ CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
 STATE_HOME=${XDG_STATE_HOME:-$HOME/.local/state}
 
 LEVELS_FILE="$CONFIG_HOME/noctalia/glass.conf"
+
+# This machine's own answer, and it is not in the repo. glass.conf is tracked,
+# so a level set there is a level set on every machine that pulls -- and the
+# right level is not a property of the setup, it is a property of the screen in
+# front of you. Same arrangement as ~/.config/hypr/host.lua: untracked, absent
+# by default, and read after the tracked file so it wins. See
+# glass.local.conf.example.
+LOCAL_FILE="$CONFIG_HOME/noctalia/glass.local.conf"
+
 OVERRIDE_FILE="$STATE_HOME/noctalia/glass-override"
 
 KITTY_OUT="$CONFIG_HOME/kitty/generated-glass.conf"
@@ -72,16 +86,24 @@ HYPR_OUT="$CONFIG_HOME/hypr/generated/glass.lua"
 # dropped to 0.60, one press jumped straight to fully opaque.
 CYCLE_STEPS=(1.00 0.75 0.60 0.50)
 
-usage() { sed -n '3,7p' "$0" | sed 's/^# \?//'; exit 2; }
+# Found by shape rather than by line number, so adding a line to the block
+# above cannot silently truncate the usage text -- which it just did. Same
+# approach as install.sh --help.
+usage() {
+    awk 'NR < 3 { next }
+         /^#[[:space:]]*$/ { if (seen) exit; next }
+         { sub(/^# ?/, ""); print; seen = 1 }' "$0"
+    exit 2
+}
 
 # ---------------------------------------------------------------------------
 # Reading the levels
 # ---------------------------------------------------------------------------
 
-# read_key <key> -- "key = value" from glass.conf, comments and spaces ignored.
-read_key() {
-    local key=$1
-    [[ -f $LEVELS_FILE ]] || return 1
+# read_from <file> <key> -- "key = value", comments and spaces ignored.
+read_from() {
+    local file=$1 key=$2
+    [[ -f $file ]] || return 1
     awk -F= -v k="$key" '
         /^[[:space:]]*#/ { next }
         {
@@ -90,7 +112,7 @@ read_key() {
             if ($1 == k && $2 != "") { print $2; found = 1; exit }
         }
         END { if (!found) exit 1 }
-    ' "$LEVELS_FILE"
+    ' "$file"
 }
 
 current_scheme() {
@@ -101,21 +123,41 @@ current_scheme() {
 }
 
 # setting <key> <fallback> -- per-scheme override, else the bare key, else the
-# built-in. Every knob in glass.conf resolves through here, so a scheme can
-# override the blur the same way it overrides the levels: `builtin:Catppuccin.
-# blur_brightness = 0.8` is read before the bare `blur_brightness`.
+# built-in, and the machine's own file before either of those. Every knob
+# resolves through here, so a scheme can override the blur the same way it
+# overrides the levels: `builtin:Catppuccin.blur_brightness = 0.8` is read
+# before the bare `blur_brightness`.
+#
+# Note the order. BOTH of the local file's keys are read before EITHER of the
+# tracked file's, rather than interleaving them per key. Otherwise a tracked
+# per-scheme line would beat a bare `window` set locally, and a machine that had
+# said "no compositor transparency here" would get it back the moment you
+# switched to the one scheme that overrides it -- which is the failure this file
+# exists to prevent.
 setting() {
-    local what=$1 fallback=$2 scheme
-    if scheme=$(current_scheme); then
-        read_key "$scheme.$what" && return 0
-    fi
-    read_key "$what" && return 0
+    local what=$1 fallback=$2 scheme file
+    scheme=$(current_scheme) || scheme=
+
+    for file in "$LOCAL_FILE" "$LEVELS_FILE"; do
+        [[ -f $file ]] || continue
+        [[ -n $scheme ]] && read_from "$file" "$scheme.$what" && return 0
+        read_from "$file" "$what" && return 0
+    done
     printf '%s' "$fallback"
 }
 
 # level <window|terminal> -- the visible opacity of a surface.
+#
+# The fallbacks are the two shipped defaults rather than one number for both:
+# with no glass.conf at all you get an opaque desktop and a translucent
+# terminal, which is what this setup is, instead of a uniform level nobody
+# chose.
 level() {
-    setting "$1" 0.90   # both default alike, i.e. every surface matches
+    case $1 in
+        window)   setting window   1.0  ;;
+        terminal) setting terminal  0.55 ;;
+        *)        setting "$1"      1.0  ;;
+    esac
 }
 
 window_level() {
@@ -155,21 +197,36 @@ background_opacity $factor
 EOF
 }
 
+# write_hypr <window level> <terminal level>
 write_hypr() {
-    local win=$1
+    local win=$1 term=$2
 
-    # Blur costs GPU time proportional to passes x size. Skip it entirely when
-    # nothing is translucent -- there is nothing behind a window to blur.
+    # Blur costs GPU time proportional to passes x size, and there is nothing
+    # behind an opaque surface to blur. But `window` at 1.0 does NOT mean
+    # nothing is translucent: kitty draws its own background at `terminal`, and
+    # the blur behind that is now the whole of the frosted effect, since the
+    # compositor supplies none. So both levels decide this. Deciding it on
+    # `window` alone left a translucent terminal sitting over a sharp,
+    # unblurred wallpaper -- transparency without the frost.
     local blur_enabled="true"
-    awk -v l="$win" 'BEGIN { exit !(l >= 0.995) }' && blur_enabled="false"
+    awk -v w="$win" -v t="$term" 'BEGIN { exit !(w >= 0.995 && t >= 0.995) }' && blur_enabled="false"
 
-    # Unfocused windows sit one step further back. The floor is 0.50 rather
-    # than 0.60 because the levels moved: at window = 0.60 a 0.60 floor made
-    # active and inactive the same number and the focus cue disappeared
-    # silently. 0.50 still leaves an inactive terminal legible -- its text
-    # composites at about 130 of 255 against a backdrop in the 60s.
-    local inactive
-    inactive=$(awk -v l="$win" 'BEGIN { v = l - 0.06; if (v < 0.50) v = 0.50; printf "%.2f", v }')
+    # Unfocused windows sit one step further back -- but only while focused
+    # ones are translucent at all. At window = 1.0 the compositor fades
+    # nothing, and dimming the unfocused ones would put back exactly what that
+    # setting is there to remove, text included. The focus cue is then the
+    # border: a gradient on the focused window, a hairline on everything else
+    # (conf/look.lua).
+    #
+    # When it does apply, the floor is 0.50 rather than 0.60 because the levels
+    # moved once already: at window = 0.60 a 0.60 floor made active and
+    # inactive the same number and the focus cue disappeared silently. 0.50
+    # still leaves an inactive terminal legible -- its text composites at about
+    # 130 of 255 against a backdrop in the 60s.
+    local inactive=$win
+    if awk -v l="$win" 'BEGIN { exit !(l < 0.995) }'; then
+        inactive=$(awk -v l="$win" 'BEGIN { v = l - 0.06; if (v < 0.50) v = 0.50; printf "%.2f", v }')
+    fi
 
     # The blur is what the wallpaper looks like by the time it reaches the back
     # of a window, so it is half of the frosted effect and it belongs in
@@ -186,13 +243,16 @@ write_hypr() {
     mkdir -p "$(dirname "$HYPR_OUT")"
     cat >"$HYPR_OUT" <<EOF
 -- Generated by noct-glass from the active colour scheme. Do not edit;
--- change the levels in ~/.config/noctalia/glass.conf instead.
+-- change the levels in ~/.config/noctalia/glass.conf instead, or in
+-- glass.local.conf for this machine only.
 --
--- active/inactive_opacity apply to EVERY window, which is what frosts GTK and
--- Qt apps that have no transparency of their own. Text fades with them: the
--- compositor cannot tell a window's glyphs from its background. kitty is the
--- one window that also draws its own translucency; noct-glass divides the two
--- out so a terminal ends up at the level glass.conf asks for.
+-- active/inactive_opacity apply to EVERY window, text included: the compositor
+-- cannot tell a window's glyphs from its background. At 1.0 -- the shipped
+-- default -- it fades nothing, and the only surface this script makes translucent
+-- is kitty, which draws its own background at \`terminal\` and leaves its text
+-- alone. The blur below is therefore what a terminal is looking through, and it
+-- stays on for exactly that reason. Zen is translucent as well, from its own mod
+-- rather than from anything here, and it gets the same blur behind it.
 
 hl.config({
     decoration = {
@@ -266,7 +326,7 @@ apply() {
     read -r win term <<<"$(levels)"
 
     write_kitty "$term" "$win"
-    write_hypr "$win"
+    write_hypr "$win" "$term"
 
     # Hyprland reloads on config change, but generated/glass.lua is reached
     # through a require() and we do not rely on those being watched.
@@ -300,8 +360,14 @@ case "${1:-apply}" in
     cycle)
         current=$(window_level)
         next=${CYCLE_STEPS[0]}
+        # Compared as a NUMBER, not as a string. The steps are written to two
+        # decimals and glass.conf is written the way a person writes a level, so
+        # "1.00" and "1.0" are the same level and were not the same string: at
+        # the shipped window = 1.0 the first press matched nothing, restarted the
+        # cycle at 1.00, and looked like the bind had done nothing.
         for i in "${!CYCLE_STEPS[@]}"; do
-            if [[ ${CYCLE_STEPS[$i]} == "$current" ]]; then
+            if awk -v a="${CYCLE_STEPS[$i]}" -v b="$current" \
+                   'BEGIN { d = a - b; if (d < 0) d = -d; exit !(d < 0.005) }'; then
                 next=${CYCLE_STEPS[$(( (i + 1) % ${#CYCLE_STEPS[@]} ))]}
                 break
             fi
@@ -313,8 +379,17 @@ case "${1:-apply}" in
         ;;
     show)
         # Read-only on purpose -- see levels().
+        #
+        # The trailing marker is appended, never inserted: `noct-check` reads
+        # the second and fourth fields of this line, so the numbers have to stay
+        # where they are. It is here because "this machine is different" is
+        # exactly the thing you want to be told when the two machines disagree
+        # and you are looking for which file said so.
+        marker=""
+        [[ -f $OVERRIDE_FILE ]] && marker="  [override: SUPER+SHIFT+G]"
+        [[ -z $marker && -f $LOCAL_FILE ]] && marker="  [glass.local.conf]"
         # shellcheck disable=SC2046
-        printf 'window %s  terminal %s\n' $(levels)
+        printf 'window %s  terminal %s%s\n' $(levels) "$marker"
         ;;
     *) usage ;;
 esac

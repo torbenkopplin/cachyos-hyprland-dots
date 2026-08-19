@@ -67,7 +67,6 @@
     "browser.brave.effective_opacity": { "value": 0.85, "tolerance": 0.04 },
     "browser.brave.page_contrast": { "value": 11.11, "tolerance": 1.5 },
     "browser.chromium.effective_opacity": { "value": 0.85, "tolerance": 0.04 },
-    "browser.chromium.page_contrast": { "value": 11.11, "tolerance": 1.5 },
-    "browser.spread": { "value": 0.00, "tolerance": 0.03 }
+    "browser.chromium.page_contrast": { "value": 11.11, "tolerance": 1.5 }
   }
 }

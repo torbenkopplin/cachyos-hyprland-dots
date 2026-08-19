@@ -119,12 +119,15 @@ hl.window_rule({
 ------------------------------------------------------------------------------
 -- Opting out of frosted glass
 --
--- bin/noct-glass sets active_opacity for every window, so the frosted look is
--- universal by default -- including GTK and Qt apps, which have no
--- transparency of their own.
+-- Dormant at the shipped levels and kept on purpose. bin/noct-glass sets
+-- active_opacity for every window, and since 2026-08-19 it sets it to 1.0 --
+-- nothing is faded, so there is nothing for these rules to exempt.
 --
--- These are the windows where that is wrong. Anything whose job is to show you
--- accurate pixels should not have the wallpaper mixed into them: you cannot
+-- They matter the moment that changes, which is two keystrokes away:
+-- SUPER+SHIFT+G cycles the whole desktop down to 0.50, and a machine can lower
+-- it permanently in ~/.config/noctalia/glass.local.conf. These are the windows
+-- where that is wrong however it was arrived at. Anything whose job is to show
+-- you accurate pixels should not have the wallpaper mixed into it: you cannot
 -- judge a photo, grade a video or pick a colour through 10% of your desktop.
 ------------------------------------------------------------------------------
 

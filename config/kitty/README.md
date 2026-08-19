@@ -27,11 +27,24 @@ instead of just the terminal, and where `/theme` can select it.
 > `themes/noctalia.conf` *and rewrites `kitty.conf`* to include it, replacing
 > whatever theme include it finds. `install.sh` symlinks `kitty.conf` into this
 > repo, so the built-in edits a tracked file — the checkout goes dirty on every
-> palette change and `git pull` on another machine conflicts over generated
-> output. That is why the colours come from a user template with an output path
-> of our own choosing. If you ever find a stray `~/.config/kitty/themes/` or an
-> `include themes/noctalia.conf` line in `kitty.conf`, the built-in got
-> re-enabled: drop `"kitty"` from `builtin_ids` in `40-templates.toml`.
+> palette change, `./install.sh --update` on the other machine then refuses to
+> pull over the edit, and `git pull` by hand conflicts over generated output. That
+> is why the colours come from a user template with an output path of our own
+> choosing.
+>
+> **It is not off just because `builtin_ids` omits it.** Observed 2026-08-19: it
+> ran anyway, eleven seconds before Noctalia saved `settings.toml`, whose copy of
+> `builtin_ids` loads after `40-templates.toml` and wins. `noctalia msg
+> templates-apply` does not reproduce it, so the config file being right proves
+> nothing. `noct-check kitty-untouched` is the check; if it fires, turn the
+> template off in the GUI (`SUPER+,`), then:
+>
+> ```sh
+> git checkout -- config/kitty/kitty.conf
+> rm -rf ~/.config/kitty/themes
+> ```
+>
+> No colours are lost — `generated-colors.conf` carries the same palette.
 
 **`generated-glass.conf`** — written by `bin/noct-glass` with the frosted-glass
 level for the active scheme. Levels are configured in

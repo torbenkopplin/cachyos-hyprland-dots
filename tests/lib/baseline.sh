@@ -65,8 +65,48 @@ noct_baseline_default_path() {
     printf '%s/tests/baselines/%s.json' "$NOCT_REPO" "${NOCT_HOST:-$(hostname 2>/dev/null || echo unknown)}"
 }
 
+# noct_baseline_clash <file> -- what says the file was recorded somewhere else.
+# Prints one line per differing hardware fact; prints nothing when it looks like
+# the same machine.
+#
+# The baseline is named after the hostname, and on this distro that is a trap
+# rather than an identity: a stock CachyOS install is called cachyos-x8664 on
+# EVERY machine. So two machines write the same file, each --record silently
+# replaces the other's numbers, and every --compare afterwards reads the other
+# machine's monitor as drift -- which is precisely the confusion the whole
+# baseline mechanism exists to remove.
+#
+# Compared on geometry rather than on anything clever. Two machines that differ
+# in resolution or refresh rate are two machines, and geometry is recorded as
+# plain integers with no spaces to parse around.
+noct_baseline_clash() {  # <file>
+    local file=$1 key was now
+    for key in monitor.width monitor.height monitor.refresh; do
+        was=$(noct_baseline_metrics "$file" | awk -v k="$key" '$1 == k { print $2; exit }')
+        now=$(noct_metric_value "$key") || continue
+        [[ -n $was && -n $now && $was != "$now" ]] && printf '%s: %s in the file, %s here\n' "$key" "$was" "$now"
+    done
+    return 0
+}
+
 noct_baseline_record() {  # <file>
-    local out=$1
+    local out=$1 clash=""
+
+    [[ -f $out ]] && clash=$(noct_baseline_clash "$out")
+    if [[ -n $clash ]]; then
+        printf '\n%s!! not overwriting %s%s\n' "$RED" "${out#"$NOCT_REPO"/}" "$RESET"
+        printf '   it was recorded on hardware this is not:\n'
+        printf '%s\n' "$clash" | sed 's/^/     /'
+        printf '\n   Both of your machines are called %s, so both want this one file and\n' "$(hostname 2>/dev/null)"
+        printf '   each --record would replace the other. Name this one for the suite:\n\n'
+        printf '     NOCT_HOST=work noct-check --all --record\n\n'
+        printf '   or name it for real, which fixes it everywhere and not just here:\n'
+        printf '     sudo hostnamectl hostname work\n\n'
+        printf '   Nothing was written.\n'
+        NOCT_BASELINE_FAIL=1
+        return 1
+    fi
+
     mkdir -p "$(dirname "$out")"
     QUIET=1 noct_json >"$out"
     printf 'recorded %d metrics to %s\n' "${#NOCT_METRICS[@]}" "$out"

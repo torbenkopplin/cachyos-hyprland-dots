@@ -91,6 +91,15 @@ check_glass_config() {
         fail glass-config "kitty background_opacity is $ko, should be $want_ko for terminal $term / window $win"
         return
     fi
+    # Reported because --record on one machine and --compare on another is the
+    # whole point of the metrics, and "the levels differ" has two very different
+    # explanations: somebody changed glass.conf, or this machine has its own
+    # answer on purpose. The second one is not a regression and should not read
+    # like one.
+    if [[ -f $CONFIG_HOME/noctalia/glass.local.conf ]]; then
+        info "glass.local.conf is in play -- these levels are this machine's own, not the repo's"
+    fi
+
     pass glass-config "generated files agree with glass.conf (window $win  terminal $term)"
 }
 
@@ -173,7 +182,7 @@ check_glass_visible() {
     noct_probe_kitty --class "$NOCT_PROBE_TAPE_CLASS" --title noct-probe-glass --bg '#ffffff'
     case $? in
         0) ;;
-        2) skip glass-visible "the probe never came to rest anywhere measurable"; return ;;
+        2) skip glass-visible "the probe never landed anywhere measurable"; return ;;
         *) skip glass-visible "the probe window never appeared"; return ;;
     esac
     addr=$NOCT_PROBE_ADDR
@@ -195,6 +204,20 @@ check_glass_visible() {
 
     local seen seen_sd own back back_sd
     read -r seen seen_sd own back back_sd <<<"$three"
+
+    # `own` is the probe painted white and forced to full opacity, so on a screen
+    # that is actually showing the desktop it lands within a few levels of 255.
+    # Far from it means the capture is of something else -- a lock screen is the
+    # one that catches you, since this check takes half a minute and the session
+    # locks at ten minutes. Every number below is derived from these captures, so
+    # there is nothing to salvage: skip rather than report a frosted effect that
+    # was measured through a lock screen.
+    if awk -v o="$own" 'BEGIN { exit !(o < 200) }'; then
+        skip glass-visible "a white window at full opacity photographed as $own of 255"
+        info "something is covering the screen -- unlock it, or close whatever is over"
+        info "the probe, and rerun. Nothing measured through it would mean anything."
+        return
+    fi
 
     local solved a backdrop backdrop_sd
     solved=$(noct_solve "$seen" "$own" "$back" "$back_sd")
@@ -295,7 +318,7 @@ check_glass_legible() {
     noct_probe_kitty --class "$NOCT_PROBE_TAPE_CLASS" --title noct-probe-legible --bg "$scheme_hex"
     case $? in
         0) ;;
-        2) skip glass-legible "the probe never came to rest anywhere measurable"; return ;;
+        2) skip glass-legible "the probe never landed anywhere measurable"; return ;;
         *) skip glass-legible "the probe window never appeared"; return ;;
     esac
     read -r mon geom <<<"$(noct_window_geom "$NOCT_PROBE_ADDR" center)"
@@ -341,9 +364,19 @@ check_glass_legible() {
         fail glass-legible "text contrast works out at ${ratio}:1, below the ${CONTRAST_MIN}:1 floor"
     fi
     info "Glyph opacity is exactly 'window' -- the compositor applies it to text and"
-    info "background alike. The fix is to raise 'window' and take the glassiness out"
-    info "of 'terminal' instead, which kitty applies to the background only and"
-    info "costs nothing in ink."
+    info "background alike, so glassiness bought there costs contrast and glassiness"
+    info "bought through 'terminal' costs none."
+    if awk -v l="$level" 'BEGIN { exit !(l >= 0.995) }'; then
+        # window is already 1.0, so the compositor is fading nothing and the
+        # advice below would be a no-op. Whatever is wrong is the terminal level
+        # or the palette, not the window one.
+        info "'window' is already 1.0 here, so this is not the compositor: raise"
+        info "'terminal' in glass.conf, or the scheme's own contrast is too low to"
+        info "survive any translucency at all (scheme.contrast in the metrics)."
+    else
+        info "The fix is to raise 'window' -- 1.0 is the shipped default and means the"
+        info "compositor fades nothing -- and take the glassiness out of 'terminal'."
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -361,6 +394,15 @@ check_glass_legible() {
 
 check_blur_stacks() {
     require_cmd blur-stacks kitty grim magick jq hyprctl || return
+
+    # With no blur there is no xray, and the comparison this check makes would
+    # pass for the trivial reason rather than the real one. noct-glass turns the
+    # blur off when BOTH levels are opaque, which is what a machine with
+    # `terminal = 1.0` in glass.local.conf looks like.
+    if [[ $(sed -n 's/.*enabled[[:space:]]*=[[:space:]]*\(true\|false\).*/\1/p' "$HYPR_GLASS" | head -1) == false ]]; then
+        skip blur-stacks "the blur is off (nothing is translucent) -- xray cannot be observed"
+        return
+    fi
 
     # Without something tiled under where the probe lands there is nothing to
     # stack against and the comparison is vacuous.

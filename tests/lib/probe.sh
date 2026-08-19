@@ -140,16 +140,39 @@ noct_window_geom() {
 # whole window being on screen was the first version of this, and it skipped
 # every run on a busy workspace.
 noct_window_settle() {
-    local addr=$1 shape=${2:-center} timeout=${3:-8} i prev= now=
+    local addr=$1 shape=${2:-center} timeout=${3:-8} i prev= now= measurable=0
 
     hyprctl dispatch "hl.dsp.window.focus({ address = \"$addr\" })" >/dev/null 2>&1
 
     for (( i = 0; i < timeout * 4; i++ )); do
         now=$(noct_window_geom "$addr" "$shape")
+        [[ -n $now ]] && measurable=1
         [[ -n $now && $now == "$prev" ]] && return 0
         prev=$now
         sleep 0.25
     done
+
+    # Two very different failures reach this line and the caller reports them
+    # identically, so say which one it was. "It never stopped moving" means an
+    # animation or a scrolling tape; "nothing was ever measurable" means the
+    # window is sitting still somewhere a patch cannot be taken from, and that is
+    # not a timing problem at all -- no amount of waiting fixes it.
+    #
+    # Observed 2026-08-19 on a 3440x1440 + 1920x1080 pair, where it skipped every
+    # pixel measurement in the suite: a tape probe opened as the second row of a
+    # column on the SHORT monitor, 942px of window starting at y=966 of 1080, so
+    # 114px were on screen against noct_window_geom's 150px floor. Nothing was
+    # wrong with the desktop and nothing was wrong with the check; the probe had
+    # simply landed under the fold, and the message said "never came to rest".
+    if (( ! measurable )); then
+        info "$(hyprctl -j clients 2>/dev/null | jq -r --arg a "$addr" '
+                  .[] | select(.address == $a)
+                  | "the probe is at \(.at[0]),\(.at[1]) sized \(.size[0])x\(.size[1]) on monitor \(.monitor), workspace \(.workspace.id)"' 2>/dev/null)"
+        info "too little of it is on screen to average -- it landed under the fold, not"
+        info "in motion. A tiled probe needs a workspace with room on the monitor it"
+        info "opens on; measure from an empty one, or run the check with only the"
+        info "primary monitor active."
+    fi
     return 1
 }
 
@@ -180,6 +203,7 @@ NOCT_PROBE_TAPE_CLASS=noct-probe-tape   # deliberately NOT floated -- see binds.
 #
 # Sets NOCT_PROBE_ADDR to the new window's address. Returns 0, or 1 if the
 # window never appeared, or 2 if it never came to rest somewhere measurable.
+# In the second case noct_window_settle has already said which of the two it was.
 #
 # It sets a variable rather than printing one, and that is not a style choice.
 # A function whose output is captured with $(...) runs in a SUBSHELL, and

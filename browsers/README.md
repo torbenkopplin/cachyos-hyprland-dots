@@ -67,21 +67,34 @@ shortcuts, sponsored stories, snippets, the onboarding tour and the
 them is the browser you asked for. Search and top sites stay on because they
 are actually useful; `Locked: false` means you can still change them in the UI.
 
-**Zen — transparency, switched off.** No browser here knows about the desktop.
-`bin/noct-glass` fades *every* window through the compositor and blurs the
-wallpaper behind it, and a browser gets that and nothing more — the same as a
-GTK app, and for the same reason: it paints its own background.
+**Zen — transparency, on but unmatched.** No browser here knows about the
+desktop. `bin/noct-glass` sets one opacity for every window through the
+compositor and blurs the wallpaper behind it, and a browser gets that and nothing
+more — the same as a GTK app, and for the same reason: it paints its own
+background.
 
-Zen is the one browser that *can* do more, with the "transparent zen" mod and
-the "Zen Internet" extension, and `zen/user.js` used to switch that on and tint
-what it left transparent from a generated `chrome/userChrome.css`. Both are gone;
-the prefs are now explicitly `false`, which is not the same as absent — `user.js`
-only sets prefs, so a deleted line leaves the old value in `prefs.js` and the
-transparency would have stayed on. See
-[theming](../docs/theming.md#frosted-glass) for what was tried and why it was
-dropped, and for the two things to disable inside Zen itself.
+Zen is the one browser that *can* do more, with the "transparent zen" mod and the
+"Zen Internet" extension, and `zen/user.js` switches on the two prefs those need:
+`browser.tabs.allow_transparent_browser` and `zen.widget.linux.transparency`.
+They are what give the window an alpha channel at all, and without them the mod
+paints against Zen's own opaque backdrop and looks like it is not installed.
 
-`user.js` is read at startup, so changing it needs Zen restarted.
+What `zen/user.js` no longer does is *tint* what the mod leaves transparent. That
+was a `browser` level in `glass.conf` written into a generated
+`chrome/userChrome.css`, and it was dropped on 2026-08-19 — see
+[theming](../docs/theming.md#what-was-tried-with-zen-and-dropped). So Zen is
+translucent at whatever the mod paints, matched to nothing, and it will not read
+as the same material as a terminal. Installing and enabling the mod is yours to
+do; no file here can.
+
+Both prefs are stated rather than omitted, and that is not the same thing:
+`user.js` only *sets* prefs, so a deleted line leaves whatever `prefs.js` already
+recorded rather than restoring the default.
+
+`user.js` is read at startup, so changing it needs Zen restarted — and because it
+re-applies at *every* startup, a pref changed by hand in `about:config` reverts on
+the next launch. That is the point of the file, and it is also the trap: it makes
+a reinstalled mod look broken until the pref here agrees with it.
 
 **Not set anywhere:** default search engine, homepage, password manager
 behaviour beyond leaving it enabled, and extension allow/block lists. Those are

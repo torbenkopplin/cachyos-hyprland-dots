@@ -52,6 +52,7 @@ cd ~/repos/cachyos-hyprland-dots
 | `--login` | Replace the display manager with greetd + `noctalia-greeter` (needs sudo). **Not** in `--all` |
 | `--dry-run` | Print what any of the above would do |
 | `--status` | Show which setup currently owns each managed path |
+| `--update` | Pull, relink, and re-apply it to the running session — see [Two machines](#two-machines) |
 | `--unlink` | Remove this script's links and restore whatever they replaced |
 
 ## The login screen
@@ -85,6 +86,73 @@ directories have generated names and do not exist until first launch, so
 Files are symlinked, so edits in the repo are live immediately and `git diff`
 shows your real config. Anything already in the way is moved to
 `*.bak-<timestamp>` rather than deleted, and `--unlink` moves it back.
+
+## Two machines
+
+Everything here is a symlink into one checkout, so "updating" is a pull — and the
+pull is the part that goes wrong, in three specific ways. `--update` is the
+command that handles all three:
+
+```sh
+./install.sh --update
+```
+
+1. **It pulls before it links, then re-execs itself.** bash reads a script from
+   disk as it runs it, so a pull that rewrites `install.sh` under a running
+   `install.sh` can resume at a byte offset that now means something else. So the
+   pull happens first and alone, and everything after it runs from the version
+   that was actually pulled.
+2. **It refuses to pull over local changes**, and prints them. Every config here
+   is a symlink into the checkout, so uncommitted changes *are* the config you
+   are running: stashing them would change your desktop out from under you, and
+   merging them is a decision only you can make. `--ff-only`, for the same
+   reason — anything else means the two machines have diverged, and that is a
+   merge, not an install step.
+3. **It makes the pull live.** Hyprland reloads its own config on change but
+   reaches `generated/glass.lua` through a `require()`, Noctalia renders its
+   templates on a colour change and not on a config change, and kitty reads its
+   colours on `SIGUSR1`. `noct-glass apply` plus `noctalia msg templates-apply`
+   covers all three; without them an update is only true of your next login.
+
+`bash <(curl … bootstrap.sh)` does the same pull on a checkout that already
+exists, so either command works — `--update` is the one that does not need the
+network to fetch a copy of itself first.
+
+### What is allowed to differ
+
+Two files, and neither is tracked:
+
+| File | From | For |
+|---|---|---|
+| `~/.config/hypr/host.lua` | `config/hypr/host.lua.example` | monitors, and the workspace bands that follow from them |
+| `~/.config/noctalia/glass.local.conf` | `config/noctalia/glass.local.conf.example` | how much translucency this screen should have |
+
+Both are read *after* the tracked files and win over them. Anything else that
+differs between your machines is a difference worth committing — that is the
+whole point of one checkout linked into place rather than two piles of copies.
+
+`*.example` files are not linked into `~/.config`; they are meant to be copied to
+a new name and edited, which a symlink into the repo cannot be.
+
+### Baselines are per machine, and the hostname is not one
+
+`noct-check --record` writes `tests/baselines/<hostname>.json`, and a stock
+CachyOS install is called `cachyos-x8664` on **every** machine. So both of yours
+want the same file, each `--record` would silently replace the other's numbers,
+and every `--compare` afterwards would read the other machine's monitor as drift
+— which is exactly the confusion the baseline mechanism exists to remove.
+
+`--record` now refuses when the file already there was recorded on hardware this
+is not, and tells you the two ways out:
+
+```sh
+NOCT_HOST=work noct-check --all --record    # name it for the suite only
+sudo hostnamectl hostname work              # name it for real, which fixes it everywhere
+```
+
+The second is better if you are going to live with two machines: `NOCT_HOST` has
+to be remembered on every invocation, and a real hostname is also what tells you
+which machine you are logged into.
 
 ## Switching with `~/repos/dots`
 

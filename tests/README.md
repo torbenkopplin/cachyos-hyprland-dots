@@ -61,6 +61,31 @@ compositor version, the wallpaper's mean luma. They are reported when they
 differ and never fail a comparison, because they are usually the answer rather
 than the problem. See [`lib/baseline.sh`](lib/baseline.sh).
 
+**The baseline is named after the hostname, which on this distro is not a name.**
+A stock CachyOS install is `cachyos-x8664` on every machine, so two machines want
+the same file and each `--record` would silently replace the other's numbers.
+`--record` refuses when the file already there was recorded on different hardware
+and prints the two ways out — `NOCT_HOST=work noct-check --all --record`, or
+giving the machine a real hostname, which is better because it does not have to be
+remembered on every invocation.
+
+**Two things make a measurement meaningless rather than wrong**, and both are
+handled by skipping rather than concluding:
+
+- **A locked screen.** `grim` photographs the lock screen without complaint. A
+  run measured through one reported that kitty ignores `SIGUSR1`, which it does
+  not. The pixel checks now notice that a window they forced to full white
+  opacity did not photograph near 255.
+- **A probe that lands off the fold.** A tiled probe goes wherever the scrolling
+  layout puts it, and on a second, shorter monitor that can be a row with 114px
+  on screen. The skip now says where the probe actually is, because "it never came
+  to rest" describes motion and this is not motion.
+
+`tests/baselines/cachyos-x8664.json` predates the 2026-08-19 glass change
+(`window 0.85`), so a comparison against it reports the glass metrics as drift.
+That is the mechanism working — they did move — but re-record per machine before
+using it to chase anything else.
+
 ## Layout
 
 | | |

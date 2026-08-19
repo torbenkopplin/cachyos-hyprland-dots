@@ -37,27 +37,35 @@ user_pref("widget.dmabuf.force-enabled", true);
 // --- Downloads -------------------------------------------------------------
 user_pref("browser.download.useDownloadDir", false);
 
-// --- Transparency: deliberately off ----------------------------------------
+// --- Transparency: on ------------------------------------------------------
 //
-// Zen can draw its own window and page backgrounds transparent -- that is what
-// the "transparent zen" mod (sameerasw) and the "Zen Internet" extension are
-// for -- and this repo used to switch it on and then tint what it left
-// transparent, from a `browser` level in ~/.config/noctalia/glass.conf written
-// into a generated chrome/userChrome.css. That was given up on 2026-08-19; the
-// reasoning is in docs/theming.md. A browser now gets exactly what every other
-// window gets from the compositor and nothing else.
+// These two prefs decide whether Zen's window has an alpha channel at all, and
+// they are what the "transparent zen" mod (sameerasw) and the "Zen Internet"
+// extension need in order to do anything. Both are CSS, and an rgba() background
+// needs something behind it to show through -- so with these false the mod paints
+// against Zen's own opaque backdrop and looks like it is not installed.
 //
-// Both are set to `false` rather than simply left out, and the difference
-// matters: user.js only ever *sets* prefs. Deleting a line does not restore the
-// default -- it leaves whatever prefs.js already recorded, so a profile that had
-// transparency switched on would silently keep it forever.
+// That is the trap worth knowing: reinstalling the mod does not help while these
+// are false, because user.js re-applies its values at every startup, so each
+// restart undoes the reinstall.
 //
-// This does not uninstall the mod or the extension. Nothing a file can do will:
-// see docs/theming.md for the two things to turn off by hand.
-user_pref("browser.tabs.allow_transparent_browser", false);
-user_pref("zen.widget.linux.transparency", false);
+// Switched off on 2026-08-19 along with the `browser` glass level, and back on
+// the same day. What was dropped and stays dropped is the *tint*: nothing
+// generates a chrome/userChrome.css any more, so what reaches the screen is
+// whatever the mod and the extension paint, not a level matched to the
+// desktop's. The reasoning for giving up that match is in docs/theming.md and it
+// still holds -- this turns the transparency back on, not the attempt to make a
+// page and a terminal read as one material.
+//
+// Stated explicitly rather than left out, and that matters in both directions:
+// user.js only ever *sets* prefs, so a deleted line leaves whatever prefs.js
+// already recorded rather than restoring the default.
+user_pref("browser.tabs.allow_transparent_browser", true);
+user_pref("zen.widget.linux.transparency", true);
 
-// Not part of that, and staying: Hyprland already dims an unfocused window
-// (inactive_opacity, 0.06 below the active level), so Zen greying itself out on
-// top of that is the same cue applied twice.
+// Not part of that, and staying off: the focus cue here is the border -- a
+// gradient on the focused window against a hairline on everything else, drawn by
+// conf/look.lua. Hyprland's own focus dim went with `window = 1.0`
+// (inactive_opacity is 1.0 too), so Zen greying itself out would be the only dim
+// on the desktop, applied by one app and by nothing else on screen.
 user_pref("zen.view.grey-out-inactive-windows", false);

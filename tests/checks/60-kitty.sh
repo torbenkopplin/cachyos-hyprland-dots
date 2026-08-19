@@ -10,6 +10,8 @@
 # a terminal looks like as numbers, and `noct-check --compare` says which of
 # them moved. See tests/lib/baseline.sh.
 
+noct_register kitty-untouched  pure check_kitty_untouched \
+    "nothing has rewritten kitty.conf behind the repo's back"
 noct_register kitty-live       live check_kitty_live \
     "a running kitty picks up a new background_opacity without being restarted"
 noct_register kitty-appearance live check_kitty_appearance \
@@ -79,11 +81,30 @@ check_kitty_live() {
 
     if awk -v d="$delta" 'BEGIN { exit !(d > 5) }'; then
         pass kitty-live "kitty re-reads background_opacity on SIGUSR1"
-    else
-        fail kitty-live "kitty ignored the new background_opacity (moved $delta levels)"
-        info "without this, 'terminal' below 'window' leaves two shades of terminal until"
-        info "every old window is closed. Check dynamic_background_opacity in kitty.conf."
+        return
     fi
+
+    # The probe is WHITE and has just been told to be fully opaque, so a healthy
+    # capture of it lands near 255. If it does not, the thing photographed was
+    # not the probe -- and the overwhelmingly likely reason is a lock screen,
+    # since this check takes about ten seconds and the session locks itself at
+    # ten minutes. Measured on 2026-08-19: locked, the two captures came back
+    # 138.9 and 138.9, a delta of 0.0, and the check reported that kitty ignores
+    # SIGUSR1. It does not. Unlocked, the same run measured 157.5 -> 255.0.
+    #
+    # A check that reports a real defect because something was in front of the
+    # screen is worse than no check, so this refuses to draw the conclusion
+    # rather than drawing the wrong one.
+    if awk -v a="$after" 'BEGIN { exit !(a < 200) }'; then
+        skip kitty-live "a white window at full opacity photographed as $after of 255"
+        info "something is covering the screen -- a lock screen, or a fullscreen window"
+        info "over the probe. Nothing measured through it means anything; unlock and rerun."
+        return
+    fi
+
+    fail kitty-live "kitty ignored the new background_opacity (moved $delta levels)"
+    info "without this, 'terminal' below 'window' leaves two shades of terminal until"
+    info "every old window is closed. Check dynamic_background_opacity in kitty.conf."
 }
 
 # ---------------------------------------------------------------------------
@@ -192,4 +213,54 @@ check_kitty_appearance() {
         fail kitty-appearance "${#problems[@]} problem(s) with how a terminal is drawn"
         local p; for p in "${problems[@]}"; do info "$p"; done
     fi
+}
+
+# ---------------------------------------------------------------------------
+# kitty-untouched
+#
+# Noctalia's BUILT-IN `kitty` template does not just write a colour file -- it
+# writes ~/.config/kitty/themes/noctalia.conf and then rewrites kitty.conf to
+# include it. install.sh deploys kitty.conf as a symlink into this repo, so that
+# edits a tracked file: the checkout goes dirty on its own, and
+# `./install.sh --update` on the other machine refuses to pull over it. Which is
+# the right refusal and a baffling one to hit, since nobody typed the edit.
+#
+# It is disabled -- `builtin_ids` in 40-templates.toml lists every built-in this
+# setup wants and `kitty` is not among them, because templates/kitty-colors.conf
+# renders the same palette to a path we chose instead. But observed on
+# 2026-08-19 at 12:04:25, it ran anyway and did exactly this, eleven seconds
+# before Noctalia saved settings.toml -- i.e. from the GUI, whose copy of
+# `builtin_ids` loads after the config file and wins over it. So the config
+# being right is not evidence that the built-in is off.
+#
+# Hence a check rather than a comment. The signature is specific enough that an
+# ordinary edit to kitty.conf cannot trip it: this repo has never shipped that
+# include line, and nothing here writes that themes/ directory.
+# ---------------------------------------------------------------------------
+
+check_kitty_untouched() {
+    local conf=$CONFIG_HOME/kitty/kitty.conf
+    local theme_dir=$CONFIG_HOME/kitty/themes
+    require_file kitty-untouched "$conf" "run ./install.sh" || return
+
+    local -a evidence=()
+    grep -q '^[[:space:]]*include[[:space:]]\+themes/noctalia.conf' "$conf" 2>/dev/null \
+        && evidence+=("kitty.conf includes themes/noctalia.conf, which this repo never wrote")
+    [[ -f $theme_dir/noctalia.conf ]] \
+        && evidence+=("${theme_dir/#$HOME/\~}/noctalia.conf exists")
+
+    if (( ${#evidence[@]} == 0 )); then
+        pass kitty-untouched "kitty.conf is the file this repo tracks"
+        return
+    fi
+
+    fail kitty-untouched "the built-in kitty template has rewritten kitty.conf"
+    local e; for e in "${evidence[@]}"; do info "$e"; done
+    info "turn it off where it actually loses: SUPER+, -> the templates list in the"
+    info "Noctalia GUI, since ~/.local/state/noctalia/settings.toml loads after"
+    info "40-templates.toml and its builtin_ids win. Then:"
+    info "  git -C \"$NOCT_REPO\" checkout -- config/kitty/kitty.conf"
+    info "  rm -rf $theme_dir"
+    info "The palette is not lost: templates/kitty-colors.conf renders the same"
+    info "colours to generated-colors.conf, which kitty.conf already includes."
 }

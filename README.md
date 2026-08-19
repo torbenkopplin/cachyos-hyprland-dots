@@ -25,8 +25,16 @@ bash <(curl -fsSL https://raw.githubusercontent.com/torbenkopplin/cachyos-hyprla
 ```
 
 Then copy `config/hypr/host.lua.example` to `~/.config/hypr/host.lua` and put
-your monitors in it — that file is the only machine-specific one, and it is
-never tracked.
+your monitors in it. That and `~/.config/noctalia/glass.local.conf` (from
+`glass.local.conf.example`) are the two machine-specific files, and neither is
+tracked — everything else is the same on every machine on purpose.
+
+Already installed somewhere, and want what you just pushed from the other
+machine:
+
+```sh
+./install.sh --update       # pull, relink, and re-apply it to the running session
+```
 
 ---
 
@@ -89,9 +97,11 @@ Colours come from the wallpaper:
 
 `/theme` (`M + CTRL + T`) switches between that, ten built-in palettes, and
 your own — **noirblaze** ships here, ported from the neovim colourscheme.
-Frosted glass follows the scheme: every window gets it from the compositor, and
-a terminal gets a good deal more of it from kitty, which is the one window that
-can fade its background without fading its text.
+Frosted glass is the terminal and nothing else. The compositor can frost every
+window, but it cannot tell a window's text from its background and fades both, so
+that was dropped on 2026-08-19: apps are opaque and kitty — the one window that
+fades its background and leaves its text alone — keeps all of it. `SUPER+SHIFT+G`
+still cycles the whole desktop through it if you want the old look for a while.
 
 Idle has one owner (Noctalia): lock at 10 minutes, screen off at 15, suspend at
 30, and anything playing video holds all three off.
@@ -115,7 +125,7 @@ config/kitty/      kitty.conf and two kittens
 config/fish/       config.fish, plugins, frozen theme colours
 bin/noct-*         the launcher providers, the glass level, the wallpaper fetcher
 browsers/          policies and user.js for Brave, Chromium, Firefox, Zen
-install.sh         linking, packages, browsers, wallpapers, login screen
+install.sh         linking, updating, packages, browsers, wallpapers, login screen
 docs/              keymap, design notes, theming, install
 TESTING.md         post-install checklist — start here on first boot
 tests/             the test suite behind `noct-check`; tests/README.md
