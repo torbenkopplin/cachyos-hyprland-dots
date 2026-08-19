@@ -214,6 +214,13 @@ check_browser_glass() {
         metric "browser.$b.page_contrast"     "$contrast" 1.5
         measured+=("$b $ratio")
 
+        # The raw captures as well as the conclusion. Every number after this
+        # is derived from them, and a derived number that looks wrong is
+        # impossible to argue with otherwise -- `opaque` is the page at
+        # compositor 1.00, so on a browser showing a white page it lands near
+        # 255, and anything else means the capture did not photograph the page.
+        info "$(printf '%-9s captures: configured %s, opaque %s, backdrop-only %s' \
+                       "$b" "$seen" "$own" "$back")"
         info "$(printf '%-9s effective opacity %s over a backdrop of %s: white lands at %s, #222 text at %s, %s:1' \
                        "$b" "$ratio" "$backdrop" "$page_bg" "$page_text" "$contrast")"
 

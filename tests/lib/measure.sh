@@ -74,6 +74,10 @@ capture_stable() {
     local mon=$1 geom=$2 out=$3 a b i
     for i in 1 2 3; do
         grim -o "$mon" "$out.1.png" 2>/dev/null || return 1
+        # Not back to back. Two screenshots taken milliseconds apart agree about
+        # anything slower than milliseconds, which includes a browser part way
+        # through painting its first frame.
+        sleep 0.4
         grim -o "$mon" "$out.2.png" 2>/dev/null || return 1
         a=$(patch_stats "$out.1.png" "$geom")
         b=$(patch_stats "$out.2.png" "$geom")
@@ -84,6 +88,45 @@ capture_stable() {
         sleep 0.5
     done
     return 2
+}
+
+# noct_wait_content <monitor> <geometry> [timeout seconds]
+#
+# Wait until what is inside the patch stops changing: three samples in a row,
+# six tenths of a second apart, agreeing to within a level.
+#
+# This is separate from waiting for the WINDOW to settle, and it has to be.
+# A browser maps its window, lays it out, and only then paints the page -- so
+# the geometry is final and stable while the content is still whatever the
+# toolkit painted first, which under a dark theme is a dark rectangle.
+# Measured: firefox's page area read 55 of 255 for the first capture and 255
+# for the next one a couple of seconds later, and the arithmetic between them
+# said the browser had no opacity at all. Asking the page to announce itself
+# with document.title was not enough -- the title changed a frame before the
+# white was actually on screen.
+#
+# Watching the pixels is the only thing that is true for every browser, every
+# toolkit and every theme.
+noct_wait_content() {
+    local mon=$1 geom=$2 timeout=${3:-15}
+    local tmp; tmp=$(mktemp -d)
+    local i prev= prev2= now agree
+
+    for (( i = 0; i < timeout * 2; i++ )); do
+        grim -o "$mon" "$tmp/c.png" 2>/dev/null || { rm -rf "$tmp"; return 1; }
+        now=$(mean_grey "$tmp/c.png" "$geom")
+        if [[ -n $prev && -n $prev2 ]]; then
+            agree=$(awk -v a="$now" -v b="$prev" -v c="$prev2" 'BEGIN {
+                d1 = a - b; if (d1 < 0) d1 = -d1
+                d2 = b - c; if (d2 < 0) d2 = -d2
+                print (d1 < 1.0 && d2 < 1.0) ? 1 : 0 }')
+            (( agree )) && { rm -rf "$tmp"; return 0; }
+        fi
+        prev2=$prev; prev=$now
+        sleep 0.6
+    done
+    rm -rf "$tmp"
+    return 1
 }
 
 # ---------------------------------------------------------------------------
@@ -182,6 +225,9 @@ noct_measure_surface() {
     # command substitution, and a subshell's defer stack is discarded with the
     # subshell. Nothing it leaves behind would ever be unwound.
     tmp=$(mktemp -d)
+
+    # Nothing is measured until the window has stopped repainting itself.
+    noct_wait_content "$mon" "$geom" || { rm -rf "$tmp"; return 2; }
 
     seen=$(capture_stable "$mon" "$geom" "$tmp/seen"); rc=$?
     (( rc != 0 )) && { rm -rf "$tmp"; return $rc; }

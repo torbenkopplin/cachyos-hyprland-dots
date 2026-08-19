@@ -313,11 +313,28 @@ noct_managed_profiles() {
 # through where the page itself paints nothing. That half is checked statically
 # instead, by zen-sheet, which compares its alpha and its specificity directly.
 #
-# The title is what the probe window is found by. Class would be more obvious,
-# but a browser's window class is its own business and differs between the four
-# (`zen`, `firefox`, `brave-browser`, `chromium`) in ways that also differ
-# between versions; a page title is set by the page.
+# The title, and why it changes
+# -----------------------------
+# The probe window is found by its title, because a browser's window class is
+# its own business and differs between the four (`zen`, `firefox`,
+# `brave-browser`, `chromium`) in ways that also differ between versions. A
+# page title is set by the page.
+#
+# It starts as noct-probe and becomes noct-probe-ready once the page has
+# actually been painted, and waiting for the second one is what makes this
+# reliable. A browser maps its window before it paints the page, and on Wayland
+# an unpainted content area is TRANSPARENT -- so a capture taken in that gap
+# photographs the wallpaper and reports a browser with no opacity at all. It is
+# also perfectly stable while it lasts, so capturing twice and comparing does
+# not catch it. Measured: firefox came out at 0.00 that way, but only on the
+# runs where something else had just been busy, which is the worst kind of
+# flake to chase.
+#
+# Two nested requestAnimationFrames after load, because the first one is
+# scheduled BEFORE the frame that contains the page and the second one runs
+# after it has been composited.
 NOCT_PROBE_TITLE=noct-probe
+NOCT_PROBE_READY=noct-probe-ready
 
 noct_probe_page() {  # <path>
     cat >"$1" <<'HTML'
@@ -325,6 +342,13 @@ noct_probe_page() {  # <path>
 <meta charset="utf-8">
 <title>noct-probe</title>
 <style>html, body { background: #ffffff; margin: 0; height: 100%; }</style>
+<script>
+  addEventListener("load", function () {
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { document.title = "noct-probe-ready"; });
+    });
+  });
+</script>
 HTML
 }
 
@@ -355,10 +379,14 @@ noct_seed_profile() {
     fi
 
     # A profile that has never been started shows its first-run tour, and the
-    # tour is a full-width page that opens IN FRONT of the probe. Everything
-    # below turns that off, and stops the browser restoring a session it does
-    # not have. None of it is configuration under test -- it is the difference
-    # between photographing the probe page and photographing a welcome screen.
+    # tour covers the whole window -- so the capture photographs the welcome
+    # screen and reports its colour as the colour of a web page. Zen's is the
+    # worst of them: "Welcome to a calmer internet" over a full-bleed image,
+    # which measured 41 of 255 where a white page should have measured 255.
+    #
+    # None of this is configuration under test. It is the difference between
+    # photographing the probe page and photographing an advertisement for the
+    # browser.
     cat >>"$dir/user.js" <<PREFS
 // Added by the test suite, for this throwaway profile only.
 user_pref("browser.startup.page", 0);
@@ -368,6 +396,11 @@ user_pref("toolkit.telemetry.reportingpolicy.firstRun", false);
 user_pref("datareporting.policy.firstRunURL", "");
 user_pref("browser.sessionstore.resume_from_crash", false);
 user_pref("browser.shell.checkDefaultBrowser", false);
+user_pref("browser.shell.didSkipDefaultBrowserCheckOnFirstRun", true);
+user_pref("app.normandy.first_run", false);
+user_pref("doh-rollout.doneFirstRun", true);
+user_pref("nimbus.firstUpdateComplete", true);
+user_pref("zen.welcome-screen.seen", true);
 PREFS
 }
 
@@ -488,17 +521,20 @@ noct_probe_browser() {
     # 30 seconds, not 12. A browser starting cold on a profile it has never
     # seen builds caches, and on a slow disk that is comfortably past the point
     # where a kitty probe would have been up ten times over.
-    NOCT_PROBE_ADDR=$(noct_wait_window "(.title // \"\") | test(\"$NOCT_PROBE_TITLE\")" 30) || {
-        defer "kill $pid 2>/dev/null; wait $pid 2>/dev/null"
+    # The READY title, not the plain one: the page says when it has been
+    # painted, and until it has, the content area is transparent and a capture
+    # of it is a photograph of the wallpaper.
+    NOCT_PROBE_ADDR=$(noct_wait_window "(.title // \"\") | test(\"$NOCT_PROBE_READY\")" 40) || {
+        # Still worth finding the window, so it can be closed rather than
+        # signalled -- a SIGTERMed browser offers troubleshoot mode next time.
+        local stray
+        stray=$(noct_wait_window "(.title // \"\") | test(\"$NOCT_PROBE_TITLE\")" 1) || stray=
+        defer "noct_close_browser '$stray' $pid"
         return 1
     }
     defer "noct_close_browser '$NOCT_PROBE_ADDR' $pid"
 
     noct_window_settle "$NOCT_PROBE_ADDR" page 20 || return 2
-
-    # Longer than a terminal's settle, and for a different reason: a browser
-    # paints its window before it paints the page, so an early capture measures
-    # the chrome's background where the page should be.
-    sleep 2.5
+    sleep 0.5
     return 0
 }
