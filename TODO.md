@@ -158,6 +158,26 @@ desktop, then delete:
       from `ctrl+alt+F2`.
 - [x] After that: `SUPER+,` → Security → Noctalia Greeter → **Sync Now**, so
       the login screen uses the current wallpaper and palette.
+- [x] **Navigation works on a band that scrolls `down`.** `SUPER+J`/`K` walks the
+      tape and only changes workspace past the end of it; `SUPER+L` crosses to the
+      other monitor instead of doing nothing. `lib/nav.lua` no longer assumes a
+      horizontal tape, and works the axis out from the compositor rather than from
+      `WSBANDS` — a laptop has no entry for a monitor it has never been plugged
+      into. `noct-check nav-axis` is the regression net; verified that it fails
+      against the pre-fix file.
+- [ ] **Pixel checks misjudge a rotated monitor.** `noct_window_geom`
+      (`tests/lib/probe.sh`) clips the patch against the monitor's `width` and
+      `height` as `hyprctl monitors` reports them — 1920x1080 for `HDMI-A-1` —
+      while window coordinates are in *logical* space, 1080x1920 under
+      `transform = 3`. So anything past y=1080 on that screen reads as off the
+      edge and every pixel measurement skips: `glass-visible`, `glass-legible`,
+      `blur-stacks`, `browser-glass`, and `column-hop` — which uses
+      `noct_probe_kitty` and so skips whenever the focused monitor is the portrait
+      one with a full workspace. It passes from `DP-3`; that difference is this bug
+      and nothing else. The comment already in `noct_window_settle`
+      diagnoses this as a probe "under the fold", which is what it looks like from
+      the inside. Fix is to swap width/height when `transform` is odd (1, 3, 5, 7).
+      `nav-axis` sidesteps it by never taking a pixel.
 - [ ] `aerc` account setup (first run walks you through it).
 - [x] **Zen's transparency is back on, unmatched.** `browsers/zen/user.js` sets
       `zen.widget.linux.transparency` and `browser.tabs.allow_transparent_browser`

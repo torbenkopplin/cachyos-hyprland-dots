@@ -2,14 +2,21 @@
 --
 -- Mental model (same as niri / PaperWM):
 --
---   * A workspace is an infinite horizontal tape of COLUMNS.
---   * A column holds one or more windows stacked vertically.
---   * H / L walk the tape.  J / K walk within a column.
---   * Workspaces stack vertically per monitor; monitors sit side by side.
+--   * A workspace is an infinite tape of COLUMNS.
+--   * A column holds one or more windows, stacked across the tape's axis.
+--   * H / L walk whatever lies sideways, then hand off to the next MONITOR.
+--   * J / K walk whatever lies up/down, then hand off to the next WORKSPACE.
 --
--- So "off the top/bottom of a column" means the next workspace, and "off the
--- left/right end of the tape" means the next monitor. conf/binds.lua wires
--- that up; this file just sets the layout's own behaviour.
+-- Note "an infinite tape" and not "an infinite horizontal tape". `direction`
+-- below is the default, and a workspace rule overrides it per band -- so a
+-- portrait monitor scrolls DOWN while a landscape one scrolls right, and on that
+-- monitor it is J/K that walk the tape and H/L that walk the column. See
+-- conf/workspaces.lua, and host.lua for the bands themselves.
+--
+-- lib/nav.lua is what makes the two keys mean the same thing on both, and it
+-- works this out from the compositor rather than from the band table -- it has to
+-- hold on a laptop plugged into a monitor no config has ever named. conf/binds.lua
+-- wires the keys up; this file just sets the layout's own behaviour.
 
 hl.config({
     scrolling = {
@@ -41,7 +48,9 @@ hl.config({
         wrap_focus   = false,
         wrap_swapcol = false,
 
-        -- New windows appear to the right and the tape scrolls rightwards.
+        -- Default only: which way a new column goes, and therefore which way
+        -- the tape runs. Per-band overrides live in the workspace rules
+        -- (conf/workspaces.lua), which is the one layout option they can carry.
         direction = "right",
     },
 })

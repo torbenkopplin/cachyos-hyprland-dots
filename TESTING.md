@@ -48,6 +48,7 @@ noct-check --list   # the names, and what each one asserts
 | `blur-stacks` | a floating window sampling past the window it sits on. Also caught `xray` being accepted as a window rule and ignored — it is a layer rule |
 | `column-hop` | `SUPER+CTRL+H/L` handing a column off to the next *workspace* instead of the next *monitor*, which put a workspace move on the horizontal keys |
 | `monitor-hop` | `SUPER+CTRL+SHIFT+<hjkl>` silently doing nothing, because no monitor lay in the direction asked for — and then the obvious fix silently doing nothing too, because the dispatcher fails without raising and a `pcall` around it returns true |
+| `nav-axis` | `SUPER+hjkl` walking the wrong structure on a band that scrolls **down**. Neither hop check noticed, because neither asks anything about `J`/`K`. Derives the tape axis from where two probe windows actually land, so it needs no entry in `WSBANDS` to be right |
 
 The `--all` set drives the display to two extremes and puts it back, and every
 one of them opens **new** windows to measure — a fresh terminal, a fresh browser
@@ -138,6 +139,10 @@ NOCT_CHECK_PATH=$PATH noct-check provider-resolve provider-run
 This is the part most likely to need adjusting, since it depends on the exact
 shape of `window.layout`.
 
+**The list below assumes a band that scrolls `right`.** On one that scrolls
+`down` the two axes swap over — see the portrait half after it. `noct-check
+nav-axis` covers whichever band the focused monitor happens to be on.
+
 - [x] `SUPER+H`/`L` moves between columns.
 - [x] `SUPER+J`/`K` moves between windows **within a column** (stack two windows
       in one column with `SUPER+O` first).
@@ -154,6 +159,31 @@ shape of `window.layout`.
       with the same modifiers — they are bound from the same table, so a
       difference means a bind went missing rather than a behaviour differing.
 - [x] With a **floating** window focused, `SUPER+hjkl` still behaves sanely.
+
+### On a band that scrolls `down`
+
+Needs a monitor whose `WSBANDS` entry says `direction = "down"` — on this desk
+that is the portrait `HDMI-A-1`. Put **two** windows on one of its workspaces;
+they will land as two full-width columns stacked vertically, not as one column.
+
+- [x] `SUPER+J`/`K` moves between them and **stays on the workspace**. This is
+      the bug fixed on 2026-08-19: it used to report "end of column" on the first
+      press, because each column holds one window, and jump a workspace while the
+      next column sat visibly below.
+- [x] Only from the **last** column does `SUPER+J` reach the next workspace.
+- [x] `SUPER+L` crosses to the other monitor on the first press. There is no
+      column to the right on a vertical band, so there is nothing to walk — it
+      used to ask for one anyway and do nothing at all.
+- [x] `SUPER+SHIFT+J` moves the window along the tape, and from the last column
+      sends it to the next workspace.
+- [x] `SUPER+CTRL+J`/`K` reorders the column along the tape, and only past the
+      end sends it to the next workspace. On a landscape band the same keys are
+      a workspace move on the first press, because nothing lies up or down there.
+
+None of this reads `WSBANDS`. `lib/nav.lua` asks the compositor instead — the
+layout's own `focus <dir>` walks whichever structure runs that way and is a
+no-op at an edge, so the edge is detected by whether focus moved. That matters
+for a laptop, which cannot have an entry for a monitor it has never met.
 
 `SUPER+CTRL` is the same four keys applied to the **column** the focused window
 lives in, which is what keeps it from duplicating `SHIFT`. Stack two windows in

@@ -9,8 +9,8 @@ dozen you need on the first day -- is in the [README](../README.md#the-keys-that
 
 | Key | Action |
 |---|---|
-| `M + H` / `L` | Focus left / right along the tape → next **monitor** at the edge |
-| `M + J` / `K` | Focus down / up within the column → next **workspace** at the edge |
+| `M + H` / `L` | Focus left / right → next **monitor** when nothing lies that way |
+| `M + J` / `K` | Focus down / up → next **workspace** when nothing lies that way |
 | `M + SHIFT + H/J/K/L` | Move the focused window, with the same handoff |
 | `M + CTRL + H/J/K/L` | Move the whole **column** — see [Arranging the tape](#arranging-the-tape) |
 | `M + CTRL + SHIFT + H/J/K/L` | Send window to another monitor, unconditionally — see [Monitors](#monitors) |
@@ -27,18 +27,47 @@ That is the distinction the two chords exist for — with a single-window column
 "drag the window right" and "reorder the column right" are the same motion, and
 without separate chords there was no way to say which you meant.
 
+### What "lies that way" means, per monitor
+
+A workspace is a tape of columns and a column is a stack of windows — but **which
+way the tape runs is per band**, set by `direction` in `WSBANDS`
+([host.lua](install.md#two-machines)). So the same key walks a different
+structure depending on the screen you are looking at:
+
+| | `M + H` / `L` walks | `M + J` / `K` walks |
+|---|---|---|
+| `direction = "right"` (landscape) | the **tape** of columns | the **column** you are in |
+| `direction = "down"` (portrait) | the **column** you are in | the **tape** of columns |
+
+You do not have to think about it: the keys always mean what they look like, and
+the handoff is always the same — sideways ends at a monitor, up and down ends at
+a workspace. The table is only here for when you want to know why `M + L` on a
+portrait screen goes straight to the other monitor. It has nothing to walk that
+way, because a portrait band stacks its columns downward.
+
+This was broken until 2026-08-19: navigation assumed every band was landscape, so
+on a portrait one `M + J` announced "end of column" on the very first press and
+jumped a workspace while the next column sat visibly below it, and `M + L` looked
+for a neighbour that a portrait band does not have and did nothing at all.
+`noct-check nav-axis` is the test that it stays fixed.
+
 ## Arranging the tape
 
 | Key | Action |
 |---|---|
-| `M + CTRL + H` / `L` | Swap this column with its neighbour → at the end of the tape, hand the whole column to the next **monitor** |
-| `M + CTRL + J` / `K` | Send the whole column to the workspace below / above |
+| `M + CTRL + H` / `L` | Swap this column with its neighbour → hand the whole column to the next **monitor** when there is none |
+| `M + CTRL + J` / `K` | Swap this column with its neighbour → send it to the workspace below / above when there is none |
 
-One rule runs through all of these: **`H`/`L` is the horizontal axis, `J`/`K` is
-the workspace axis.** Focus, a window and a whole column all run out of columns
-going sideways and hand off to the monitor that way; all three go up and down
-through workspaces. `M + CTRL + SHIFT` is the same monitor handoff for a single
-window, without having to reach the end of the tape first.
+One rule runs through all of these: **`H`/`L` is the monitor axis, `J`/`K` is the
+workspace axis, and each one walks whatever local structure lies along it first.**
+Focus, a window and a whole column all behave the same way, which is the whole
+point of the three chords being three chords rather than three behaviours.
+
+On a landscape band that means `M + CTRL + H`/`L` reorders columns and
+`M + CTRL + J`/`K` is a workspace move on the first press, exactly as before. On
+a portrait band the two swap over, because that is where the tape runs.
+`M + CTRL + SHIFT` is the monitor handoff for a single window, without having to
+reach the end of the tape first.
 
 ### Monitors
 
@@ -57,6 +86,11 @@ This used to be left/right only, which meant that on a desk whose second screen
 is to the *left*, `M + CTRL + SHIFT + L` did nothing at all — the selector
 resolved to no monitor and the keypress was swallowed. `noct-check monitor-hop`
 is the test that it stays fixed.
+
+### Restructuring the tape
+
+| Key | Action |
+|---|---|
 | `M + O` | Consume — pull the next window into this column |
 | `M + I` | Expel — push this window out into its own column |
 | `M + SHIFT + .` | Promote to a new column |
