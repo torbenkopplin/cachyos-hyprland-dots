@@ -372,27 +372,50 @@ PREFS
 }
 
 # noct_close_browser <address> <pid> -- shut a probe browser down the way a
-# person would, and only force it if that does not work.
+# person would, and do not come back until its window is actually gone.
 #
 # Closing the window rather than signalling the process, because a browser that
 # is SIGTERMed thinks it crashed. Measured: killing the probe left Firefox
-# showing "Open Firefox in Troubleshoot Mode?" on its next launch and Zen
+# offering "Open Firefox in Troubleshoot Mode?" on its next launch and Zen
 # restarting in safe mode -- a test that makes the thing it tested worse.
 #
-# The pid is a fallback and not the mechanism, for a second reason: the command
-# on PATH is usually a wrapper that execs the real binary, so the pid this
-# suite has is not always the pid that owns the window. Closing the last window
-# is what makes a browser exit, whatever it is called underneath.
+# Waiting on the WINDOW rather than on the pid, and this is the part that
+# matters. The command on PATH is usually a wrapper that execs the real binary,
+# so the pid this suite holds is often already gone while the browser it
+# started is still on screen. Waiting on that pid returns instantly and the
+# next browser's probe then finds the PREVIOUS browser's window, which is by
+# then in the middle of closing -- so the patch lands on wallpaper and the
+# browser is reported as having no opacity at all. That is exactly what
+# happened: firefox measured 0.00 on a run where zen had not finished closing.
 noct_close_browser() {
     local addr=$1 pid=$2 i
     [[ -n $addr ]] && hyprctl dispatch "hl.dsp.window.close({ window = \"address:$addr\" })" >/dev/null 2>&1
-    for (( i = 0; i < 20; i++ )); do
-        kill -0 "$pid" 2>/dev/null || return 0
+    for (( i = 0; i < 40; i++ )); do
+        if ! hyprctl -j clients 2>/dev/null | jq -e --arg a "$addr" \
+               'any(.[]; .address == $a)' >/dev/null 2>&1; then
+            kill -0 "$pid" 2>/dev/null && { kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; }
+            return 0
+        fi
         sleep 0.25
     done
     kill "$pid" 2>/dev/null
     wait "$pid" 2>/dev/null
     return 0
+}
+
+# noct_no_probe_windows [timeout] -- wait until nothing titled like a probe is
+# left on screen. Called between browsers, because "the window I asked to close
+# has gone" and "no window that a title match could confuse for mine is left"
+# are different statements, and only the second one makes the next probe safe.
+noct_no_probe_windows() {
+    local timeout=${1:-10} i n
+    for (( i = 0; i < timeout * 4; i++ )); do
+        n=$(hyprctl -j clients 2>/dev/null \
+            | jq -r --arg t "$NOCT_PROBE_TITLE" '[ .[] | select((.title // "") | test($t)) ] | length')
+        [[ ${n:-0} == 0 ]] && return 0
+        sleep 0.25
+    done
+    return 1
 }
 
 # noct_probe_browser <browser>

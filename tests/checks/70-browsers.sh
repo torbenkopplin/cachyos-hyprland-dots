@@ -156,6 +156,14 @@ check_browser_glass() {
         # measurement is the one that answers the question.
         noct_glass_reset
 
+        # Nothing that a title match could mistake for this browser's probe.
+        # See noct_close_browser: the previous browser's window outliving the
+        # pid that started it is how firefox once measured 0.00.
+        noct_no_probe_windows || {
+            info "$b: a previous probe window is still on screen -- skipped"
+            continue
+        }
+
         local mark; mark=$(noct_defer_mark)
         noct_probe_browser "$b"
         case $? in
