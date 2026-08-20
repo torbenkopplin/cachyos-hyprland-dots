@@ -460,5 +460,7 @@ noct-glass show                      # level currently in effect
 
 ---
 
-See also: [install](install.md) for which packages the theming depends on, and
-[design notes](design.md) for the rest of the config's shape.
+See also: [install](install.md) for which packages the theming depends on,
+[design notes](design.md) for the rest of the config's shape, and
+[decisions 010–013](decisions/README.md) for the short form of everything here
+that was settled against something else.

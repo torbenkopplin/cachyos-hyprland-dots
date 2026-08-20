@@ -48,7 +48,7 @@
 # configures -- the prefs those need are set false in browsers/zen/user.js -- so
 # the probe and the intent agree. What it cannot tell you is whether YOUR real
 # profile still has the mod switched on. That is a look at the screen, and
-# TESTING.md §7 asks for it.
+# TESTING.md's theming section asks for it.
 
 # ---------------------------------------------------------------------------
 # Windows

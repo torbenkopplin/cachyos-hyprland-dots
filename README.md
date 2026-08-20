@@ -113,6 +113,14 @@ only one thing may own idle).
 
 **[→ colours, wallpapers and glass](docs/theming.md)**
 
+**[→ decisions](docs/decisions/README.md)** — every choice with the date and the
+measurement that settled it, and a table of the things that were built, measured
+and dropped. Read that table before rebuilding one of them.
+
+**[→ upstream facts](docs/upstream.md)** — what Hyprland 0.56 and Noctalia
+5.0.0-beta.8 actually do, as opposed to what their docs say. Start here when
+something looks correct and does nothing.
+
 ---
 
 ## What is where
@@ -129,8 +137,9 @@ install.sh         the installer's front door: flags, and the order steps run in
 install/manifest/  what gets deployed — links, packages, units, browser files
 install/lib/       the engine that reads them
 docs/              keymap, design notes, theming, install, decisions
-TESTING.md         post-install checklist — start here on first boot
-tests/             the test suite behind `noct-check`; tests/README.md
+TESTING.md         post-install checklist — only what a person has to judge
+tests/             noct-check (needs a session), lint.sh and install-fakeroot.sh
+                   (need nothing); tests/README.md
 ```
 
 To change almost anything, start in **`config/hypr/conf/options.lua`**.

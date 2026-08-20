@@ -205,4 +205,12 @@ is playing is audio in a terminal.
 
 ---
 
+---
+
+This file is the narrative: how the five mechanisms work. The *choices* — with
+their dates, the measurements that settled them, and the things that were built
+and then dropped — are one per file in
+[decisions/](decisions/README.md). What Hyprland and Noctalia actually do, as
+opposed to what they document, is [upstream.md](upstream.md).
+
 See also: [the full keymap](keymap.md).
