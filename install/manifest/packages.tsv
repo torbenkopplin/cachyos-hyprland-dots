@@ -1,0 +1,245 @@
+# packages.tsv -- every package this setup installs, and why.
+#
+# pacman first, always. CachyOS rebuilds its repos with architecture-specific
+# optimisations (x86-64-v3/v4, LTO, BOLT), so a package that exists in the
+# repos is meaningfully better than the same package built locally from the
+# AUR. Every name in the `repo` phase below is therefore attempted with pacman
+# regardless of where it "usually" lives, and only what pacman cannot resolve
+# falls through to an AUR helper.
+#
+# Names are not verified against the repos during an install, so installs are
+# permissive: a name that resolves nowhere is reported in the summary instead of
+# aborting the run. `./install.sh --check` is the pass that verifies every name
+# here against the repos and the AUR *before* a fresh machine meets it -- run it
+# after editing this file.
+#
+# Format: phase <TAB> group <TAB> name
+#
+#   phase   repo    the main pass: pacman, then the AUR for whatever is left
+#           cursor  the same, but only when no Bibata build is already present
+#           npm     installed with npm, prefixed into ~/.local
+#           claude  npm as well, and skipped when `claude` is already on PATH
+#           login   only by ./install.sh --login
+#   group   what it is for. tests/deps.tsv names this group in its third
+#           column, and `noct-check deps-manifest` fails when a declared
+#           dependency is not in the group that claims to install it.
+#
+# Rows run in file order, and the group order below is the order the main pass
+# has always installed them in.
+#
+# The reason a package is here goes in a comment above it. That is not
+# decoration: half of these are present because a config file names them
+# directly, and the only way to know whether a name can be deleted is to have
+# written down what reads it.
+
+# --- desktop ---------------------------------------------------------------
+# Compositor, shell, and the pieces the config actually calls out to.
+#
+# uwsm, nautilus, libnotify and hyprpolkitagent are here because conf/ names
+# them directly -- see the comment on each. They are easy to miss precisely
+# because a CachyOS Hyprland install usually pulls them in already, so the gap
+# only shows up on a machine that started from a different base.
+
+repo	desktop	hyprland
+repo	desktop	xdg-desktop-portal-hyprland
+repo	desktop	xdg-desktop-portal-gtk
+repo	desktop	kitty
+repo	desktop	qt6ct
+repo	desktop	hyprpicker
+repo	desktop	hyprlock
+repo	desktop	wl-clipboard
+repo	desktop	brightnessctl
+repo	desktop	playerctl
+
+# grim is what bin/noct-check measures the frosted glass with -- the only way
+# to tell a 3-level effect from a 17-level one is to photograph the screen and
+# do the arithmetic. imagemagick, which does that arithmetic, is in `yazi`.
+repo	desktop	grim
+
+# Fonts, all three named because something reads each of them:
+#   ttf-jetbrains-mono-nerd  kitty's font_family, and the glyphs starship and
+#                            eza draw their icons from
+#   adwaita-fonts            Adwaita Sans, the shell's UI face (00-shell.toml).
+#                            Usually present as a GNOME dependency, which is
+#                            not a thing to rely on
+#   noto-*                   everything else, emoji included
+repo	desktop	noto-fonts
+repo	desktop	noto-fonts-emoji
+repo	desktop	ttf-jetbrains-mono-nerd
+repo	desktop	adwaita-fonts
+
+# options.lua sets LAUNCH_PREFIX = "uwsm app -- ", so without uwsm every single
+# app bind fails. Clear LAUNCH_PREFIX instead if you do not want it.
+repo	desktop	uwsm
+
+# options.lua FILE_MANAGER.
+repo	desktop	nautilus
+
+# polkit is only the library; an agent is what actually shows the password
+# prompt, so GUI privilege escalation is silently dead without one.
+repo	desktop	polkit
+repo	desktop	hyprpolkitagent
+
+# notify-send, which every bin/noct-* script uses to report what it did.
+repo	desktop	libnotify
+
+# hypridle is deliberately NOT here. Noctalia has its own idle service and this
+# repo configures it (config/noctalia/70-idle.toml); running hypridle as well
+# means two countdowns to the same lock screen, each unaware of the other. That
+# is not hypothetical -- it is what a machine upgraded from ~/repos/dots ends up
+# with, and services.tsv turns the leftover unit off. Nothing else here needs
+# it: hyprlock stays, since it is a perfectly good fallback lock you can call by
+# hand. See docs/decisions/006-idle-has-one-owner.md.
+
+# --- system ----------------------------------------------------------------
+# Backends behind the launcher's /aout /ain /bt /net /power providers. Without
+# these the providers list "not installed" and do nothing.
+
+repo	system	libpulse
+repo	system	networkmanager
+repo	system	bluez
+repo	system	bluez-utils
+repo	system	power-profiles-daemon
+
+# --- dev -------------------------------------------------------------------
+# Editor, and the tools the neovim config shells out to:
+#   fzf + bat  -> fzf-lua and its previewer
+#   ripgrep    -> grep backend
+#   nodejs/npm -> mason needs it for tsgo, eslint and lemminx
+
+repo	dev	neovim
+repo	dev	git
+repo	dev	base-devel
+repo	dev	nodejs
+repo	dev	npm
+
+# tree-sitter-cli is the one to be careful about, and it is the reason
+# tests/deps.tsv exists at all. nvim-treesitter shells out to `tree-sitter` to
+# build a parser from a grammar, but the neovim config is its own repository --
+# cloned by --nvim, not vendored here -- so NOTHING in this repo names the
+# dependency. It was missing from this list for as long as this list has
+# existed, on a machine that happened to have it installed by hand, and the only
+# symptom on a fresh one is a treesitter error that talks about the grammar.
+# `noct-check deps-manifest` is what makes that impossible to repeat.
+repo	dev	tree-sitter-cli
+
+repo	dev	ripgrep
+repo	dev	fd
+repo	dev	fzf
+repo	dev	bat
+repo	dev	curl
+repo	dev	wget
+repo	dev	unzip
+
+# --- shell -----------------------------------------------------------------
+# The shell, and the plugin manager used to get a fish-native nvm.
+
+repo	shell	fish
+repo	shell	fisher
+repo	shell	fastfetch
+
+# --- prompt ----------------------------------------------------------------
+# Referenced directly by the carried-over fish config: starship builds the
+# prompt, eza backs `ls`/`lt`, bat backs `cat` (bat is in `dev`).
+#
+# rustup is deliberately NOT here, though conf.d/rustup.fish is named after it.
+# It declares `Conflicts With: rust cargo`, and pacman runs with --noconfirm,
+# which answers the "remove them?" prompt rather than aborting -- so on any
+# machine that already has the repo toolchain this would swap a working
+# rust/cargo for a rustup that ships no toolchain at all until
+# `rustup default stable` is run by hand. Nothing here needs rustup: cargo from
+# the repos lands on PATH at /usr/bin/cargo, and CachyOS builds it with the same
+# architecture optimisations that are the whole reason this file prefers repo
+# packages. Install rustup yourself if you want per-project toolchain pinning;
+# conf.d/rustup.fish works either way.
+
+repo	prompt	starship
+repo	prompt	eza
+
+# --- yazi ------------------------------------------------------------------
+# yazi and its preview pipeline.
+
+repo	yazi	yazi
+repo	yazi	ffmpeg
+repo	yazi	7zip
+repo	yazi	jq
+repo	yazi	poppler
+repo	yazi	imagemagick
+repo	yazi	chafa
+
+# --- browsers --------------------------------------------------------------
+repo	browsers	chromium
+repo	browsers	firefox
+repo	browsers	brave-bin
+repo	browsers	zen-browser-bin
+
+# --- apps ------------------------------------------------------------------
+# Part of the setup rather than of the desktop.
+
+# Asked for by name, and the one messenger with no web client worth using.
+repo	apps	signal-desktop
+
+# Mail. The brief was keyboard-driven, vim-style, TUI, and able to send
+# attachments -- which is aerc almost exactly: modal keybinds, :commands,
+# `:attach` for files, and it opens the message in $EDITOR (nvim, per
+# conf/env.lua). neomutt is the other candidate and is more configurable; aerc
+# wins on arriving usable, understanding maildir and IMAP out of the box, and
+# having a first-run account wizard rather than a .muttrc.
+#
+# No account config is tracked here: an accounts.conf holds mail addresses and
+# server names, and its password entries would either be secrets in git or a
+# keyring reference that only works on one machine. Run `aerc` once and answer
+# the wizard.
+repo	apps	aerc
+
+# --- likely-aur ------------------------------------------------------------
+# Usually AUR-only, but still attempted with pacman first, because CachyOS ships
+# some of these in its own repos and a repo build beats a local one.
+
+repo	likely-aur	noctalia
+repo	likely-aur	satty
+repo	likely-aur	claude-code
+
+# --- cursor ----------------------------------------------------------------
+# The cursor theme named by CURSOR_THEME in conf/options.lua, installed only
+# when no Bibata build already provides it.
+#
+# No Bibata package exists in the repos, so this is AUR-only, and the AUR
+# variants (bibata-cursor-theme, -bin, -git, and the illogical-impulse build
+# that ~/repos/dots pulls in) all ship /usr/share/icons/Bibata-*. pacman aborts
+# an entire transaction on a file conflict, so asking for one on a machine that
+# already has another would take the rest of the package step down with it --
+# which is why this is its own phase with a predicate rather than a row in
+# `repo`.
+#
+# Nothing breaks if it ends up not installed either: an XCURSOR_THEME that names
+# a missing theme means the pointer stays the compositor default.
+
+cursor	desktop	bibata-cursor-theme-bin
+
+# --- npm -------------------------------------------------------------------
+# Installed with npm rather than pacman, prefixed into ~/.local so they never
+# need root and land on the PATH this repo already asks you to have.
+#
+# LSP servers are deliberately absent: the neovim config installs those through
+# mason (tsgo, eslint, vimls, lua_ls, lemminx), and a second copy on PATH would
+# only cause confusion.
+
+npm	globals	eslint
+npm	globals	@mermaid-js/mermaid-cli
+
+# --- claude ----------------------------------------------------------------
+# Tried as a package first, in `likely-aur` above; npm is the documented
+# fallback and the one that works when no AUR build exists. Its own phase
+# because it is skipped outright when `claude` is already on PATH, and that is a
+# predicate rather than a row.
+
+claude	globals	@anthropic-ai/claude-code
+
+# --- login -----------------------------------------------------------------
+# Installed by ./install.sh --login only. greetd is the daemon; noctalia-greeter
+# is the greeter that runs inside it, and it brings its own small wlroots
+# compositor so it does not need Hyprland to be up first.
+
+login	login	greetd
+login	login	noctalia-greeter

@@ -1,0 +1,54 @@
+# links.tsv -- every path this repo deploys, and where it goes.
+#
+# install.sh links individual FILES, never whole directories, so Hyprland and
+# Noctalia can still create their own files alongside yours without fighting
+# the repo. A `tree` row means "every file under here", walked and linked one
+# by one; it does not mean the directory itself is linked.
+#
+# Symlinks are safe for everything here:
+#
+#   ~/.config/hypr/*      Hyprland only ever reads its config.
+#   ~/.config/noctalia/*  Noctalia only ever reads ~/.config/noctalia. It saves
+#                         GUI changes to ~/.local/state/noctalia/settings.toml,
+#                         a different tree -- so the app can never clobber a
+#                         tracked file or replace a link.
+#   ~/.config/yazi/*      read-only as far as yazi is concerned.
+#   ~/.local/bin/noct-*   plain scripts.
+#
+# Format: section <TAB> kind <TAB> source <TAB> root <TAB> destination
+#
+#   section  the heading it is reported under, and the order rows run in
+#   kind     file       link this one file
+#            tree       link every file under this directory, recursively
+#            exec-tree  the same, and chmod +x the source first
+#   source   relative to the repository root
+#   root     config  ->  $XDG_CONFIG_HOME (~/.config)
+#            bin     ->  ~/.local/bin
+#   destination  relative to that root; "." means straight into it
+#
+# Two kinds of file are skipped inside a tree, by rule rather than by row:
+# README.md, because documentation belongs in the repo rather than scattered
+# through ~/.config, and *.example, because those are meant to be COPIED to a
+# new name (host.lua, glass.local.conf) and edited -- a symlink into the repo
+# cannot be either.
+
+configs	tree	config/hypr	config	hypr
+configs	tree	config/noctalia	config	noctalia
+configs	tree	config/yazi	config	yazi
+configs	tree	config/kitty	config	kitty
+configs	tree	config/fish	config	fish
+configs	file	config/starship/starship.toml	config	starship.toml
+
+# Read by uwsm before the compositor starts, and the only place the session
+# gets ~/.local/bin on PATH -- which is what the launcher providers and the
+# noct-glass binds are found through. See config/uwsm/env.
+configs	tree	config/uwsm	config	uwsm
+
+# The same PATH, through the systemd user manager instead, for the case where
+# the session was started without uwsm. See config/environment.d.
+configs	tree	config/environment.d	config	environment.d
+
+# The launcher providers, the glass level, the wallpaper fetcher and the test
+# runner. noct-common.sh is in here too: it is sourced rather than run, but it
+# has to sit beside the scripts that source it.
+scripts	exec-tree	bin	bin	.

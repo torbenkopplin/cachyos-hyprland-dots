@@ -125,8 +125,10 @@ config/kitty/      kitty.conf and two kittens
 config/fish/       config.fish, plugins, frozen theme colours
 bin/noct-*         the launcher providers, the glass level, the wallpaper fetcher
 browsers/          policies and user.js for Brave, Chromium, Firefox, Zen
-install.sh         linking, updating, packages, browsers, wallpapers, login screen
-docs/              keymap, design notes, theming, install
+install.sh         the installer's front door: flags, and the order steps run in
+install/manifest/  what gets deployed — links, packages, units, browser files
+install/lib/       the engine that reads them
+docs/              keymap, design notes, theming, install, decisions
 TESTING.md         post-install checklist — start here on first boot
 tests/             the test suite behind `noct-check`; tests/README.md
 ```

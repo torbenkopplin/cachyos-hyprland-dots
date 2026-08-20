@@ -1,4 +1,5 @@
-# deps.sh -- does install.sh actually install everything this setup needs?
+# deps.sh -- does the package manifest actually install everything this setup
+# needs?
 #
 # The failure this is built around
 # --------------------------------
@@ -25,7 +26,7 @@ noct_register deps-declared  pure check_deps_declared \
     "nothing in bin/ or tests/ depends on a tool the manifest does not name"
 
 DEPS_TSV=$NOCT_REPO/tests/deps.tsv
-INSTALL_SH=$NOCT_REPO/install.sh
+PKG_TSV=$NOCT_REPO/install/manifest/packages.tsv
 
 # deps_rows -- the manifest, comments and blank lines removed.
 deps_rows() {
@@ -34,32 +35,41 @@ deps_rows() {
 }
 
 # ---------------------------------------------------------------------------
-# deps-manifest -- the manifest against install.sh.
+# deps-manifest -- the dependency manifest against the package manifest.
 #
-# Checked against the named list rather than against the file as a whole, and
-# that matters: a package named in a comment, or sitting in PKGS_LOGIN when it
-# is needed by every machine, both look like "install.sh mentions it" to a
-# grep and neither one installs it on an ordinary run.
+# Checked against the named group rather than against the file as a whole, and
+# that matters: a package named in a comment, or sitting in the `login` group
+# when it is needed by every machine, both look like "the manifest mentions it"
+# to a grep and neither one installs it on an ordinary run.
+#
+# The group is also checked for existing at all, which is what catches a group
+# renamed in packages.tsv and not here.
 # ---------------------------------------------------------------------------
 
-# install_list_contents <PKGS_NAME> -- the words inside that array literal.
-# Comments are stripped first, so a package named only in a comment does not
-# count as installed -- which is precisely the mistake worth catching.
-install_list_contents() {
-    awk -v want="$1" '
-        $0 ~ "^" want "=\\(" { inside = 1 }
-        inside {
-            line = $0
-            sub(/#.*/, "", line)
-            gsub(/^[^(]*\(/, "", line)
-            if (line ~ /\)/) { sub(/\).*/, "", line); print line; exit }
-            print line
-        }' "$INSTALL_SH"
+# pkg_manifest_rows -- phase, group and name, comments removed.
+pkg_manifest_rows() {
+    [[ -f $PKG_TSV ]] || return 1
+    grep -v '^[[:space:]]*#' "$PKG_TSV" | awk -F'\t' 'NF >= 3'
+}
+
+# group_exists <group>
+group_exists() {
+    pkg_manifest_rows | awk -F'\t' -v g="$1" '$2 == g { found = 1 } END { exit !found }'
+}
+
+# group_installs <group> <package> -- is that exact name in that group?
+#
+# An exact field match, not a grep: `firefox` and `zen-browser-bin` both
+# contain shorter names as substrings, and a package named only in a comment
+# above the row is not installed by anything.
+group_installs() {
+    pkg_manifest_rows | awk -F'\t' -v g="$1" -v p="$2" \
+        '$2 == g && $3 == p { found = 1 } END { exit !found }'
 }
 
 check_deps_manifest() {
     require_file deps-manifest "$DEPS_TSV" "it is the manifest itself" || return
-    require_file deps-manifest "$INSTALL_SH" "this is not a checkout of the repo" || return
+    require_file deps-manifest "$PKG_TSV" "this is not a checkout of the repo" || return
 
     local cmd pkg list scope why problems=() count=0
     while IFS=$'\t' read -r cmd pkg list scope why; do
@@ -67,13 +77,13 @@ check_deps_manifest() {
         count=$((count + 1))
         [[ $list == - ]] && continue    # base system: nothing installs it
 
-        if ! grep -qE "^$list=\(|^$list=\( " "$INSTALL_SH" \
-           && ! grep -qE "^$list=" "$INSTALL_SH"; then
-            problems+=("$cmd: install.sh has no list called $list")
+        if ! group_exists "$list"; then
+            problems+=("$cmd: packages.tsv has no group called $list")
+            problems+=("  why it is needed: $why")
             continue
         fi
-        if ! install_list_contents "$list" | grep -qw -- "$pkg"; then
-            problems+=("$cmd needs $pkg, and $list does not install it")
+        if ! group_installs "$list" "$pkg"; then
+            problems+=("$cmd needs $pkg, and the $list group does not install it")
             problems+=("  why it is needed: $why")
         fi
     done < <(deps_rows)
@@ -81,13 +91,14 @@ check_deps_manifest() {
     metric deps.declared "$count"
 
     if (( ${#problems[@]} == 0 )); then
-        pass deps-manifest "install.sh installs all $count declared dependencies"
+        pass deps-manifest "the manifest installs all $count declared dependencies"
     else
-        fail deps-manifest "install.sh is missing $(( ${#problems[@]} / 2 )) declared dependency(ies)"
+        fail deps-manifest "packages.tsv is missing $(( ${#problems[@]} / 2 )) declared dependency(ies)"
         local p; for p in "${problems[@]}"; do info "$p"; done
         info ""
-        info "Add the package to that list in install.sh. A machine set up from this repo"
-        info "does not get it otherwise, and nothing else in the suite will say so."
+        info "Add a row to install/manifest/packages.tsv in that group. A machine set up"
+        info "from this repo does not get it otherwise, and nothing else in the suite will"
+        info "say so."
     fi
 }
 

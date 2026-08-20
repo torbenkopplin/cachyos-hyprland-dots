@@ -1,0 +1,30 @@
+# services.tsv -- the units this setup turns on, and the one it turns off.
+#
+# Format: scope <TAB> unit <TAB> action
+#
+#   scope   system  systemctl (needs sudo)
+#           user    systemctl --user
+#   action  enable   enable --now, if the unit exists on this machine
+#           disable  disable --now, but only if it is currently enabled or
+#                    active -- so a machine that never had it stays quiet
+#
+# A unit that does not exist is skipped without comment: these are all provided
+# by packages.tsv, and a missing one is already reported by the package step.
+
+# Backends behind the launcher providers. Installing the package is not enough:
+# nmcli, bluetoothctl and powerprofilesctl all talk to a daemon.
+system	NetworkManager.service	enable
+system	bluetooth.service	enable
+system	power-profiles-daemon.service	enable
+
+# Noctalia's idle service is what this repo configures (70-idle.toml). hypridle
+# does the same job from a config directory the repo does not manage, and on a
+# machine that ran ~/repos/dots it is still enabled as a user unit -- so the
+# screen locks on whichever of the two counts down first, with two different
+# sets of timeouts and only one of them written down here.
+#
+# A user unit, so no sudo, and disabling it is a one-word undo if you would
+# rather keep hypridle: `systemctl --user enable --now hypridle`, and then set
+# every behaviour in 70-idle.toml to enabled = false so only one of them acts.
+# See docs/decisions/006-idle-has-one-owner.md.
+user	hypridle.service	disable

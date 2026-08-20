@@ -161,7 +161,7 @@ answers to the same three captures.
 
 ### If it needs a new tool
 
-Add it to `deps.tsv`, with the package, the `install.sh` list that installs it,
+Add it to `deps.tsv`, with the package, the `packages.tsv` group that installs it,
 and one line on why. `deps-declared` fails until you do — that is the check
 that stops the manifest rotting, and the manifest is what stops another
 `tree-sitter-cli`.

@@ -54,6 +54,33 @@ cd ~/repos/cachyos-hyprland-dots
 | `--status` | Show which setup currently owns each managed path |
 | `--update` | Pull, relink, and re-apply it to the running session — see [Two machines](#two-machines) |
 | `--unlink` | Remove this script's links and restore whatever they replaced |
+| `--check` | Verify every package name in the manifest against the repos, the AUR and npm. Installs nothing |
+| `--root DIR` | Do everything under `DIR` instead of `~`, and skip the steps that change the machine rather than a path |
+
+### `--root`, and why the installer has one
+
+`--root` redirects all four of the installer's roots at once — `~/.config`,
+`~/.local/bin`, `~` and `/etc` — so a full run lands in a throwaway directory
+and needs neither sudo nor a single environment variable:
+
+```sh
+./install.sh --root /tmp/fake --all --login   # links, policies, greetd config
+find /tmp/fake -type l | wc -l                # 51
+```
+
+Steps that change the *machine* rather than a path — packages, systemd units,
+the login shell, the git clone, the wallpaper download, the display-manager
+switch — say so and skip. Everything that writes a file runs for real.
+
+This exists for two reasons. It is how the installer is tested, by
+`tests/install-fakeroot.sh` and in CI, on a machine with no Hyprland and no
+pacman. And it is the structural answer to the accident of 2026-08-19: a test
+run against a throwaway `HOME` relinked a live desktop's `~/.config` into a
+`/tmp` checkout that was then deleted, because `HOME` and `XDG_CONFIG_HOME` are
+two different roots and only one of them had been overridden. That refusal is
+still in place, but `--root` is the thing to reach for instead — one flag, one
+root, nothing to get half right. See
+[decisions/012](decisions/012-installer-is-data-plus-an-engine.md).
 
 ## The login screen
 
@@ -204,6 +231,11 @@ ignored, look there first.
 
 ## What `--packages` installs
 
+The list itself is `install/manifest/packages.tsv`, one row per package, with
+the reason it is there in a comment above it. This is the summary; that file is
+the source of truth, and `./install.sh --check` verifies every name in it
+resolves somewhere before a fresh machine has to find out.
+
 | Group | Why |
 |---|---|
 | hyprland, portals, kitty, qt6ct, hyprpicker, hyprlock | the session itself |
@@ -352,10 +384,29 @@ bin/
   noct-glass          frosted glass level, per scheme
   noct-wallfetch      fills the wallpaper folders from Wallhaven
 bootstrap.sh          curl-able one-command installer
-install.sh
+install.sh            the front door: flags, and the order the steps run in
+install/
+  manifest/
+    links.tsv         every path deployed, and where it goes
+    packages.tsv      every package installed, and why it is needed
+    services.tsv      the units turned on, and the one turned off
+    browsers.tsv      the policies and the user.js roots
+  lib/
+    common.sh         the four roots, output helpers, the one refusal
+    link.sh           link / unlink / status
+    packages.sh       pacman, the AUR, npm, and --check
+    session.sh        login shell, systemd units, the neovim clone
+    browsers.sh       policies and user.js
+    wallpapers.sh     noct-wallfetch, and the per-monitor section check
+    login.sh          greetd + noctalia-greeter
+    update.sh         pull, re-exec, re-apply
 docs/                 keymap.md, design.md, theming.md, install.md (this file)
+  decisions/          one file per settled decision, and what settled it
 TESTING.md            post-install checklist — start here on first boot
 ```
+
+Adding a config file to the deployment is a line in `links.tsv`; adding a
+package is a line in `packages.tsv`. Neither one needs the engine touched.
 
 To change almost anything, start in `config/hypr/conf/options.lua`.
 

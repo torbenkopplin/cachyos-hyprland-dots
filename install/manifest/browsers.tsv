@@ -1,0 +1,33 @@
+# browsers.tsv -- declarative browser configuration.
+#
+# Policies and preferences only. Profiles -- cookies, saved logins, history --
+# are never touched: see browsers/README.md.
+#
+# Format: kind <TAB> source <TAB> ...
+#
+#   policy  source <TAB> destination
+#           Written with `install -Dm644` as root. Chromium-family browsers
+#           and Firefox both read a managed-policy JSON from /etc, which is
+#           the one place a setting cannot be un-set from inside the browser.
+#
+#   userjs  source <TAB> label <TAB> profile root [<TAB> profile root ...]
+#           Linked into every profile directory found under those roots.
+#           Firefox-family profiles have generated directory names, so they are
+#           discovered rather than assumed, and they do not exist until the
+#           browser has been launched once.
+#
+#           More than one root is allowed because a browser's profile directory
+#           is not a stable thing: Zen moved from ~/.zen to ~/.config/zen, and a
+#           file written to the root the browser is not using is invisible
+#           rather than an error. ~/.config/zen is where zen-browser-bin 1.21
+#           keeps profiles; ~/.zen is kept for older builds and the flatpak.
+#
+# Paths starting with ~ are relative to HOME; everything else is absolute, and
+# both are prefixed by --root when one is given.
+
+policy	browsers/brave/policies.json	/etc/brave/policies/managed/policies.json
+policy	browsers/chromium/policies.json	/etc/chromium/policies/managed/policies.json
+policy	browsers/firefox/policies.json	/etc/firefox/policies/policies.json
+
+userjs	browsers/firefox/user.js	Firefox	~/.mozilla/firefox
+userjs	browsers/zen/user.js	Zen	~/.config/zen	~/.zen
