@@ -1,0 +1,56 @@
+# glass.local.conf -- this machine's own glass levels. NOT tracked.
+#
+#   cp config/noctalia/glass.local.conf.example ~/.config/noctalia/glass.local.conf
+#
+# Copy it into place, edit it, and it applies here and nowhere else. Absent by
+# default, which means "use the tracked levels in glass.conf" -- so a machine
+# without this file needs nothing done to it.
+#
+# Why this exists
+# ---------------
+# glass.conf is tracked, so a level set there is a level set on every machine
+# that pulls. But the right level is not a property of the setup, it is a
+# property of the screen you are sitting in front of: a glass level that reads
+# well on a bright panel at home is one you fight all day on a work laptop
+# under office light, and neither answer is the one to commit for both.
+#
+# Same arrangement as ~/.config/hypr/host.lua, and for the same reason -- these
+# are the two files that are allowed to differ per machine. Anything else that
+# differs is a difference worth committing.
+#
+# How it resolves
+# ---------------
+# bin/noct-glass reads this file BEFORE glass.conf, and both of its keys before
+# either of glass.conf's:
+#
+#   1. <scheme>.<key> here
+#   2. <key> here
+#   3. <scheme>.<key> in glass.conf
+#   4. <key> in glass.conf
+#   5. the built-in default
+#
+# The order matters at step 2 against step 3: a bare `window` set here beats a
+# per-scheme `window` in glass.conf. Otherwise a machine that had said "no
+# compositor transparency here" would get it back the moment you switched to the
+# one scheme that overrides it.
+#
+# `noct-glass show` prints [glass.local.conf] when this file is in play, so
+# "why do the two machines look different" has an answer you can read off.
+#
+# Every key glass.conf accepts works here, levels and blur alike. Nothing is
+# inherited selectively -- a key you leave out simply falls through to glass.conf.
+
+# --- what you probably want it for -----------------------------------------
+
+# No translucency at all on this machine, terminal included.
+# terminal = 1.0
+
+# The other direction: the old look back, glass on every window. Costs contrast
+# on every app that cannot fade its background without fading its text, which is
+# all of them except kitty -- see glass.conf.
+# window   = 0.85
+# terminal = 0.55
+
+# A dimmer backdrop, for a screen where the wallpaper reads too bright through
+# a terminal.
+# blur_brightness = 0.75
