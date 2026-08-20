@@ -5,6 +5,7 @@
 # nothing about the PATH the launcher's providers run under. Read it from the
 # process instead of asking a shell.
 
+# shellcheck disable=SC2088  # a description read by a person, not a path
 noct_register session-path pure check_session_path \
     "~/.local/bin is on the PATH the session actually runs with"
 noct_register session-env  pure check_session_env \

@@ -1,0 +1,57 @@
+# The half of the test suite that does not need a desktop.
+#
+# `noct-check` measures a running Hyprland session and so only works on the
+# machine it is describing. Everything here runs on a bare Ubuntu runner with no
+# Hyprland, no Noctalia, no pacman and no fish -- which is exactly why
+# ./install.sh has a --root: the installer can be run for real, into a throwaway
+# directory, and checked.
+#
+# What this catches that a person reading a diff does not: a manifest row
+# pointing at a renamed file (which deploys a dangling symlink, and a dangling
+# symlink in ~/.config/hypr is a session that will not start), two rows claiming
+# one destination, a TOML file the shell would silently drop a section from, and
+# a shellcheck warning in 3000 lines of bash.
+
+name: checks
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  static:
+    name: static checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # shellcheck ships on the runner; lua does not, and luac is what parses
+      # the sixteen Lua files this config is written in.
+      - name: install lua and shellcheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends lua5.4 shellcheck
+
+      - name: versions
+        run: |
+          bash --version | head -1
+          shellcheck --version | sed -n 2p
+          luac5.4 -v
+          python3 --version
+
+      - name: tests/lint.sh
+        run: tests/lint.sh
+
+      - name: tests/install-fakeroot.sh
+        run: tests/install-fakeroot.sh
+
+      # The front door has to keep working with no arguments at all, and --help
+      # is generated from the header comment by shape rather than by line
+      # number, so an edit to that block can truncate it silently.
+      - name: install.sh --help and --dry-run
+        run: |
+          ./install.sh --help | tail -3
+          test "$(./install.sh --help | wc -l)" -gt 30
+          ./install.sh --root "$(mktemp -d)" --dry-run

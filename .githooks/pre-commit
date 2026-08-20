@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# pre-commit -- the static suite, before the commit rather than after the push.
+#
+# Enable it once per checkout:
+#
+#     git config core.hooksPath .githooks
+#
+# Skip it for one commit with `git commit --no-verify`. It runs the same two
+# scripts CI does and takes about four seconds, most of that shellcheck.
+
+set -uo pipefail
+
+REPO=$(git rev-parse --show-toplevel)
+cd "$REPO" || exit 1
+
+# Nothing worth checking staged? Then nothing to do. Documentation counts:
+# tests/lint.sh checks that the links in it resolve.
+if ! git diff --cached --name-only --diff-filter=ACMR \
+     | grep -qE '\.(sh|lua|toml|json|tsv|py|md)$|^bin/|^install\.sh$|^bootstrap\.sh$'; then
+    exit 0
+fi
+
+fail=0
+tests/lint.sh || fail=1
+tests/install-fakeroot.sh || fail=1
+
+if (( fail )); then
+    printf '\n\e[31mpre-commit: the static suite failed.\e[0m\n'
+    printf 'Fix it, or commit with --no-verify if you know why it is wrong.\n\n'
+    exit 1
+fi

@@ -388,7 +388,9 @@ case "${1:-apply}" in
         marker=""
         [[ -f $OVERRIDE_FILE ]] && marker="  [override: SUPER+SHIFT+G]"
         [[ -z $marker && -f $LOCAL_FILE ]] && marker="  [glass.local.conf]"
-        # shellcheck disable=SC2046
+        # Deliberately unquoted: levels() prints the two numbers separated by a
+        # space, and they are two arguments here.
+        # shellcheck disable=SC2046,SC2183
         printf 'window %s  terminal %s%s\n' $(levels) "$marker"
         ;;
     *) usage ;;

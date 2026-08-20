@@ -30,12 +30,13 @@ do_login() {
 
     local greetd_conf=$SYS/etc/greetd/config.toml
 
-    if ! command -v pacman >/dev/null 2>&1; then
-        warn "pacman not found -- this step only works on CachyOS/Arch"
-        return 0
-    fi
-
     if ! sandboxed; then
+        # Only the package half needs a package manager. Under --root there is
+        # no package half, and the config this writes is the part worth testing.
+        if ! command -v pacman >/dev/null 2>&1; then
+            warn "pacman not found -- this step only works on CachyOS/Arch"
+            return 0
+        fi
         say "packages"
         UNRESOLVED=()
         local -a login_pkgs=()

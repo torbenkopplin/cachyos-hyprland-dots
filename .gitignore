@@ -4,3 +4,6 @@
 # Editor / LSP scratch
 .luarc-local.json
 *.swp
+
+# Bytecode from the python-syntax check
+__pycache__/
