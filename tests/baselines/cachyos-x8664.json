@@ -3,8 +3,8 @@
   "recorded": "2026-08-19T01:17:52Z",
   "summary": { "pass": 17, "fail": 0, "skip": 2 },
   "results": [
-    { "check": "session-path", "status": "pass", "message": "/home/torben/.local/bin is on the shell's PATH" },
-    { "check": "session-env", "status": "pass", "message": "both PATH files put /home/torben/.local/bin on the session's PATH" },
+    { "check": "session-path", "status": "pass", "message": "~/.local/bin is on the shell's PATH" },
+    { "check": "session-env", "status": "pass", "message": "both PATH files put ~/.local/bin on the session's PATH" },
     { "check": "deps-manifest", "status": "pass", "message": "install.sh installs all 45 declared dependencies" },
     { "check": "deps-installed", "status": "pass", "message": "45 of the declared dependencies are on this machine" },
     { "check": "deps-declared", "status": "pass", "message": "every guarded tool in bin/ and tests/ is in the manifest" },

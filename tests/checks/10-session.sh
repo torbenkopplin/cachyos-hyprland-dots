@@ -23,12 +23,12 @@ check_session_path() {
     path=$(session_path) || { skip session-path "noctalia is not running"; return; }
 
     if [[ ":$path:" == *":$BIN_HOME:"* ]]; then
-        pass session-path "$BIN_HOME is on the shell's PATH"
+        pass session-path "$(tilde "$BIN_HOME") is on the shell's PATH"
     else
-        fail session-path "$BIN_HOME is missing from the running shell's PATH"
+        fail session-path "$(tilde "$BIN_HOME") is missing from the running shell's PATH"
         info "every /aout /ain /bt /net /power /theme entry will answer \"No results found\""
         info "and SUPER+SHIFT+G will do nothing. Fix: ./install.sh, then log out and in."
-        info "got: $path"
+        info "got: $(tilde "$path")"
     fi
 }
 
@@ -59,7 +59,7 @@ check_session_env() {
     else
         local got
         got=$(env -i HOME="$HOME" PATH=/usr/bin sh -c ". '$f'; printf '%s' \"\$PATH\"")
-        [[ ":$got:" == *":$BIN_HOME:"* ]] || problems+=("sourcing $f does not add $BIN_HOME (got: $got)")
+        [[ ":$got:" == *":$BIN_HOME:"* ]] || problems+=("sourcing $(tilde "$f") does not add $(tilde "$BIN_HOME") (got: $(tilde "$got"))")
     fi
 
     # The real generator, not a reimplementation of it. environment.d has its
@@ -76,12 +76,12 @@ check_session_env() {
         if [[ -z $envd ]]; then
             problems+=("environment.d sets no PATH at all")
         elif [[ ":$envd:" != *":$BIN_HOME:"* ]]; then
-            problems+=("environment.d expands to a PATH without $BIN_HOME (got: $envd)")
+            problems+=("environment.d expands to a PATH without $(tilde "$BIN_HOME") (got: $(tilde "$envd"))")
         fi
     fi
 
     if (( ${#problems[@]} == 0 )); then
-        pass session-env "both PATH files put $BIN_HOME on the session's PATH"
+        pass session-env "both PATH files put $(tilde "$BIN_HOME") on the session's PATH"
     else
         fail session-env "${#problems[@]} problem(s) with the session PATH files"
         local pr; for pr in "${problems[@]}"; do info "$pr"; done

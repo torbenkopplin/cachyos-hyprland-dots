@@ -465,6 +465,18 @@ check_no_secrets() {
     done < <(git -C "$REPO" ls-files -z \
         | xargs -0 grep -nHE '://[^/[:space:]@"'"'"']+:[^/[:space:]@"'"'"']+@' 2>/dev/null)
 
+    # 4. No absolute home directory. A baseline is recorded output and it is
+    #    committed on purpose, so whatever a check printed ends up public --
+    #    and "/home/<name>" names the machine's user account to everyone who
+    #    clones. tests/lib/harness.sh collapses $HOME to ~ in every string it
+    #    records, so a hit here means either a hand-edited baseline or a path
+    #    written somewhere that redaction does not reach.
+    while IFS= read -r f; do
+        problems+=("$f -- absolute home path; use ~ (harness.sh tilde) so the account name stays private")
+    done < <(git -C "$REPO" ls-files -z \
+        | xargs -0 grep -nHoE '/home/[A-Za-z0-9._-]+' 2>/dev/null \
+        | grep -vE '/home/(user|users|you|youruser|username|USER)([^A-Za-z0-9._-]|$)')
+
     verdict no-secrets "no tracked file carries an address, a password or a copy-me file" "${problems[@]}"
 }
 

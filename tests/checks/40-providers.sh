@@ -51,7 +51,7 @@ check_provider_resolve() {
         pass provider-resolve "every provider binary resolves under the session PATH"
     else
         fail provider-resolve "not found by the launcher: ${missing[*]}"
-        info "the launcher runs these through 'sh -lc'; /etc/profile does not add $BIN_HOME"
+        info "the launcher runs these through 'sh -lc'; /etc/profile does not add $(tilde "$BIN_HOME")"
     fi
 }
 

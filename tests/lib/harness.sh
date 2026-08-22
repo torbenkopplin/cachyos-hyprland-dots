@@ -224,8 +224,28 @@ noct_summary() {
 # machine where the suite is reporting that jq is missing.
 # ---------------------------------------------------------------------------
 
+# tilde -- a path with the home directory collapsed to ~.
+#
+# For messages a person reads, and for anything that might be recorded: a
+# baseline is committed to a public remote, so the absolute path names the
+# machine's user account to everyone who clones it. ~ says the same thing.
+# The ~ in the replacement MUST be backslashed. Unescaped, bash tilde-expands
+# it back to $HOME and the substitution becomes a silent no-op that looks
+# exactly like a working one. The guard is for a HOME that is empty or /, where
+# an empty pattern would otherwise match at every position.
+tilde() {
+    local p=$1
+    [[ -n ${HOME:-} && $HOME != / ]] || { printf '%s' "$p"; return; }
+    printf '%s' "${p//$HOME/\~}"
+}
+
 _json_escape() {
     local s=$1
+    # Redaction before escaping, and here rather than in each check, because
+    # this is the one function every string in a baseline passes through --
+    # messages, metric values, the host name. A check added later cannot leak a
+    # home path into a committed file without going through this line.
+    [[ -n ${HOME:-} && $HOME != / ]] && s=${s//$HOME/\~}
     s=${s//\\/\\\\}; s=${s//\"/\\\"}; s=${s//	/\\t}
     printf '%s' "$s"
 }
