@@ -92,6 +92,34 @@ because the decisions log is the memory.
       width and height when `transform` is odd (1, 3, 5, 7)**, in one place.
       `nav-axis` sidesteps it by never taking a pixel.
 
+## Worth exploring
+
+- [ ] **A tracked config for `spotify_player`.** Only the package is automated
+      today ([`packages.tsv`](install/manifest/packages.tsv), `apps` group);
+      nothing in `config/` names it, so it runs on its own defaults. It reads
+      three files from `~/.config/spotify-player`, and they are worth deciding
+      separately rather than as one job:
+      - `theme.toml` — a `name` plus optional `palette` and `component_style`.
+        This is the one with an actual argument behind it: the TUI is the only
+        thing here that paints its own colours and does not inherit the shell
+        palette, so it is either matched by hand or left looking like a
+        different machine.
+      - `keymap.toml` — `[[keymaps]]` entries, and `command = "None"` to drop a
+        default bind. Only worth writing if a default collides with something
+        kitty or Hyprland already takes.
+      - `app.toml` — where `theme` is selected, and where the cover art is
+        sized: `cover_img_length` defaults to `0`, meaning derive the column
+        count from the terminal's cell aspect ratio, with `cover_img_width = 5`
+        rows. The default is the right starting point; it is only worth pinning
+        if kitty's cell ratio makes the art the wrong shape.
+
+      Tracking any of them means a `config/spotify-player/` directory and a row
+      per file in [`links.tsv`](install/manifest/links.tsv), the same shape as
+      every other app here. Left undone deliberately for now: defaults that
+      work are worth more than a config written before the app has been lived
+      with, and a tracked file that only restates the default is a file that
+      will drift from it silently.
+
 ## Waiting on upstream
 
 - [ ] **If the bar capsules should ever be glass**, the only routes left are

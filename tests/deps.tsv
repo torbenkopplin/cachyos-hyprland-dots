@@ -88,6 +88,7 @@ chromium	chromium	browsers	optional	the clean-engine browser
 # --- applications ----------------------------------------------------------
 aerc	aerc	apps	optional	mail
 signal-desktop	signal-desktop	apps	optional	messaging
+spotify_player	spotify-player	apps	optional	spotify TUI. Note the command is spelt with an underscore and the package with a hyphen
 satty	satty	likely-aur	optional	screenshot annotation
 
 # --- what the test suite itself needs --------------------------------------

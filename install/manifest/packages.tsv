@@ -192,6 +192,33 @@ repo	apps	signal-desktop
 # the wizard.
 repo	apps	aerc
 
+# Spotify, as a TUI. The one to install is the repo build, not the AUR one: the
+# features that make this worth having are compile-time, and CachyOS ships them
+# all switched on. `spotify_player features` prints the list -- as of 0.24.1
+# that is streaming, image + sixel + ratatui-image, notify, fzf, daemon,
+# media-control and pulseaudio-backend, with only `pixelate` off. Building it
+# from the AUR would mean re-deciding all of that by hand, and getting a
+# non-optimised build for the trouble.
+#
+# What each of those buys, since a missing one is invisible until you look for
+# the feature it silently disables:
+#   streaming       runs its own librespot client, so this machine appears as a
+#                   "spotify-player" device rather than only steering other
+#                   ones. Spotify Connect works either way
+#   image + sixel   album art. In kitty -- the terminal this repo configures --
+#                   it goes out over kitty's own graphics protocol; sixel is the
+#                   fallback for terminals without one, and Unicode blocks the
+#                   fallback after that
+#   media-control   MPRIS, which is what makes playerctl (in `desktop`) and the
+#                   shell's media widget see it at all
+#   notify          uses libnotify, already in `desktop`
+#   fzf             already in `dev`
+#
+# Needs a Spotify Premium account -- the API endpoints it drives are
+# Premium-only -- and one `spotify_player authenticate` to log in. Nothing about
+# that is tracked here: the credentials land in ~/.cache/spotify-player.
+repo	apps	spotify-player
+
 # --- likely-aur ------------------------------------------------------------
 # Usually AUR-only, but still attempted with pacman first, because CachyOS ships
 # some of these in its own repos and a repo build beats a local one.
