@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+# noct-mail -- open aerc with one group of accounts.
+#
+#   noct-mail             list the groups found in accounts.conf
+#   noct-mail work        open aerc with every work-* account
+#   noct-mail home        open aerc with every home-* account
+#   noct-mail all         open aerc with every account, ungrouped ones included
+#
+# aerc has no concept of a group. Accounts are one flat list, :switch-account
+# cycles all of them, and the account config explicitly cannot be reloaded at
+# runtime -- so "switch profile" cannot mean anything inside a running aerc.
+# What aerc does have is `-a`, which loads a named SUBSET at startup and keeps
+# the order given. That is the whole mechanism here.
+#
+# A group is therefore a naming convention: everything before the first hyphen
+# in a section name. `[work-gmail]` and `[work-mail]` are the `work` group.
+#
+# The list is read back out of accounts.conf rather than written down here, and
+# that is the point. accounts.conf is not tracked -- it holds real addresses --
+# so hardcoding account names in this script would put half of that file in a
+# public repository and would need editing on both machines every time an
+# account is added. Adding one is now a section header and nothing else.
+#
+# NOCT_MAIL_ACCOUNTS overrides the file, for trying a layout without touching
+# the real one. It is passed through to aerc as -A so both halves agree.
+
+set -uo pipefail
+
+ACCOUNTS=${NOCT_MAIL_ACCOUNTS:-${XDG_CONFIG_HOME:-$HOME/.config}/aerc/accounts.conf}
+
+die() { printf 'noct-mail: %s\n' "$1" >&2; exit "${2:-1}"; }
+
+# Every [section] in accounts.conf is an account -- aerc-accounts(5) reserves no
+# section name, and global options live above the first one rather than in a
+# section of their own. A commented-out stanza does not match, which is what
+# makes "#[home-gmail]" a working way to park an account.
+sections() {
+    grep -oE '^[[:space:]]*\[[^]]+\]' "$ACCOUNTS" 2>/dev/null \
+        | tr -d '[]' | tr -d ' \t'
+}
+
+# ---------------------------------------------------------------------------
+
+command -v aerc >/dev/null 2>&1 || die "aerc is not installed -- ./install.sh --packages"
+
+[[ -f $ACCOUNTS ]] || die "no $ACCOUNTS
+       copy it from the example the installer linked next to it:
+         cp ~/.config/aerc/accounts.conf.example ~/.config/aerc/accounts.conf
+         chmod 600 ~/.config/aerc/accounts.conf"
+
+mapfile -t all < <(sections)
+(( ${#all[@]} )) || die "$ACCOUNTS defines no accounts (every stanza commented out?)"
+
+group=${1-}
+
+# No argument: report what the file is offering rather than guessing.
+if [[ -z $group ]]; then
+    printf 'groups in %s\n\n' "${ACCOUNTS/#$HOME/\~}"
+    declare -A seen=()
+    for s in "${all[@]}"; do
+        [[ $s == *-* ]] || continue
+        seen[${s%%-*}]+=" $s"
+    done
+    if (( ${#seen[@]} )); then
+        for g in "${!seen[@]}"; do
+            printf '  %-10s%s\n' "$g" "${seen[$g]}"
+        done | sort
+    else
+        printf '  none -- no section name contains a hyphen\n'
+    fi
+
+    # An account in no group is invisible to every `noct-mail <group>`, so it is
+    # worth saying so rather than letting it quietly never open.
+    local_ungrouped=()
+    for s in "${all[@]}"; do [[ $s == *-* ]] || local_ungrouped+=("$s"); done
+    if (( ${#local_ungrouped[@]} )); then
+        printf '\n  ungrouped, reachable only by `noct-mail all`: %s\n' "${local_ungrouped[*]}"
+    fi
+    printf '\nusage: noct-mail <group> | noct-mail all\n'
+    exit 0
+fi
+
+# ---------------------------------------------------------------------------
+
+declare -a args=()
+[[ -n ${NOCT_MAIL_ACCOUNTS-} ]] && args+=(-A "$ACCOUNTS")
+
+if [[ $group == all ]]; then
+    exec aerc "${args[@]}"
+fi
+
+declare -a want=()
+for s in "${all[@]}"; do
+    [[ $s == "$group"-* ]] && want+=("$s")
+done
+
+if (( ! ${#want[@]} )); then
+    printf 'noct-mail: no account is named %s-*\n\n' "$group" >&2
+    "$0" >&2
+    exit 2
+fi
+
+# -a takes one comma-separated list and preserves its order, so the order the
+# accounts appear in accounts.conf is the order of the tabs.
+IFS=,; list="${want[*]}"; unset IFS
+exec aerc "${args[@]}" -a "$list"

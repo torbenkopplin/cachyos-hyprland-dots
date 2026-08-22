@@ -383,6 +383,7 @@ bin/
   noct-theme          colour scheme picker
   noct-glass          frosted glass level, per scheme
   noct-wallfetch      fills the wallpaper folders from Wallhaven
+  noct-mail           opens aerc with one group of accounts (work / home)
 bootstrap.sh          curl-able one-command installer
 install.sh            the front door: flags, and the order the steps run in
 install/
