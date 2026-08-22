@@ -70,6 +70,27 @@ because the decisions log is the memory.
       alternative is commented directly above the line, and a wrong guess fails
       loudly at first connect.
 
+- [ ] **Get the same logins working on the second machine**, which needs two
+      things `install.sh` cannot do for you, because both are secrets:
+
+      1. **The GPG key.** `pass` decrypts with it, so without it the second
+         machine has a password store it cannot read. Either move the one key
+         across (`gpg --export-secret-keys --armor` on one, `gpg --import` on
+         the other — over a USB stick or `scp`, not a paste into anything
+         hosted), or give each machine its own key and name both as recipients:
+         `pass init <key-a> <key-b>`, which re-encrypts every entry to both and
+         means no secret key ever leaves the machine that made it.
+      2. **The store itself**, `~/.password-store`. Copy it, or `pass git init`
+         and push it to a **private** remote. Not this one, and not any public
+         one: `pass` encrypts the *contents* of each entry and not its
+         *filename*, so a published store still lists `mail/work-gmail` and
+         every other account name in plain sight.
+
+      `accounts.conf` is the third file that has to exist on that machine, and
+      it is a copy rather than a link precisely so it can differ — see
+      [decision 014](docs/decisions/014-two-machine-local-files.md) for the
+      other two files in that category.
+
 - [ ] **The last Wi-Fi check** in [TESTING.md §5](TESTING.md#5-launcher-providers--binnoct---20-launchertoml)
       needs a **secured network this machine has not joined before**. Everything
       up to the passphrase prompt is verified; the no-echo half cannot be faked.
