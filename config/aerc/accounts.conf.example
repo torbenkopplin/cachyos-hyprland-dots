@@ -1,0 +1,149 @@
+# accounts.conf.example -- copy to ~/.config/aerc/accounts.conf and edit.
+#
+#     cp ~/.config/aerc/accounts.conf.example ~/.config/aerc/accounts.conf
+#     chmod 600 ~/.config/aerc/accounts.conf
+#
+# The chmod is not optional: aerc refuses to start if this file is readable by
+# anyone else, because it names a credential command. That refusal is a feature
+# (see [general] in aerc.conf).
+#
+#
+# NOTHING REAL GOES IN THIS FILE
+# ------------------------------
+# This .example is tracked and the remote is public, so every address, hostname
+# and username below is a placeholder. Your real ones belong ONLY in
+# ~/.config/aerc/accounts.conf, which is outside the repository -- not in
+# config/aerc/, which is inside it.
+#
+# That distinction is the whole design, and it is easy to get wrong, because
+# every other config in this setup DOES live in config/ and get symlinked out.
+# accounts.conf is the exception: it is copied, once per machine, and never
+# tracked. `tests/lint.sh no-secrets` fails the commit if a real address or a
+# file called accounts.conf ever lands in the repo.
+#
+# Passwords are a separate matter again -- see below, they are not in this file
+# either, in any form.
+#
+#
+# WHERE THE PASSWORD COMES FROM
+# -----------------------------
+# Not from here. `source-cred-cmd` and `outgoing-cred-cmd` run a command and
+# read the password off its stdout, so what this file stores is the lookup and
+# the password store keeps the secret. Set up once:
+#
+#     gpg --quick-generate-key "Your Name <you@example.com>"
+#     pass init <the key id gpg just printed>
+#     pass insert mail/work
+#
+# aerc caches what the command returned until it exits, so the GPG agent asks
+# once per session rather than once per sync. Set `outgoing-cred-cmd-cache =
+# false` to be asked on every send instead.
+#
+#
+# THE ONE ENCODING TRAP
+# ---------------------
+# Every field in these URLs is URL-DECODED by aerc, so a username that is an
+# email address must have its @ written as %40 -- otherwise the URL contains two
+# @ and the host is parsed as whatever follows the last one. A password written
+# inline needs the same treatment: @ %40, : %3A, / %2F, # %23, % %25.
+#
+# This is the most common reason a first connect fails, and it fails with a
+# confusing error rather than an obvious one.
+
+
+# --- a self-hosted Dovecot account -----------------------------------------
+# The common shape for a domain running its own mail: IMAP on 993 and
+# submission on 465, both implicit TLS, AUTH PLAIN, and IDLE so new mail
+# arrives without polling. If 143 and 587 are filtered there is no STARTTLS
+# variant to fall back to, so the scheme must be the `s` one on both legs.
+#
+# Check your own server rather than assuming. Both of these print what it
+# really offers, including the SIZE limit that governs how big an attachment
+# can be:
+#
+#     printf 'a CAPABILITY\na LOGOUT\n' \
+#         | openssl s_client -connect mail.example.com:993 -crlf -quiet
+#     printf 'EHLO localhost\nQUIT\n' \
+#         | openssl s_client -connect mail.example.com:465 -crlf -quiet
+
+[work]
+from        = Your Name <you@example.com>
+
+# Dovecot may want the full address as the username, or just the local part.
+# The address is the more common default; if authentication fails, try:
+#   source = imaps://you@mail.example.com:993
+source              = imaps://you%40example.com@mail.example.com:993
+source-cred-cmd     = pass show mail/work
+
+outgoing            = smtps://you%40example.com@mail.example.com:465
+outgoing-cred-cmd   = pass show mail/work
+
+# Dovecot does not file sent mail for you; the client has to. Folder names vary
+# by server -- check the folder list in aerc before trusting these.
+copy-to             = Sent
+postpone            = Drafts
+default             = INBOX
+
+
+# --- the big providers -----------------------------------------------------
+# Hostnames and ports below are the providers' own public endpoints, read off
+# each service's live capability banner rather than off a support page. The SIZE
+# figure is the real message ceiling, which is what actually limits attachments.
+#
+#   provider    IMAP                        submission                  cap
+#   iCloud      imap.mail.me.com:993 TLS    smtp.mail.me.com:587 STARTTLS   27 MiB
+#   Gmail       imap.gmail.com:993 TLS      smtp.gmail.com:465 TLS          34 MiB
+#   M365        outlook.office365.com:993   smtp.office365.com:587 STARTTLS 150 MiB
+#
+# The scheme follows the port's TLS style: `imaps`/`smtps` for implicit TLS,
+# plain `imap`/`smtp` for STARTTLS. Getting that pair wrong is the second most
+# common first-connect failure after the %40.
+
+# iCloud. Advertises AUTH PLAIN alongside XOAUTH2, so an ordinary password
+# works -- but it must be an app-specific password generated at appleid.apple.com,
+# not the Apple ID password, and two-factor auth has to be on before Apple will
+# issue one. Apple documents the IMAP username as the part BEFORE the @ of your
+# iCloud address, while submission wants the whole address; if one leg
+# authenticates and the other does not, that asymmetry is the first thing to
+# try.
+#[icloud]
+#from              = Your Name <you@example.com>
+#source            = imaps://you@imap.mail.me.com:993
+#source-cred-cmd   = pass show mail/icloud
+#outgoing          = smtp://you%40example.com@smtp.mail.me.com:587
+#outgoing-cred-cmd = pass show mail/icloud
+#copy-to           = Sent Messages
+
+# Gmail. AUTH PLAIN is advertised and works with an App Password (two-factor
+# first, again). Google's own advice is to prefer OAuth, and aerc can do that
+# with imaps+oauthbearer -- but it needs a client_id and a token endpoint, which
+# means registering an app, so the App Password is the shorter road.
+#
+# Gmail also advertises X-GM-EXT-1, which aerc implements, so server-side search
+# understands Gmail's query syntax.
+#
+# copy-to is deliberately absent: Gmail files sent mail itself from the SMTP
+# side, so setting it produces two copies of everything you send.
+#[gmail]
+#from              = Your Name <you@example.com>
+#source            = imaps://you%40example.com@imap.gmail.com:993
+#source-cred-cmd   = pass show mail/gmail
+#outgoing          = smtps://you%40example.com@smtp.gmail.com:465
+#outgoing-cred-cmd = pass show mail/gmail
+#folder-map        = Archive=[Gmail]/All Mail
+
+# Microsoft 365 / Outlook. The one case where a password probably will not work,
+# and the banners say why: IMAP advertises AUTH PLAIN, but submission offers
+# only AUTH LOGIN and XOAUTH2 -- no PLAIN at all -- and Microsoft has disabled
+# basic authentication tenant-wide for most organisations regardless of what is
+# advertised. Advertised is not the same as permitted.
+#
+# So try smtp+login:// first, and if the tenant has basic auth off, OAuth2 is
+# the only route -- imaps+xoauth2:// with a registered client_id. See
+# aerc-imap(5) for the oauth2 parameters.
+#[m365]
+#from              = Your Name <you@example.com>
+#source            = imaps://you%40example.com@outlook.office365.com:993
+#source-cred-cmd   = pass show mail/m365
+#outgoing          = smtp+login://you%40example.com@smtp.office365.com:587
+#outgoing-cred-cmd = pass show mail/m365

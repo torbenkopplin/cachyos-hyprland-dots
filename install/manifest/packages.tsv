@@ -192,6 +192,39 @@ repo	apps	signal-desktop
 # the wizard.
 repo	apps	aerc
 
+# w3m is aerc's, not ours. aerc.conf's default filter list -- which this repo
+# now carries verbatim in config/aerc/aerc.conf -- maps text/html to a filter
+# script called `html`, and that script is a wrapper around w3m. So with w3m
+# absent the single most common kind of mail in existence renders as nothing,
+# and nothing anywhere says why: the filter fails silently and aerc shows an
+# empty body. It is the tree-sitter-cli shape exactly (see tests/deps.tsv) --
+# a dependency of a config file rather than of a package, which is the kind
+# pacman cannot know about.
+#
+# The other filters need nothing: colorize and wrap are compiled binaries
+# shipped inside aerc, and calendar, hldiff and plaintext are awk scripts.
+# show-ics-details.py would want python-icalendar, but no default filter line
+# invokes it, so it is not a dependency until someone wires it up.
+repo	apps	w3m
+
+# How aerc gets a password without one being written down. accounts.conf sets
+# source-cred-cmd/outgoing-cred-cmd to `pass show mail/<account>`, so the file
+# holds the lookup and the password store holds the secret -- which is what
+# makes that file safe to keep out of git without also making it useless.
+#
+# Chosen over the libsecret route deliberately. secret-tool is already on PATH
+# as a libsecret dependency, but nothing on this machine provides
+# org.freedesktop.secrets: gnome-keyring is not installed, and the only
+# activatable name on the bus is org.kde.secretservicecompat, which does not
+# launch. Making that work would mean gnome-keyring plus PAM wiring to unlock
+# it at login, which greetd does not do for you -- three moving parts, on two
+# machines, for the same outcome. pass needs a GPG key and nothing else, and
+# gpg is already here.
+#
+# It brings its own dependency the way aerc does: `pass` is a shell script
+# around gpg, and gpg comes with the base system rather than from this file.
+repo	apps	pass
+
 # Spotify, as a TUI. The one to install is the repo build, not the AUR one: the
 # features that make this worth having are compile-time, and CachyOS ships them
 # all switched on. `spotify_player features` prints the list -- as of 0.24.1

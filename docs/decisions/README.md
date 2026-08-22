@@ -46,6 +46,7 @@ So the **Settled against** sections are the load-bearing half of this directory.
 | 016 | [greetd + noctalia-greeter, and it is opt-in](016-greetd-instead-of-plasmalogin.md) | 2026-08-19 |
 | 017 | [Workspaces stay dynamic](017-workspaces-stay-dynamic.md) | 2026-08-18 |
 | 018 | [A launcher provider gets two seconds, so it may not ask anything slow](018-providers-get-two-seconds.md) | 2026-08-18 |
+| 019 | [Mail credentials live in `pass`, and `accounts.conf` holds only the lookup](019-mail-credentials-live-in-pass.md) | 2026-08-22 |
 
 ## Settled against, in one place
 
@@ -58,6 +59,8 @@ The dead ends, and where the reasoning is. Read these before rebuilding one.
 | A browser-parity gate in the suite | A deliberately translucent Zen *is* a spread, so the gate could only fire on the intended state. Retired, not exempted — and not kept as a metric either, because a baseline tolerance is the same gate under another name | [013](013-zen-is-translucent-unmatched.md) |
 | A small glass island instead of a bar | A capsule draws opaque whatever you ask; the only surface that takes an opacity spans the monitor; the only width lever is absolute pixels and shared between screens | [009](009-the-bar-is-three-capsules.md) |
 | A large blur, for one uniform shade | It averages the wallpaper away: measured a lift of 3 levels of 255, i.e. nothing on screen saying the glass was on | [011](011-the-blur-is-small.md) |
+| A keyring for the mail password | `secret-tool` is on PATH but nothing owns `org.freedesktop.secrets`; the only activatable name fails to launch. It needs gnome-keyring plus PAM unlock wiring under greetd, on both machines, for what one GPG key already buys | [019](019-mail-credentials-live-in-pass.md) |
+| The mail password inline in `accounts.conf` | A readable secret on disk, when `source-cred-cmd` costs one line. Kept documented as the fallback for a machine with no GPG key | [019](019-mail-credentials-live-in-pass.md) |
 | `hypridle` alongside Noctalia's idle service | Two countdowns to the same lock screen, one of them configured in a directory this repo does not manage | [006](006-idle-has-one-owner.md) |
 | Persistent workspaces, for a fixed row of pips | It is a compositor change that buys a cosmetic one and gives up the dynamic model | [017](017-workspaces-stay-dynamic.md) |
 | `rustup` in the package list | `Conflicts With: rust cargo` plus `--noconfirm` would silently swap a working toolchain for one that ships none | [015](015-pacman-first.md) |

@@ -15,8 +15,14 @@ cd "$REPO" || exit 1
 
 # Nothing worth checking staged? Then nothing to do. Documentation counts:
 # tests/lint.sh checks that the links in it resolve.
+#
+# `^config/` is here for one specific reason: no-secrets is the check that stops
+# a real accounts.conf being committed, and an extension list alone never fires
+# for it -- `.conf` was not in this pattern, so a commit staging ONLY that file
+# skipped the entire suite and the guard with it. Anything deployed to a machine
+# is worth the four seconds regardless of what it is called.
 if ! git diff --cached --name-only --diff-filter=ACMR \
-     | grep -qE '\.(sh|lua|toml|json|tsv|py|md)$|^bin/|^install\.sh$|^bootstrap\.sh$'; then
+     | grep -qE '\.(sh|lua|toml|json|tsv|py|md|conf)$|^bin/|^config/|^install\.sh$|^bootstrap\.sh$'; then
     exit 0
 fi
 

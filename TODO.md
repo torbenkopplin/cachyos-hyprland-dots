@@ -43,14 +43,32 @@ because the decisions log is the memory.
       `tests/install-fakeroot.sh`, takes about four seconds, and
       `git commit --no-verify` skips it.
 
-- [ ] **Run `./install.sh --check` once**, on a machine with network. It verifies
-      every name in `packages.tsv` against the repos, the AUR and npm, and it has
-      not been run since the manifest was written from the old bash arrays.
+- [ ] **Run `./install.sh --check` on the OTHER machine.** Done here on
+      2026-08-22: 65 repo names, 1 from the AUR, 3 from npm, every name resolves.
+      It has not been run on the second machine, which is the one that has never
+      installed from this manifest.
 
-- [ ] **`aerc` account setup** — first run walks you through it. Nothing is
-      tracked: an `accounts.conf` holds addresses, server names and a password
-      reference, which is either a secret in git or a keyring entry that only
-      works on one machine.
+- [ ] **`aerc` account setup**, which is now three commands rather than a wizard.
+      `config/aerc/aerc.conf` is tracked and linked; `accounts.conf` is not, and
+      the settings for this domain are already filled in
+      ([decision 019](docs/decisions/019-mail-credentials-live-in-pass.md)):
+      ```sh
+      cp ~/.config/aerc/accounts.conf.example ~/.config/aerc/accounts.conf
+      chmod 600 ~/.config/aerc/accounts.conf   # aerc refuses to start without this
+      gpg --quick-generate-key "<your name and address>"
+      pass init <the key id gpg printed>
+      pass insert mail/<account>
+      ```
+      Then `./install.sh --packages` for `w3m` and `pass`, which are new.
+
+      The real settings are already written to
+      `~/.config/aerc/accounts.conf`, outside the repo and mode 600 — no
+      address, hostname or account name appears anywhere in the repository, and
+      `tests/lint.sh no-secrets` fails the commit if one ever does. The `pass`
+      entry name to use is in that file. The one unknown left is whether the
+      server wants the full address or the short name as the login; the
+      alternative is commented directly above the line, and a wrong guess fails
+      loudly at first connect.
 
 - [ ] **The last Wi-Fi check** in [TESTING.md §5](TESTING.md#5-launcher-providers--binnoct---20-launchertoml)
       needs a **secured network this machine has not joined before**. Everything

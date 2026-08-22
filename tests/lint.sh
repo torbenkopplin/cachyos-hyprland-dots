@@ -411,6 +411,63 @@ check_decisions_index() {
 # Runner
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# no-secrets -- nothing personal or secret is tracked.
+#
+# The remote is public, and this repo's whole pattern is that a file with real
+# values in it is COPIED to ~/.config rather than symlinked out of config/ --
+# accounts.conf, glass.local.conf, host.lua. That pattern is one careless `git
+# add` away from failing, and it fails silently: a committed address looks
+# exactly like a committed example.
+#
+# Three rules, in increasing order of how easy the mistake is to make.
+# ---------------------------------------------------------------------------
+
+check_no_secrets() {
+    local -a problems=()
+    local f real
+
+    # 1. For every tracked X.example there must be no tracked X. The .example
+    #    suffix IS the statement that the real file is local-only, so tracking
+    #    both is a contradiction the linker also cannot resolve -- it skips
+    #    *.example and would deploy the real one.
+    while IFS= read -r f; do
+        real=${f%.example}
+        git -C "$REPO" ls-files --error-unmatch -- "$real" >/dev/null 2>&1 \
+            && problems+=("$real is tracked, but $f says it should be local-only")
+    done < <(git -C "$REPO" ls-files '*.example')
+
+    # 2. No email address outside the placeholder domains. The allowlist is
+    #    deliberately tiny and literal: git@github.com for the SSH remotes, and
+    #    systemd's unit@instance.service, which is email-shaped and is not an
+    #    address.
+    #
+    #    Two placeholder forms pass: anything mentioning example.com/org/net,
+    #    which is reserved for documentation precisely so this rule can be
+    #    strict, and a placeholder local part (you@, user@, me@) in front of a
+    #    provider's own public hostname -- because `you@imap.gmail.com` names a
+    #    service endpoint and no person. A real address matches neither.
+    while IFS= read -r f; do
+        problems+=("$f -- personal address in a tracked file; real values belong in ~/.config only")
+    done < <(git -C "$REPO" ls-files -z \
+        | xargs -0 grep -nHoE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' 2>/dev/null \
+        | grep -vE 'example\.(com|org|net)' \
+        | grep -vE ':[0-9]+:(you|user|name|me|your\.name)@' \
+        | grep -vE '(^|[^A-Za-z0-9._%+-])git@github\.com' \
+        | grep -vE '@[A-Za-z0-9.-]+\.service')
+
+    # 3. No password inline in a URL. aerc, and anything else taking a URL,
+    #    accepts user:password@host -- so this is the shape a leaked secret
+    #    actually has. Matches only a userinfo field with a colon in it, so
+    #    imaps://user%40host@server and git@github.com:owner/repo do not.
+    while IFS= read -r f; do
+        problems+=("$f -- looks like a password inline in a URL")
+    done < <(git -C "$REPO" ls-files -z \
+        | xargs -0 grep -nHE '://[^/[:space:]@"'"'"']+:[^/[:space:]@"'"'"']+@' 2>/dev/null)
+
+    verdict no-secrets "no tracked file carries an address, a password or a copy-me file" "${problems[@]}"
+}
+
 CHECKS=(
     "shell-syntax|check_shell_syntax|every shell script parses"
     "shellcheck|check_shellcheck|no shellcheck warnings above the exception list"
@@ -424,6 +481,7 @@ CHECKS=(
     "deps-groups|check_deps_groups|deps.tsv names package groups that exist"
     "doc-links|check_doc_links|every relative link in the docs resolves"
     "decisions-index|check_decisions_index|the decisions log and its index agree"
+    "no-secrets|check_no_secrets|no credential, address or copy-me file is tracked"
 )
 
 if [[ ${1-} == --list ]]; then

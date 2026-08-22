@@ -39,6 +39,12 @@ configs	tree	config/kitty	config	kitty
 configs	tree	config/fish	config	fish
 configs	file	config/starship/starship.toml	config	starship.toml
 
+# aerc.conf only. accounts.conf is NOT tracked -- it names mail addresses,
+# server names and a credential command -- so config/aerc/ ships an .example
+# to copy, which the linker skips by the same rule that skips
+# glass.local.conf.example.
+configs	tree	config/aerc	config	aerc
+
 # Read by uwsm before the compositor starts, and the only place the session
 # gets ~/.local/bin on PATH -- which is what the launcher providers and the
 # noct-glass binds are found through. See config/uwsm/env.

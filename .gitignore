@@ -7,3 +7,12 @@
 
 # Bytecode from the python-syntax check
 __pycache__/
+
+# Credentials and anything else with real values in it. These are the files the
+# repo ships as *.example and expects you to COPY to ~/.config rather than have
+# symlinked out of here -- so a copy landing in the repo is always a mistake,
+# and the remote is public. tests/lint.sh no-secrets is the check that fails a
+# commit if one gets added with `git add -f` anyway.
+accounts.conf
+*.local.conf
+host.lua
