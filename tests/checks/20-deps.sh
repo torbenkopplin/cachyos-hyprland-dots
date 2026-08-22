@@ -117,7 +117,14 @@ check_deps_installed() {
     local cmd pkg list scope why missing_core=() missing_opt=() have=0
     while IFS=$'\t' read -r cmd pkg list scope why; do
         [[ -n $cmd ]] || continue
-        if command -v "$cmd" >/dev/null 2>&1; then
+        # type -P, not command -v. command -v resolves shell functions
+        # before it looks at PATH, and this harness defines functions called
+        # pass, fail, skip, info and metric -- so a dependency named after one
+        # of them counted as installed no matter what. `pass`, the password
+        # manager, is the collision that found this: it reported present on a
+        # machine that had never had it. type -P searches PATH and nothing
+        # else, so a function can no longer stand in for a binary.
+        if type -P "$cmd" >/dev/null 2>&1; then
             have=$((have + 1))
             continue
         fi

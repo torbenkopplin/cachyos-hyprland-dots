@@ -167,7 +167,9 @@ noct_unwind() { noct_unwind_to 0; }
 require_cmd() {  # <check name> <cmd>...
     local name=$1 missing=() c
     shift
-    for c in "$@"; do command -v "$c" >/dev/null 2>&1 || missing+=("$c"); done
+    # type -P for the same reason as tests/checks/20-deps.sh: command -v
+    # would find this file's own pass/fail/skip/info functions first.
+    for c in "$@"; do type -P "$c" >/dev/null 2>&1 || missing+=("$c"); done
     (( ${#missing[@]} == 0 )) && return 0
     skip "$name" "not installed: ${missing[*]}"
     return 1
