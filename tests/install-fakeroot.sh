@@ -156,6 +156,18 @@ else
     ok "browser policies" "all written under the root"
 fi
 
+missing=()
+while IFS=$'\t' read -r kind src rest; do
+    [[ $kind == keyd ]] || continue
+    [[ -f $ROOT$rest ]] || missing+=("$rest")
+done < <(rows input)
+if (( ${#missing[@]} )); then
+    bad "keyd remap" "${#missing[@]} not written"
+    printf '      %s\n' "${missing[@]}"
+else
+    ok "keyd remap" "written under the root"
+fi
+
 if [[ -f $ROOT/etc/greetd/config.toml ]] \
    && grep -q 'noctalia-greeter-session' "$ROOT/etc/greetd/config.toml"; then
     ok "greetd config" "written, and names the greeter session"

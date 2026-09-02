@@ -1,0 +1,21 @@
+# input.tsv -- the remapping this setup does below the compositor.
+#
+# One row, and it exists because a keyboard lied about one of its keys: the MX
+# Keys sends the Windows snipping chord where PrtSc belongs, and no setting on
+# the keyboard can change it. See input/keyd/mx-keys.conf for the whole story
+# and docs/decisions/020-the-print-key-is-remapped-below-hyprland.md for why it
+# is not a Hyprland bind.
+#
+# Format: kind <TAB> source <TAB> destination
+#
+#   keyd  source <TAB> destination
+#         Written with `install -Dm644` as root, the same way a browser policy
+#         is: keyd reads /etc/keyd before anyone logs in, so a symlink into a
+#         home directory is not a thing to put there. The destination must be
+#         /etc/keyd/*.conf -- keyd loads nothing else, and tests/lint.sh
+#         manifest-sources says so rather than letting the file be ignored.
+#
+# Paths starting with ~ are relative to HOME; everything else is absolute, and
+# both are prefixed by --root when one is given.
+
+keyd	input/keyd/mx-keys.conf	/etc/keyd/mx-keys.conf

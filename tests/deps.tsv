@@ -41,6 +41,7 @@ nautilus	nautilus	desktop	core	options.lua FILE_MANAGER
 wl-copy	wl-clipboard	desktop	core	clipboard binds
 brightnessctl	brightnessctl	desktop	core	the brightness keys
 playerctl	playerctl	desktop	core	the media keys, and the bar's player widget
+keyd	keyd	system	optional	the MX Keys sends the Windows snipping chord where PrtSc belongs; keyd is what turns it back into Print (input/keyd/mx-keys.conf). Optional because a machine without that keyboard does not need it -- but where it is absent the screenshot key files a window into the scratchpad instead of taking a picture, which reads as a broken bind
 
 # --- terminal and shell ----------------------------------------------------
 kitty	kitty	desktop	core	options.lua TERMINAL, and the only window that can be translucent by itself

@@ -5,6 +5,8 @@
 #   ./install.sh --packages      install everything the setup needs
 #   ./install.sh --nvim          clone the neovim config
 #   ./install.sh --browsers      install browser policies (needs sudo)
+#   ./install.sh --input         install the keyd remap that turns the MX Keys
+#                                screenshot key back into Print (needs sudo)
 #   ./install.sh --wallpapers    download wallpapers into ~/Pictures/Wallpapers
 #   ./install.sh --all           all of the above, in the right order. This
 #                                includes the wallpaper download, which is a few
@@ -44,10 +46,10 @@
 # to take over the shared paths, --unlink to hand them back.
 #
 # What goes where is data, not code: install/manifest/*.tsv lists the links, the
-# packages, the units and the browser files, each row with the reason it is
-# there. install/lib/*.sh is the engine that reads them. Adding a config file to
-# the deployment is a line in links.tsv; adding a package is a line in
-# packages.tsv.
+# packages, the units, the browser files and the keyd remap, each row with the
+# reason it is there. install/lib/*.sh is the engine that reads them. Adding a
+# config file to the deployment is a line in links.tsv; adding a package is a
+# line in packages.tsv.
 
 set -euo pipefail
 
@@ -57,7 +59,7 @@ STAMP=$(date +%Y%m%d-%H%M%S)
 
 DRY_RUN=0 UNLINK=0 STATUS=0 CHECK=0
 DO_LINK=0 DO_PACKAGES=0 DO_BROWSERS=0 DO_NVIM=0 DO_WALLPAPERS=0 DO_LOGIN=0
-DO_UPDATE=0
+DO_INPUT=0 DO_UPDATE=0
 ROOT_ARG=""
 
 # Kept because --update re-execs this script after pulling, and has to hand on
@@ -73,6 +75,7 @@ while (( $# )); do
         --check)    CHECK=1 ;;
         --packages) DO_PACKAGES=1 ;;
         --browsers) DO_BROWSERS=1 ;;
+        --input)    DO_INPUT=1 ;;
         --nvim)     DO_NVIM=1 ;;
         --wallpapers) DO_WALLPAPERS=1 ;;
         # Implies linking: a pull that adds a config file has not landed until
@@ -81,7 +84,7 @@ while (( $# )); do
         # Deliberately not part of --all: everything else here is reversible by
         # rerunning something, this one decides whether you get a login screen.
         --login)    DO_LOGIN=1 ;;
-        --all)      DO_LINK=1; DO_PACKAGES=1; DO_BROWSERS=1; DO_NVIM=1; DO_WALLPAPERS=1 ;;
+        --all)      DO_LINK=1; DO_PACKAGES=1; DO_BROWSERS=1; DO_INPUT=1; DO_NVIM=1; DO_WALLPAPERS=1 ;;
         --root)     shift; [[ $# ]] || { echo "--root needs a directory" >&2; exit 2; }; ROOT_ARG=$1 ;;
         --root=*)   ROOT_ARG=${1#--root=} ;;
         # The whole header comment, found by shape rather than by line number,
@@ -92,7 +95,7 @@ while (( $# )); do
     shift
 done
 # No action flags at all -> just link, which is the common case.
-(( DO_PACKAGES || DO_BROWSERS || DO_NVIM || DO_WALLPAPERS || DO_LOGIN || DO_LINK || CHECK )) || DO_LINK=1
+(( DO_PACKAGES || DO_BROWSERS || DO_INPUT || DO_NVIM || DO_WALLPAPERS || DO_LOGIN || DO_LINK || CHECK )) || DO_LINK=1
 
 # --status and --unlink report on or undo the deployment; pulling first would
 # change what they are reporting on or undoing.
@@ -108,6 +111,8 @@ source "$INSTALL_LIB/packages.sh"
 source "$INSTALL_LIB/session.sh"
 # shellcheck source=install/lib/browsers.sh
 source "$INSTALL_LIB/browsers.sh"
+# shellcheck source=install/lib/input.sh
+source "$INSTALL_LIB/input.sh"
 # shellcheck source=install/lib/wallpapers.sh
 source "$INSTALL_LIB/wallpapers.sh"
 # shellcheck source=install/lib/login.sh
@@ -146,6 +151,7 @@ fi
 (( DO_NVIM ))     && do_nvim
 (( DO_LINK ))     && do_link
 (( DO_BROWSERS ))   && do_browsers
+(( DO_INPUT ))      && do_input
 (( DO_WALLPAPERS )) && do_wallpapers
 (( DO_LOGIN ))      && do_login
 

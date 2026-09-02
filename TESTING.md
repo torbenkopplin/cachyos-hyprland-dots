@@ -97,6 +97,31 @@ chords. See [decision 007](docs/decisions/007-tap-super-is-a-release-bind.md).
 
 If it does misfire, set `SUPER_TAP_ENABLED = true` in `conf/options.lua`.
 
+### The MX Keys screenshot key — `input/keyd/mx-keys.conf`
+
+Only on a machine with the MX Keys, and only after `./install.sh --input` and a
+running `keyd`. The key sends `SUPER+SHIFT+S` in firmware; the remap turns it
+into a bare `Print`. See [decision
+020](docs/decisions/020-the-print-key-is-remapped-below-hyprland.md).
+
+- [ ] `systemctl is-active keyd` says `active`.
+- [ ] Pressing the screenshot key opens the region selector, and does **not**
+      send the focused window to the scratchpad. Press it **several times** — one
+      press in four leaked through as the raw chord when this was measured, and
+      one press is not enough to see that.
+- [ ] `CTRL` + the screenshot key takes the fullscreen shot. `SUPER` + it does
+      not, and cannot: `SUPER` is one of the keycodes the key itself sends.
+- [ ] `SUPER+ALT+S` sends a window to the scratchpad from that keyboard.
+- [ ] On the laptop's built-in keyboard, `SUPER+SHIFT+S` still sends to the
+      scratchpad and `SUPER+Print` still takes the fullscreen shot — the remap is
+      matched on the receiver's id and nothing else.
+
+If the key files a window away *every* time, the remap is not loaded at all:
+`sudo keyd monitor` prints the id of whatever you press, and a keyboard reached
+over Bluetooth rather than through the receiver has a different one — another line
+in the `[ids]` section. If it does it occasionally, that is the open question in
+decision 020, and `sudo keyd monitor -t` is the measurement that would close it.
+
 ## 3. The bar — `lib/bar.lua` + `10-bar.toml`
 
 `noct-check bar-hot-edge` measures the pointer reveal and the stuck case.

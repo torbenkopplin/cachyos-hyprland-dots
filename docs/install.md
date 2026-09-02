@@ -47,6 +47,7 @@ cd ~/repos/cachyos-hyprland-dots
 | `--packages` | Install everything below via pacman, an AUR helper, and npm |
 | `--nvim` | Clone `torbenkopplin/nvimrc` to `~/.config/nvim` |
 | `--browsers` | Install browser policies and `user.js` (needs sudo) |
+| `--input` | Write the `keyd` remap that turns the MX Keys screenshot key back into `Print` (needs sudo) |
 | `--wallpapers` | Download wallpapers into `~/Pictures/Wallpapers` (a few hundred MB) |
 | `--all` | All of the above, in dependency order — wallpapers included, last |
 | `--login` | Replace the display manager with greetd + `noctalia-greeter` (needs sudo). **Not** in `--all` |
@@ -247,6 +248,7 @@ resolves somewhere before a fresh machine has to find out.
 | libnotify | `notify-send`, which every `bin/noct-*` script uses to report what it did |
 | noctalia, satty | the shell and its screenshot editor |
 | libpulse, networkmanager, bluez, power-profiles-daemon | the backends `/aout` `/ain` `/bt` `/net` `/power` shell out to — without these those providers just say "not installed" |
+| keyd | reads `/etc/keyd/mx-keys.conf` and turns the MX Keys screenshot chord into a real `Print` key — [decision 020](decisions/020-the-print-key-is-remapped-below-hyprland.md) |
 | neovim, git, base-devel, nodejs, npm | editor, and what mason needs to build its servers |
 | fish, fisher, fastfetch | the login shell and its plugin manager |
 | starship, eza | what your fish config calls: the prompt, and `ls`/`lt` |
@@ -374,6 +376,9 @@ browsers/
   README.md           what is versioned here, and what deliberately is not
   brave|chromium|firefox/policies.json
   firefox|zen/user.js
+input/
+  README.md           why these are root files rather than links
+  keyd/mx-keys.conf   the MX Keys screenshot chord, turned back into Print
 bin/
   noct-common.sh      shared helpers: the title -> payload map, sanitising
   noct-audio          PipeWire sink/source switching
@@ -392,12 +397,14 @@ install/
     packages.tsv      every package installed, and why it is needed
     services.tsv      the units turned on, and the one turned off
     browsers.tsv      the policies and the user.js roots
+    input.tsv         the keyd remap, and where it is written
   lib/
     common.sh         the four roots, output helpers, the one refusal
     link.sh           link / unlink / status
     packages.sh       pacman, the AUR, npm, and --check
     session.sh        login shell, systemd units, the neovim clone
     browsers.sh       policies and user.js
+    input.sh          the keyd remap, and the reload that makes it live
     wallpapers.sh     noct-wallfetch, and the per-monitor section check
     login.sh          greetd + noctalia-greeter
     update.sh         pull, re-exec, re-apply

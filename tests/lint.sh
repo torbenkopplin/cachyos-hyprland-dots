@@ -246,6 +246,21 @@ check_manifest_sources() {
         esac
     done < <(rows browsers)
 
+    # The destination is checked here and not only in the engine because keyd
+    # ignores a file in /etc/keyd that is not named *.conf, and ignoring it is
+    # all it does: no log line, no error, and a keyboard that still sends the
+    # chord it was supposed to stop sending.
+    while IFS=$'\t' read -r kind src rest; do
+        [[ -n ${kind:-} ]] || continue
+        n=$((n+1))
+        [[ -f $src ]] || problems+=("input.tsv: no such file: $src")
+        case $kind in
+            keyd) [[ $rest == /etc/keyd/*.conf ]] \
+                || problems+=("input.tsv: keyd only loads /etc/keyd/*.conf: $rest") ;;
+            *) problems+=("input.tsv: unknown kind '$kind'") ;;
+        esac
+    done < <(rows input)
+
     verdict manifest-sources "$n manifest rows point at something that exists" "${problems[@]}"
 }
 

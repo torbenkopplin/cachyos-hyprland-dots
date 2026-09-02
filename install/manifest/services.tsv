@@ -17,6 +17,10 @@ system	NetworkManager.service	enable
 system	bluetooth.service	enable
 system	power-profiles-daemon.service	enable
 
+# The remap in /etc/keyd/mx-keys.conf, which is a file nobody reads until this
+# unit is running. See input/keyd/mx-keys.conf.
+system	keyd.service	enable
+
 # Noctalia's idle service is what this repo configures (70-idle.toml). hypridle
 # does the same job from a config directory the repo does not manage, and on a
 # machine that ran ~/repos/dots it is still enabled as a user unit -- so the

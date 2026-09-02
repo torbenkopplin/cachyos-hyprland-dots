@@ -122,6 +122,7 @@ is the test that it stays fixed.
 | `M + SHIFT + 1…9`, `0` | Send window to workspace *n* on this monitor |
 | `` M + ` `` | Previous workspace |
 | `M + S` / `SHIFT + S` | Scratchpad: toggle / send to |
+| `M + ALT + S` | Send to scratchpad, from an MX Keys too — see [Apps](#apps) |
 
 ## Shell
 
@@ -178,7 +179,24 @@ rules come out of it, and both are enforced in `bin/noct-common.sh`:
 | `M + E` | File manager |
 | `M + SHIFT + B` | Browser |
 | `Print` / `M + Print` | Screenshot region / screen |
+| `CTRL + Print` | Screenshot screen, again — the MX Keys' only way to reach it |
 | `M + C` | Colour picker |
+
+**On the MX Keys S, the screenshot key is `Print` because `keyd` makes it one.**
+The key sends the Windows snipping chord `SUPER+SHIFT+S` from firmware, and
+`input/keyd/mx-keys.conf` turns that chord back into a bare `Print` — for that
+keyboard only, matched on the receiver's id. Two things cost, both on the same
+keyboard:
+
+- `M + SHIFT + S` is a screenshot there, so send-to-scratchpad is `M + ALT + S`.
+- `M + Print` cannot be reached at all: `SUPER` is one of the keycodes the key
+  itself sends, and the remap strips it. `CTRL` survives, so `CTRL + Print` is
+  the fullscreen shot from that keyboard.
+
+Both aliases work from every keyboard, and the laptop's built-in one keeps
+`M + SHIFT + S` and `M + Print` unchanged. See [decision
+020](decisions/020-the-print-key-is-remapped-below-hyprland.md), including the
+one press in four that still came through unremapped.
 
 ---
 

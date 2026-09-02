@@ -101,6 +101,13 @@ repo	system	bluez
 repo	system	bluez-utils
 repo	system	power-profiles-daemon
 
+# The MX Keys sends the Windows snipping chord where PrtSc belongs, and no
+# setting on the keyboard changes it. keyd catches that chord below the
+# compositor and hands Hyprland a real Print key instead. The config it reads is
+# input/keyd/mx-keys.conf, written by ./install.sh --input; without the package
+# that file is in /etc and nothing reads it.
+repo	system	keyd
+
 # --- dev -------------------------------------------------------------------
 # Editor, and the tools the neovim config shells out to:
 #   fzf + bat  -> fzf-lua and its previewer

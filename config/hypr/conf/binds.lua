@@ -254,8 +254,17 @@ hl.bind(mod .. " + grave", hl.dsp.focus({ workspace = "previous_per_monitor" }),
     { description = "Last workspace" })
 
 -- Scratchpad.
+--
+-- SUPER+ALT+S is the same bind as SUPER+SHIFT+S, and it is here because of one
+-- keyboard: the MX Keys screenshot key sends SUPER+SHIFT+S in firmware, and
+-- input/keyd/mx-keys.conf turns that chord into Print for that keyboard only.
+-- So on the MX Keys the SHIFT form is a screenshot and this is how a window
+-- reaches the scratchpad; on the laptop's own keyboard both work. See
+-- docs/decisions/020-the-print-key-is-remapped-below-hyprland.md.
 hl.bind(mod .. " + S",         hl.dsp.workspace.toggle_special("magic"), { description = "Scratchpad" })
 hl.bind(mod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:magic" }),
+    { description = "Send to scratchpad" })
+hl.bind(mod .. " + ALT + S",   hl.dsp.window.move({ workspace = "special:magic" }),
     { description = "Send to scratchpad" })
 
 ------------------------------------------------------------------------------
@@ -348,8 +357,15 @@ hl.bind("XF86AudioPrev",  hl.dsp.exec_cmd(NOCT .. "media previous"), { locked = 
 -- Screenshots
 ------------------------------------------------------------------------------
 
-hl.bind("Print",         hl.dsp.exec_cmd(NOCT .. "screenshot-region"),     { description = "Screenshot region" })
+-- CTRL+Print is the same bind as SUPER+Print, and it is here for the MX Keys.
+-- That keyboard's screenshot key sends SUPER+SHIFT+S in firmware, so SUPER is
+-- one of the keycodes the key itself presses: input/keyd/mx-keys.conf strips it
+-- along with SHIFT and there is no way to hold a *second* SUPER on top. CTRL is
+-- not part of that layer and survives it -- measured -- so CTRL is how the
+-- fullscreen half of the pair is reachable from this keyboard at all.
+hl.bind("Print",           hl.dsp.exec_cmd(NOCT .. "screenshot-region"),     { description = "Screenshot region" })
 hl.bind(mod .. " + Print", hl.dsp.exec_cmd(NOCT .. "screenshot-fullscreen"), { description = "Screenshot screen" })
+hl.bind("CTRL + Print",    hl.dsp.exec_cmd(NOCT .. "screenshot-fullscreen"), { description = "Screenshot screen" })
 hl.bind(mod .. " + C",     hl.dsp.exec_cmd("hyprpicker -a -n"),              { description = "Pick a colour" })
 
 ------------------------------------------------------------------------------
