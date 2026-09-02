@@ -12,7 +12,6 @@
 
   "PromotionalTabsEnabled": false,
   "WelcomePageOnOSUpgradeEnabled": false,
-  "DefaultBrowserSettingEnabled": false,
 
   "PasswordLeakDetectionEnabled": true,
   "BackgroundModeEnabled": false,

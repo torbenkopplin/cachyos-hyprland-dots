@@ -109,6 +109,27 @@ behaviour beyond leaving it enabled, and extension allow/block lists. Those are
 personal choices, and a policy does not merely set a default — it removes your
 ability to change it from the UI at all.
 
+**Not set anywhere, after a second look:** which browser is the default.
+Brave and Chromium carried `DefaultBrowserSettingEnabled: false` until
+2026-08-26, grouped with the promo keys because the "make me your default?"
+prompt on startup reads as one of them. It is not only that: the Chromium
+policy stops the startup check *and* greys out the button in settings, so it
+was the "Not set anywhere" rule above being broken by the key that quotes it.
+There is no Chromium key for the pair, so the nag comes back — that is the
+trade, and it is the right way round.
+
+Firefox's `DontCheckDefaultBrowser: true` stays, because it is the nag-only
+half and nothing more. Zen has no policy file here at all: `/etc/firefox/policies`
+is Firefox's alone.
+
+Which browser actually handles a link is XDG's business, not a browser's, and
+nothing in this repo sets it:
+
+```sh
+xdg-settings get default-web-browser
+xdg-settings set default-web-browser zen.desktop
+```
+
 **Not disabled anywhere:** sync, in any browser. That is the deliberate
 consequence of keeping profiles out of git — sync is how bookmarks, extensions
 and logins reach the new machine.
