@@ -93,6 +93,10 @@ if status is-interactive # Commands to run in interactive sessions can go here
   alias pop='git stash pop'
   alias diff='git diff'
 
+  # Work specific
+  alias cbe='veracrypt /mnt/data/cloudbackend && cd /run/media/veracrypt1'
+  alias cbeoff='veracrypt -u /run/media/veracrypt1'
+
   # Shelly -- CachyOS's package manager. One tool for the repositories, the
   # AUR, Flatpaks and AppImages, which is why install.sh reaches for it before
   # pacman + paru and why it is worth having on the keyboard too.
