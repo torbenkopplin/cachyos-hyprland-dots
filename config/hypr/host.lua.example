@@ -7,6 +7,10 @@
 -- hyprland.lua loads it with pcall(dofile, ...) before anything else, so it can
 -- set globals the rest of the config reads -- WSBANDS in particular.
 --
+-- Hyprland's autoreload watches the config files it parses itself. This one is
+-- reached through dofile and is not among them, so a change here lands with
+-- `hyprctl reload` (or the next login) and not on save.
+--
 -- Find your monitor names and ids with:  hyprctl monitors
 
 ------------------------------------------------------------------------------
@@ -16,6 +20,72 @@
 -- hl.monitor({ output = "DP-3",     mode = "preferred", position = "auto", scale = "auto" })
 -- hl.monitor({ output = "HDMI-A-1", mode = "preferred", position = "auto", scale = "auto",
 --              transform = 1 })  -- 1 = 90 degrees, i.e. portrait
+
+------------------------------------------------------------------------------
+-- Lid, on a laptop
+------------------------------------------------------------------------------
+--
+-- logind suspends on a lid close only while nothing else is attached: a second
+-- connected display counts as docked, and HandleLidSwitchDocked defaults to
+-- ignore. So on a docked laptop the switch reaches nothing, and the built-in
+-- panel stays lit -- windows and all -- under a shut lid. Disable it instead.
+--
+-- Three things this has to get right, all measured 2026-08-26:
+--
+--   * hl.monitor() applies at runtime, from a bind callback. `hyprctl keyword
+--     monitor` does not -- under a Lua config it refuses with "keyword can't
+--     work with non-legacy parsers".
+--   * re-applying a spec that merely omits `disabled` does NOT clear an earlier
+--     disable. The key has to be present and false.
+--   * a switch bind fires on a transition only, so a login or a reload with the
+--     lid already shut needs the state reconciling once by hand.
+--
+-- `locked = true` is what `bindl` means in hyprland.conf syntax: the bind has to
+-- fire with the lockscreen up, which is exactly when the lid is shut.
+
+-- local EDP = {
+--     output = "eDP-1", mode = "preferred", position = "0x0", scale = "1",
+--     disabled = false,
+-- }
+--
+-- local function set_edp(shut)
+--     hl.monitor(shut and { output = EDP.output, disabled = true } or EDP)
+-- end
+--
+-- local function lid_shut()
+--     local f = io.open("/proc/acpi/button/lid/LID0/state", "r")
+--     if not f then return false end
+--     local state = f:read("a")
+--     f:close()
+--     return state:match("closed") ~= nil
+-- end
+--
+-- -- Asked of the kernel rather than of hl.get_monitors(), because this has to
+-- -- answer during the initial config parse, before Hyprland has enumerated any
+-- -- output of its own.
+-- local function external_connected()
+--     local p = io.popen("grep -l '^connected$' /sys/class/drm/*/status 2>/dev/null")
+--     if not p then return false end
+--     local found = false
+--     for line in p:lines() do
+--         if not line:match("eDP") then found = true end
+--     end
+--     p:close()
+--     return found
+-- end
+--
+-- set_edp(lid_shut() and external_connected())
+--
+-- hl.bind("switch:on:Lid Switch", function()
+--     -- Never disable the last output: undocked, the same switch also reaches
+--     -- logind and suspends, and a session with no screen left is one there is
+--     -- no way back into.
+--     if #hl.get_monitors() < 2 then return end
+--     set_edp(true)
+-- end, { locked = true, description = "Lid shut: disable eDP-1" })
+--
+-- hl.bind("switch:off:Lid Switch", function() set_edp(false) end,
+--     { locked = true, description = "Lid open: enable eDP-1" })
 
 ------------------------------------------------------------------------------
 -- Workspace bands
