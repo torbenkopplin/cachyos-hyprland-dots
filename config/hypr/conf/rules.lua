@@ -99,22 +99,22 @@ hl.window_rule({
 
 ------------------------------------------------------------------------------
 -- Column widths for specific apps
---
--- `scrolling_width` sets the column width a window claims when it first lands
--- on the tape, as a fraction of the monitor.
 ------------------------------------------------------------------------------
-
-hl.window_rule({
-    name  = "wide-browser",
-    match = { class = "^(firefox|zen|chromium|google-chrome|brave-browser)$" },
-    scrolling_width = 0.667,
-})
-
-hl.window_rule({
-    name  = "narrow-terminal",
-    match = { class = "^(kitty|foot|Alacritty|com\\.mitchellh\\.ghostty)$" },
-    scrolling_width = 0.5,
-})
+--
+-- There are none, and that is the point of the comment.
+--
+-- `scrolling_width` is a per-window override of the column width a window
+-- claims when it first lands on the tape, as a fraction of the monitor, and it
+-- does work -- measured 2026-08-26, a probe kitty under a 0.5 rule came out at
+-- 2546px of a 5120px monitor. That is exactly the problem: terminals and a
+-- browser are most of what gets opened, so a rule on those two classes IS the
+-- default you live with, and COLUMN_WIDTH never gets a say. The tape ended up
+-- at halves and two-thirds while conf/options.lua said a third.
+--
+-- So the width comes from one place now: COLUMN_WIDTH, per-monitor via a band
+-- (lib/colwidth.lua), and SUPER+PLUS / SUPER+MINUS for the window in front of
+-- you. Add a rule back here only for an app that is unusable at the default,
+-- not for one you merely prefer wider.
 
 ------------------------------------------------------------------------------
 -- Opting out of frosted glass

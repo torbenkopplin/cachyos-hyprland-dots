@@ -57,7 +57,7 @@ WORKSPACE_BAND = 10
 -- or the whole width where an ultrawide wants a third -- and lib/colwidth.lua is
 -- what makes that per-monitor value stick. This is the value monitors with no
 -- band of their own get.
-COLUMN_WIDTH = 0.333
+COLUMN_WIDTH = 0.25
 
 ------------------------------------------------------------------------------
 -- Pointer
