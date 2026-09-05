@@ -19,8 +19,11 @@ app's own config format through templates, and pokes the app to reload.
 active one with `●`:
 
 - **your own palettes** — anything in `~/.config/noctalia/palettes/`.
-  **noirblaze** ships there, ported from `~/.config/nvim/colors/noirblaze.lua`
-  so the desktop matches the editor. Dark only, like the original.
+  **noirblaze** is linked there from `vendor/noirblaze/dist/noirblaze.json`, a
+  submodule, so the desktop and the editor are the same theme rather than two
+  copies of it — see [021](decisions/021-the-colourscheme-is-a-submodule.md).
+  Dark only, like the original. Its `terminal` glass level is **measured from
+  the wallpaper** rather than fixed; that is in the glass section below.
 - **built-ins** — Ayu, Catppuccin, Dracula, Eldritch, Gruvbox, Kanagawa,
   Noctalia, Nord, Rosé Pine, Tokyo-Night.
 - **wallpaper-derived** — under any of nine generators (Tonal Spot, Content,
@@ -183,7 +186,7 @@ Two knobs, and **both are stated as what you see**:
 | Knob | Means | Applies to |
 |---|---|---|
 | `window` | how opaque an ordinary window is | Hyprland's `active_opacity` — **every window**. Fades text with the background; the compositor cannot tell one from the other. **Shipped at 1.0**, i.e. it fades nothing |
-| `terminal` | how opaque a **terminal** ends up | kitty's own `background_opacity`, which fades only the background and leaves text fully opaque. **Shipped at 0.55**, and the whole of the effect |
+| `terminal` | how opaque a **terminal** ends up | kitty's own `background_opacity`, which fades only the background and leaves text fully opaque. **0.55 for most schemes; measured per wallpaper for noirblaze** — see below |
 
 A browser is not on that list, deliberately, and there is no third level coming
 — but Zen is translucent anyway, by itself and outside these knobs entirely. See
@@ -225,6 +228,44 @@ Two consequences that are easy to trip over:
 `SUPER+SHIFT+G` still cycles `1.00 → 0.75 → 0.60 → 0.50` across the whole
 desktop, so the old look is one keypress away when you want it, and gone again on
 the next scheme change.
+
+### noirblaze measures its own level
+
+A fixed `terminal` is not a fixed amount of glass. The effect is worth
+`(backdrop − the window's own colour) × (1 − opacity)`, so at 0.55, across the
+41 ultrawide wallpapers in `~/Pictures/Wallpapers`, the lift runs from **9.0**
+on the darkest to **99.0** on the brightest. Ten to one — and the low end is
+under the `LIFT_MIN = 12` that `noct-check glass-visible` enforces, i.e. on some
+wallpapers there was no visible glass at all.
+
+So for `custom:noirblaze`, `noct-glass` measures the wallpaper actually on
+screen and solves for the level that puts the composited background where the
+palette's contrast floors need it. The solver lives in the submodule
+(`vendor/noirblaze/build/solve`), needs nothing but awk, and takes the backdrop
+as an argument — so the same code runs here and in CI.
+
+```sh
+noct-glass show          # window 1.0  terminal 0.90  [adaptive]
+vendor/noirblaze/build/solve --backdrop 200   # why that number
+```
+
+**This is not less glass. It is the same glass every time** — the lift holds at
+about 18, one above the 17 [011](decisions/011-the-blur-is-small.md) was tuned
+for. The number moves instead: roughly 0.66 over a dark wallpaper, 0.90 over a
+bright one.
+
+Three things worth knowing:
+
+- The backdrop is the **brightest window-sized tile** of the displayed crop, not
+  the image mean, because `blur.xray` is off and a window samples what is behind
+  itself — and a window can be anywhere. Measured, the brightest tile runs ~50
+  levels above the whole-image mean. The consequence is that over the darker
+  parts of a mixed wallpaper the lift sits near the floor (measured 12.6).
+- It is skipped while `SUPER+SHIFT+G` has an override in effect. That bind means
+  "make the desktop this glassy now", and a solver quietly overruling it is the
+  bind not working.
+- `adaptive = false` in `glass.conf` or `glass.local.conf` turns it off and goes
+  back to the fixed level.
 
 ### One machine's own levels
 
@@ -443,10 +484,12 @@ colour through 10% of your wallpaper.
 
 One consequence worth knowing:
 
-- **Neovim inside a transparent kitty.** Your `noirblaze.lua` paints `Normal`
-  with `bg = #121212`, so the editor stays opaque against kitty's translucent
-  background. `bg = "none"` fixes it — a change in *your nvim repo*, not this
-  one. `config/kitty/README.md` has the snippet and the trade-off.
+- **Neovim inside a transparent kitty.** `init.lua` in the nvim repo already
+  sets `bg = "none"` on `Normal` and nineteen other groups, so the editor
+  composites against the wallpaper like the shell does. noirblaze is solved for
+  that case: every foreground clears its contrast floor against the *composited*
+  background, not just against `#121212`. `config/kitty/README.md` has the
+  detail.
 
 Useful commands:
 

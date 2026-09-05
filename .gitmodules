@@ -1,0 +1,3 @@
+[submodule "vendor/noirblaze"]
+	path = vendor/noirblaze
+	url = git@github.com:torbenkopplin/noirblaze.git

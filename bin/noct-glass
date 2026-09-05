@@ -76,6 +76,16 @@ LOCAL_FILE="$CONFIG_HOME/noctalia/glass.local.conf"
 
 OVERRIDE_FILE="$STATE_HOME/noctalia/glass-override"
 
+# The terminal level this script last applied adaptively. Read to decide whether
+# a recomputed level is different enough to be worth applying at all -- see
+# adaptive_terminal().
+ADAPTIVE_FILE="$STATE_HOME/noctalia/glass-adaptive"
+
+# The colourscheme repo, vendored as a submodule. It carries the solver, which
+# needs nothing but awk and takes the backdrop as an argument -- so it runs here
+# and in CI with the same code and no desktop.
+SOLVER="$(dirname "$(dirname "$(readlink -f "$0")")")/vendor/noirblaze/build/solve"
+
 KITTY_OUT="$CONFIG_HOME/kitty/generated-glass.conf"
 HYPR_OUT="$CONFIG_HOME/hypr/generated/glass.lua"
 
@@ -165,6 +175,158 @@ window_level() {
     # `cycle` feel immediate without editing the per-scheme table.
     [[ -f $OVERRIDE_FILE ]] && { cat "$OVERRIDE_FILE"; return 0; }
     level window
+}
+
+# ---------------------------------------------------------------------------
+# The adaptive terminal level
+#
+# Off unless a scheme asks for it (`custom:noirblaze.adaptive = true`), because
+# it only means anything for a palette whose contrast floors are known.
+#
+# Why it exists, and it is not the reason you would guess. The obvious argument
+# is legibility. The stronger one is that a FIXED level is not a fixed amount of
+# glass: the effect is worth
+#
+#   lift = (backdrop - the window own colour) x (1 - opacity)
+#
+# so at `terminal = 0.55`, measured across the 41 ultrawide wallpapers in this
+# machine own folder, the lift ranges from 9.0 on the darkest to 99.0 on the
+# brightest. Ten to one, and the bottom of that range is BELOW the LIFT_MIN of
+# 12 that tests/checks/50-glass.sh enforces -- i.e. on some wallpapers the
+# frosted glass this repo is built around is not visible at all.
+#
+# Decision 011 tuned the blur against a lift of 17, measured on a wallpaper of
+# mean luma 99. That was a correct measurement of one image.
+#
+# So this does not make the desktop less glassy. It holds the lift at 18 -- one
+# above the number that was tuned for -- whatever is on screen.
+# ---------------------------------------------------------------------------
+
+# monitor_backdrop <name> <width> <height> -- the brightest window-sized patch
+# of that monitor wallpaper, 0-255, as the compositor presents it.
+#
+# Three things this has to get right, all of which were measured wrong first:
+#
+#   the CROP, not the file. fill_mode = "crop" scales to cover and discards the
+#       overflow -- about a third of the height of a 16:9 image on a 21:9 screen.
+#       Measured on wallhaven-6lqwyq: the raw file reads 147.8 and the displayed
+#       crop 142.0.
+#
+#   the BRIGHTEST TILE, not the mean. blur.xray is false and the columns tile,
+#       so a window samples the wallpaper behind ITSELF. Across the same 41
+#       wallpapers the brightest window-sized tile ran about 50 levels above the
+#       whole-image mean -- median 153 against 101. A window can be anywhere, so
+#       the level has to serve the worst place you can put one.
+#
+#   LUMA, not the unweighted channel mean. `%[fx:mean]` averages R, G and B
+#       equally; on wallhaven-1klxl3 that reads 78.5 where BT.601 luma is 70.4.
+#
+# Validated against the screen on 2026-09-05: predicting the centre tile of this
+# wallpaper gave 139 against a `noct-check glass-visible` measurement of 137.4,
+# an error of 1.2%.
+monitor_backdrop() {
+    local wall=$1 w=$2 h=$3
+    [[ -f $wall ]] || return 1
+    command -v magick >/dev/null 2>&1 || return 1
+
+    # Measured at an eighth of the monitor rather than full size. A tile mean is
+    # an area average, so downsampling first computes the same number -- checked
+    # on wallhaven-6lqwyq: 200 at 3440x1440 and 200 at 430x180. What it changes
+    # is the cost, and this runs from a colours hook: 998 ms at full size,
+    # 223 ms here. `jpeg:size` is most of that, because it lets libjpeg decode
+    # the 7529x4256 original at scale instead of decoding it all and throwing it
+    # away. It is ignored by every other format, harmlessly.
+    #
+    # The blur is scaled to match and is nearly decorative at this size: the
+    # average is dominated by the tile, not the radius. That is exactly why a
+    # STRUCTURE estimate cannot be taken from here -- spatial variation is what
+    # downsampling destroys -- and why the solver takes sd as an argument rather
+    # than guessing it.
+    local tw=$(( w / 8 )) th=$(( h / 8 ))
+    (( tw < 64 )) && tw=64
+    (( th < 64 )) && th=64
+
+    magick -define "jpeg:size=$(( tw * 2 ))x$(( th * 2 ))" "$wall" \
+           -resize "${tw}x${th}^" -gravity center -extent "${tw}x${th}" \
+           -blur 0x3 -colorspace Gray -resize 4x3! -depth 8 txt:- 2>/dev/null |
+    awk -F'[(,)]' '/^[0-9]+,[0-9]+:/ { if ($3 > m) m = $3 } END { if (m == "") exit 1; print m }'
+}
+
+# backdrop -- the worst backdrop on any monitor, which is the one the level has
+# to serve: there is one `terminal` and a terminal can be on either screen.
+#
+# jq rather than a hand-rolled parser: it is already a declared dependency for
+# exactly this (tests/deps.tsv, "every check that reads hyprctl -j"). The
+# transform matters -- a rotated monitor reports its panel size, so HDMI-A-1 at
+# transform 3 is 1920x1080 in `hyprctl monitors` and 1080x1920 on the desk, and
+# cropping a wallpaper to the wrong aspect measures an image nobody sees.
+backdrop() {
+    local worst=0 name w h wall b
+    command -v hyprctl >/dev/null 2>&1 || return 1
+    command -v jq >/dev/null 2>&1 || return 1
+
+    while read -r name w h; do
+        [[ -n ${name:-} ]] || continue
+        wall=$(noct_setting "wallpaper.monitors.$name" path) ||
+            wall=$(noct_setting "wallpaper.last" path) ||
+            wall=$(noct_setting "wallpaper.default" path) || continue
+        b=$(monitor_backdrop "$wall" "$w" "$h") || continue
+        awk -v a="$b" -v c="$worst" 'BEGIN { exit !(a > c) }' && worst=$b
+    done < <(hyprctl monitors -j 2>/dev/null | jq -r '
+        .[] | . as $m
+        | (if (.transform % 2) == 1 then [.height, .width] else [.width, .height] end) as $wh
+        | "\($m.name) \($wh[0]) \($wh[1])"' 2>/dev/null)
+
+    [[ $worst == 0 ]] && return 1
+    printf '%s' "$worst"
+}
+
+# adaptive_terminal <commit|peek> -- the level to use, or nothing if this is not
+# wanted or not possible. Every failure here is silent and falls back to the
+# configured level: a colours hook that errors is a desktop that does not
+# repaint.
+#
+# `peek` answers from the cache and measures nothing, because reading the
+# configuration must not have side effects and must not cost half a second.
+# That rule is why `show` no longer calls apply(); measuring two wallpapers to
+# answer "what level is in effect" would break it in the same way and answer a
+# different question besides -- what is in effect is what was last APPLIED.
+adaptive_terminal() {
+    local mode=${1:-commit}
+    [[ $(setting adaptive false) == true ]] || return 1
+    [[ -x $SOLVER ]] || return 1
+
+    local b alpha
+    if [[ $mode == peek ]]; then
+        local cached
+        cached=$(cat "$ADAPTIVE_FILE" 2>/dev/null) && [[ -n $cached ]] || return 1
+        printf '%s' "$cached"
+        return 0
+    fi
+    b=$(backdrop) || return 1
+    alpha=$("$SOLVER" --backdrop "$b" --json 2>/dev/null |
+            sed -n 's/.*"alpha":\([0-9.]*\).*/\1/p')
+    [[ -n $alpha ]] || return 1
+
+    # Hysteresis, and the threshold is derived rather than picked.
+    #
+    #   d(alpha)/d(backdrop) = (T - own) / (backdrop - own)^2
+    #
+    # which at a backdrop of 153 and T = 36 is 0.0009 per level. Everything
+    # downstream is written to two decimals, so a change smaller than 0.02 is
+    # literally a no-op -- and applying it still costs a `hyprctl reload` and a
+    # SIGUSR1 repaint of every terminal on screen. 0.02 is about 22 levels of
+    # backdrop at 153 and 11 at 100, i.e. it fires when the wallpaper actually
+    # changes and not when it is re-encoded.
+    local last
+    if last=$(cat "$ADAPTIVE_FILE" 2>/dev/null) && [[ -n $last ]]; then
+        awk -v a="$alpha" -v b="$last" \
+            'BEGIN { d = a - b; if (d < 0) d = -d; exit !(d < 0.02) }' && { printf '%s' "$last"; return 0; }
+    fi
+
+    mkdir -p "$(dirname "$ADAPTIVE_FILE")"
+    printf '%s' "$alpha" >"$ADAPTIVE_FILE"
+    printf '%s' "$alpha"
 }
 
 # ---------------------------------------------------------------------------
@@ -307,10 +469,19 @@ EOF
 # must not have side effects: `show` used to call apply(), so asking what the
 # levels were rewrote the generated files, reloaded Hyprland and signalled every
 # kitty. A check that has to disturb the thing it measures is not a check.
+# levels [peek] -- "<window> <terminal>", and nothing else.
 levels() {
-    local win term
+    local win term adaptive mode=${1:-commit}
     win=$(window_level)
     term=$(level terminal)
+
+    # The adaptive level wins over the configured one, and only for a scheme
+    # that asked for it. It is deliberately NOT consulted while a manual
+    # override is in effect: SUPER+SHIFT+G means "make the desktop this glassy
+    # now", and a solver quietly overruling that is the bind not working.
+    if [[ ! -f $OVERRIDE_FILE ]] && adaptive=$(adaptive_terminal "$mode"); then
+        term=$adaptive
+    fi
 
     # SUPER+SHIFT+G is "make the desktop more or less glassy", not "make
     # everything except the terminal more or less glassy" -- so while a manual
@@ -387,11 +558,19 @@ case "${1:-apply}" in
         # and you are looking for which file said so.
         marker=""
         [[ -f $OVERRIDE_FILE ]] && marker="  [override: SUPER+SHIFT+G]"
+        # Read from the cache rather than recomputed. `show` is read-only on
+        # purpose -- noct-check parses the second and fourth fields of this line
+        # -- and measuring two wallpapers to answer "what is in effect" would
+        # both cost half a second and answer a different question: what is in
+        # effect is what was last APPLIED.
+        if [[ -z $marker && $(setting adaptive false) == true && -f $ADAPTIVE_FILE ]]; then
+            marker="  [adaptive]"
+        fi
         [[ -z $marker && -f $LOCAL_FILE ]] && marker="  [glass.local.conf]"
         # Deliberately unquoted: levels() prints the two numbers separated by a
         # space, and they are two arguments here.
         # shellcheck disable=SC2046,SC2183
-        printf 'window %s  terminal %s%s\n' $(levels) "$marker"
+        printf 'window %s  terminal %s%s\n' $(levels peek) "$marker"
         ;;
     *) usage ;;
 esac

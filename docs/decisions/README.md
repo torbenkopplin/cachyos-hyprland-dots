@@ -48,6 +48,7 @@ So the **Settled against** sections are the load-bearing half of this directory.
 | 018 | [A launcher provider gets two seconds, so it may not ask anything slow](018-providers-get-two-seconds.md) | 2026-08-18 |
 | 019 | [Mail credentials live in `pass`, and `accounts.conf` holds only the lookup](019-mail-credentials-live-in-pass.md) | 2026-08-22 |
 | 020 | [The MX Keys print key is remapped below Hyprland, not bound inside it](020-the-print-key-is-remapped-below-hyprland.md) | 2026-08-26 |
+| 021 | [The colourscheme is a submodule, and its opacity is measured](021-the-colourscheme-is-a-submodule.md) | 2026-09-05 |
 
 ## Settled against, in one place
 
@@ -62,6 +63,8 @@ The dead ends, and where the reasoning is. Read these before rebuilding one.
 | A large blur, for one uniform shade | It averages the wallpaper away: measured a lift of 3 levels of 255, i.e. nothing on screen saying the glass was on | [011](011-the-blur-is-small.md) |
 | A Hyprland bind on the MX Keys screenshot chord | A bind cannot subtract the modifiers, so the key never becomes a Print key — and one press of it fired `SUPER+SHIFT+S` *and* `SUPER+S`, so the scratchpad answers underneath whatever the chord is pointed at | [020](020-the-print-key-is-remapped-below-hyprland.md) |
 | Moving the scratchpad off `S` to free the chord | The `S` / `SHIFT+S` pair is the toggle-and-send shape the rest of the keymap is built from | [020](020-the-print-key-is-remapped-below-hyprland.md) |
+| A fixed `terminal` level | `lift = (backdrop − own) × (1 − opacity)`, so one number is ten different amounts of glass across the wallpaper folder — 9.0 to 99.0, the low end below the suite's own `LIFT_MIN` | [021](021-the-colourscheme-is-a-submodule.md) |
+| Keeping the palette here and the Lua in the nvim repo, in step by hand | They had already diverged: the palette's `_comment` credited upstream for `#00ff77`, which upstream does not have | [021](021-the-colourscheme-is-a-submodule.md) |
 | A keyring for the mail password | `secret-tool` is on PATH but nothing owns `org.freedesktop.secrets`; the only activatable name fails to launch. It needs gnome-keyring plus PAM unlock wiring under greetd, on both machines, for what one GPG key already buys | [019](019-mail-credentials-live-in-pass.md) |
 | The mail password inline in `accounts.conf` | A readable secret on disk, when `source-cred-cmd` costs one line. Kept documented as the fallback for a machine with no GPG key | [019](019-mail-credentials-live-in-pass.md) |
 | `hypridle` alongside Noctalia's idle service | Two countdowns to the same lock screen, one of them configured in a directory this repo does not manage | [006](006-idle-has-one-owner.md) |

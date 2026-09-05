@@ -39,6 +39,21 @@ configs	tree	config/kitty	config	kitty
 configs	tree	config/fish	config	fish
 configs	file	config/starship/starship.toml	config	starship.toml
 
+# The colourscheme, from the submodule at vendor/noirblaze. It used to be a
+# tracked file at config/noctalia/palettes/noirblaze.json, and it is not any
+# more: the same theme drives neovim, and keeping two hand-edited copies in step
+# is exactly the drift this repo's whole shape is against.
+#
+# Note the source is OUTSIDE config/. install/lib/link.sh links "$REPO/$src", so
+# any path in the checkout works; nothing in the engine needed changing.
+#
+# The row has to be a `file` rather than letting the `tree` row above pick it up,
+# because the tree row walks config/noctalia and the palette no longer lives
+# there. Both rows claiming ~/.config/noctalia/palettes/noirblaze.json is what
+# `tests/lint.sh manifest-collisions` exists to catch, and deleting the tracked
+# file is what stops it.
+configs	file	vendor/noirblaze/dist/noirblaze.json	config	noctalia/palettes/noirblaze.json
+
 # aerc.conf only. accounts.conf is NOT tracked -- it names mail addresses,
 # server names and a credential command -- so config/aerc/ ships an .example
 # to copy, which the linker skips by the same rule that skips

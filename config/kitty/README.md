@@ -20,8 +20,10 @@ terminal, so the file belongs to the template engine; the copy in git would be
 stale the moment you changed scheme.
 
 Your old static noirblaze theme lived in a file like this. It is not lost — it is
-now `config/noctalia/palettes/noirblaze.json`, where it drives the whole desktop
-instead of just the terminal, and where `/theme` can select it.
+now its own repository, vendored at `vendor/noirblaze` and linked into
+`~/.config/noctalia/palettes/`, where it drives the whole desktop instead of just
+the terminal and where `/theme` can select it. See
+[decision 021](../../docs/decisions/021-the-colourscheme-is-a-submodule.md).
 
 > **Do not enable Noctalia's built-in `kitty` template.** It writes
 > `themes/noctalia.conf` *and rewrites `kitty.conf`* to include it, replacing
@@ -59,16 +61,19 @@ so a first launch before Noctalia has started is not fatal.
 kitty's `background_opacity` makes the terminal *background* translucent while
 leaving text opaque — that is what the frosted-glass effect is built on.
 
-Neovim will not inherit it. Your `noirblaze.lua` sets `Normal` and `NormalNC`
-to `bg = c.bg` (`#121212`), which paints an opaque rectangle over the whole
-terminal. If you want the editor to be frosted too, that needs a one-line
-change **in the nvim repo, not this one**:
+Neovim inherits it, because `init.lua` in the nvim repo sets `bg = "none"` on
+`Normal`, `NormalNC` and eighteen other groups right after loading the
+colourscheme. So the editor composites against the wallpaper exactly as the
+shell does.
 
-```lua
-hi("Normal",   { fg = c.fg2, bg = "none" })
-hi("NormalNC", { fg = c.fg2, bg = "none" })
-```
+That is the case noirblaze is solved for. Every foreground clears its contrast
+floor against the **composited** background rather than against `#121212` — which
+matters, because kitty makes a cell translucent only when its background matches
+the default background, so a group with `bg = c.bg` composites and a group with
+`bg = c.bg3` (a popup, the status line) does not, and the two need different
+foregrounds to reach the same ratio.
 
-Worth knowing before you decide: with a transparent editor background, the
-`CursorLine` and `Visual` highlights become the only things separating text
-from the wallpaper, and unfocused splits stop being visually distinct.
+Worth knowing: with a transparent editor background, `CursorLine` and `Visual`
+are the only things separating text from the wallpaper, and unfocused splits
+stop being visually distinct. Both of those still paint an explicit background,
+so both survive the transparency.

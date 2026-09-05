@@ -41,6 +41,16 @@ do_update() {
         note "the configs are symlinks into here, so these ARE your live config:"
         printf '%s\n' "$dirty" | sed 's/^/      /'
         note "commit them, or 'git stash', or 'git checkout --' them, then rerun --update"
+        # A submodule shows up here as " M vendor/<name>" whenever its checkout
+        # is not at the commit this repo records -- which happens the moment you
+        # edit the theme in place, and it is NOT something 'git stash' or
+        # 'git checkout --' in this repo will resolve. Say so, because the advice
+        # above is otherwise wrong for that one line.
+        if printf '%s\n' "$dirty" | grep -q '^.[[:space:]]*M[[:space:]]*vendor/'; then
+            note "a 'vendor/...' line means a SUBMODULE has moved, not a file here:"
+            note "commit and push inside it, then 'git add' it here -- or"
+            note "'git submodule update --recursive' to throw those changes away"
+        fi
         return 0
     fi
 
@@ -63,6 +73,18 @@ do_update() {
         return 0
     fi
 
+    # Submodules are pulled as part of the pull, not left for the next command
+    # to discover. vendor/noirblaze carries the colourscheme, and links.tsv
+    # points a row straight at a file inside it: a submodule left uninitialised
+    # deploys a DANGLING SYMLINK into ~/.config/noctalia/palettes, which is the
+    # exact failure tests/lint.sh manifest-sources exists to catch and which
+    # this end of it can prevent outright.
+    #
+    # --init so a first pull after the submodule was added works without a
+    # separate command, --recursive because a submodule may have its own.
+    git -C "$REPO" submodule update --init --recursive || \
+        warn "submodule update failed -- vendor/ may be stale or missing"
+
     after=$(git -C "$REPO" rev-parse HEAD)
     if [[ $before == "$after" ]]; then
         say "already up to date (${after:0:7})"
@@ -74,6 +96,18 @@ do_update() {
     printf '\n'
     say "re-running with the version just pulled"
     DOTS_UPDATED=$after exec "$REPO/install.sh" "${ARGV[@]}"
+}
+
+# The active scheme as color-scheme-set wants it: "<source> <name>". Read from
+# Noctalia's own state files rather than over IPC, the same way bin/noct-common.sh
+# does -- this runs from the installer, not from inside the shell, but the reader
+# is the one that cannot deadlock and it is already written.
+noct_scheme_for_reapply() {
+    local common="$REPO/bin/noct-common.sh"
+    [[ -f $common ]] || return 1
+    # shellcheck source=/dev/null
+    . "$common" 2>/dev/null || return 1
+    noct_scheme 2>/dev/null
 }
 
 # Make what was just linked show up in the session that is already running.
@@ -110,5 +144,23 @@ do_reapply() {
         noctalia msg templates-apply >/dev/null 2>&1 \
             && say "templates re-rendered" \
             || note "noctalia would not re-render (shell not running?)"
+
+        # ...but templates-apply re-renders against the palette Noctalia ALREADY
+        # HAS IN MEMORY. It does not re-read the palette file, so an update that
+        # changed config/noctalia/palettes/*.json -- or moved the colourscheme
+        # into vendor/noirblaze, which is exactly what happened -- renders the
+        # old colours and reports success.
+        #
+        # Measured 2026-09-05: with the palette relinked to the submodule and
+        # bright.black changed from #737373 to #8b8b8b, templates-apply wrote
+        # #737373. Re-issuing color-scheme-set with the scheme already selected
+        # is what makes it re-read the file, and it wrote #8b8b8b.
+        local scheme
+        if scheme=$(noct_scheme_for_reapply); then
+            # shellcheck disable=SC2086
+            noctalia msg color-scheme-set $scheme >/dev/null 2>&1 \
+                && say "palette re-read ($scheme)" \
+                || note "noctalia would not re-read the palette"
+        fi
     fi
 }
