@@ -424,6 +424,50 @@ software this repo does not own, and it will read as its own material next to
 everything else. That is the price of having the effect at all, and it is the
 same price the `browser` level was invented to avoid paying.
 
+### …and then the terminal moved, so Zen got one number
+
+Since [021](decisions/021-the-colourscheme-is-a-submodule.md) the terminal level
+is measured from the wallpaper, which on a bright one takes it from 0.55 to about
+0.90. Zen did not move, and the two stopped reading as the same desktop.
+Measured on 2026-09-07, both windows over the same wallpaper:
+
+| | luma | local backdrop | effective opacity |
+|---|---|---|---|
+| Zen page | **89**, warm | 124 | **≈ 0.32** |
+| kitty | **22**, neutral | 82 | **0.93** (configured 0.90) |
+
+The old match was a coincidence — at a fixed 0.55 the two sat about 14 levels
+apart and nobody noticed. And a luma match alone would not have fixed it: Zen was
+showing 68% of a photograph and the terminal 7% of the same one, so one was warm
+and the other neutral. **Only equal opacity matches them.**
+
+So `browsers/zen/user.js` now sets two prefs, and they are the mod's own rather
+than anything invented here:
+
+```js
+user_pref("mod.sameerasw.zen_bg_color_enabled", true);
+user_pref("mod.sameerasw.zen_transparency_color", "rgba(18, 18, 18, 0.90)");
+```
+
+`rgba(18, 18, 18, …)` is the palette's own background, so Zen composites towards
+the same ground the terminal does. 0.90 because Zen's number is fixed and the
+terminal's is not: across the wallpaper folder the terminal lands between 0.66
+and 0.91, and 0.90 tracks that best — within 5 levels at the median wallpaper and
+2 at the brightest.
+
+**This is not the `browser` level coming back.** There is still no number for a
+browser in `glass.conf` and still no CSS written into a profile. The mod
+publishes these in its own `preferences.json` and reads them in its own
+stylesheet — with the checkbox off it falls through to `#00000000`, which is
+exactly why a page read as the wallpaper. See
+[022](decisions/022-zen-gets-a-number-after-all.md) for which of 013's four
+objections still apply (one of them does).
+
+**Two things to know.** It needs a Zen restart, because a Firefox-family browser
+reads `user.js` once at startup. And `user.js` wins over the mod's settings
+panel at every restart, so change the number here rather than there — the same
+trap the two prefs above it carry.
+
 **One consequence in the suite.** `noct-check browser-glass` used to fail when the
 four browsers were more than 0.06 apart — the compositor's own focus step. A Zen
 that is translucent by itself is exactly the spread that assertion was written to

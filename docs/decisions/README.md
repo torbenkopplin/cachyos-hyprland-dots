@@ -49,6 +49,7 @@ So the **Settled against** sections are the load-bearing half of this directory.
 | 019 | [Mail credentials live in `pass`, and `accounts.conf` holds only the lookup](019-mail-credentials-live-in-pass.md) | 2026-08-22 |
 | 020 | [The MX Keys print key is remapped below Hyprland, not bound inside it](020-the-print-key-is-remapped-below-hyprland.md) | 2026-08-26 |
 | 021 | [The colourscheme is a submodule, and its opacity is measured](021-the-colourscheme-is-a-submodule.md) | 2026-09-05 |
+| 022 | [Zen gets a number after all, and it is the mod's own](022-zen-gets-a-number-after-all.md) | 2026-09-07 |
 
 ## Settled against, in one place
 
@@ -57,6 +58,7 @@ The dead ends, and where the reasoning is. Read these before rebuilding one.
 | Not doing | Because | Where |
 |---|---|---|
 | Frosted glass on every window | The compositor cannot tell a glyph from its background, so the price is a permanent discount on every letter in every app | [010](010-glass-is-the-terminal-only.md) |
+| A `browser` level in `glass.conf`, or generated CSS in a Zen profile | Still settled against. [022](022-zen-gets-a-number-after-all.md) sets one pref the mod publishes; it does not bring back a level or a stylesheet | [013](013-zen-is-translucent-unmatched.md), [022](022-zen-gets-a-number-after-all.md) |
 | Making Zen's translucency match the desktop's | It only showed on pages that paint no background, it needed a silent specificity fight with someone else's extension, and there was no room between the two focus states | [013](013-zen-is-translucent-unmatched.md) |
 | A browser-parity gate in the suite | A deliberately translucent Zen *is* a spread, so the gate could only fire on the intended state. Retired, not exempted — and not kept as a metric either, because a baseline tolerance is the same gate under another name | [013](013-zen-is-translucent-unmatched.md) |
 | A small glass island instead of a bar | A capsule draws opaque whatever you ask; the only surface that takes an opacity spans the monitor; the only width lever is absolute pixels and shared between screens | [009](009-the-bar-is-three-capsules.md) |
