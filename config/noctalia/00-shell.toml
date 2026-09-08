@@ -94,3 +94,6 @@ enabled = true
 [shell.panel]
 session_placement = "floating"
 session_position  = "center"
+
+[audio]
+enable_overdrive = true
