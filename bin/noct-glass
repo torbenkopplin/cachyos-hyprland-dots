@@ -11,40 +11,26 @@
 # switching scheme from /theme (or the settings GUI, or IPC) lands the matching
 # glass level without anything else being involved.
 #
-# How the effect is built
-# -----------------------
-# Hyprland blurs whatever is behind a window wherever that window is not fully
-# opaque. Two levels feed that, and both are stated as what you actually see:
+# Two levels, both stated as what you SEE, and both defined in
+# ~/.config/noctalia/glass.conf -- which is where the reasoning lives, next to
+# the numbers it explains:
 #
-#   window    -> decoration.active_opacity / inactive_opacity, i.e. EVERY
-#                window. The compositor cannot separate a window's text from its
-#                background, so this fades both. Shipped at 1.0 since
-#                2026-08-19: no compositor transparency at all.
+#   window    every window, via decoration.active_opacity. The compositor
+#             cannot tell a window's text from its background, so this fades
+#             both. Shipped at 1.0 since 2026-08-19: no compositor transparency.
+#   terminal  how opaque a terminal ends up. kitty is the only window here that
+#             fades its background and leaves its text alone, and so the whole
+#             of the effect. Shipped at 0.55.
 #
-#   terminal  -> how opaque a *terminal* ends up. kitty is the only window here
-#                that can be translucent on its own, and the only one that fades
-#                its background WITHOUT fading its text. Shipped at 0.55, and
-#                the whole of the effect now.
+# The value written for kitty is terminal / window, because the compositor is
+# already applying `window` to that surface. At window = 1.0 that is a division
+# by one.
 #
-# So the value written for the terminal is not the level itself, it is
-# terminal / window: the compositor is already applying `window` to that surface,
-# and this is the factor that turns it into the level you asked for. At
-# window = 1.0 that division is by one, so `terminal` reaches kitty untouched.
+# Two files: glass.conf is tracked and applies everywhere, glass.local.conf is
+# this machine's own and wins outright.
 #
-# Why it is that way round: every step of glassiness taken through `window`
-# costs contrast, and every step taken through `terminal` costs none. Glass on
-# a GTK or Qt app can only be bought by fading its text, and that was not worth
-# it on a machine you work on -- so those apps are opaque, on purpose, and the
-# terminal keeps the effect. Measured, and the reasoning is in glass.conf.
-#
-# A browser is not a special case. It gets `window`, like every other app that
-# paints its own background. There was a third level here that tinted Zen's page
-# area for the transparency mod; it was given up on 2026-08-19 and the reasoning
-# is in docs/theming.md.
-#
-# Two files, and the second one is not in the repo: glass.conf is tracked and
-# applies everywhere, glass.local.conf is this machine's own and wins. Set
-# `terminal = 1.0` there for a desktop with no translucency anywhere at all.
+# Decisions 010 (glass is the terminal only), 011 (the blur is small) and 021
+# (the adaptive level) are why. docs/theming.md is the long form.
 
 set -uo pipefail
 
@@ -183,65 +169,34 @@ window_level() {
 # Off unless a scheme asks for it (`custom:noirblaze.adaptive = true`), because
 # it only means anything for a palette whose contrast floors are known.
 #
-# Why it exists, and it is not the reason you would guess. The obvious argument
-# is legibility. The stronger one is that a FIXED level is not a fixed amount of
-# glass: the effect is worth
-#
-#   lift = (backdrop - the window own colour) x (1 - opacity)
-#
-# so at `terminal = 0.55`, measured across the 41 ultrawide wallpapers in this
-# machine own folder, the lift ranges from 9.0 on the darkest to 99.0 on the
-# brightest. Ten to one, and the bottom of that range is BELOW the LIFT_MIN of
-# 12 that tests/checks/50-glass.sh enforces -- i.e. on some wallpapers the
-# frosted glass this repo is built around is not visible at all.
-#
-# Decision 011 tuned the blur against a lift of 17, measured on a wallpaper of
-# mean luma 99. That was a correct measurement of one image.
-#
-# So this does not make the desktop less glassy. It holds the lift at 18 -- one
-# above the number that was tuned for -- whatever is on screen.
+# A FIXED level is not a fixed amount of glass: lift = (backdrop - own) x
+# (1 - opacity), so `terminal = 0.55` measured 9.0 on the darkest of 41
+# wallpapers and 99.0 on the brightest -- the low end below the LIFT_MIN of 12
+# that 50-glass.sh enforces. This holds the lift at 18 whatever is on screen.
+# Decision 021.
 # ---------------------------------------------------------------------------
 
 # monitor_backdrop <name> <width> <height> -- the brightest window-sized patch
 # of that monitor wallpaper, 0-255, as the compositor presents it.
 #
-# Three things this has to get right, all of which were measured wrong first:
-#
-#   the CROP, not the file. fill_mode = "crop" scales to cover and discards the
-#       overflow -- about a third of the height of a 16:9 image on a 21:9 screen.
-#       Measured on wallhaven-6lqwyq: the raw file reads 147.8 and the displayed
-#       crop 142.0.
-#
-#   the BRIGHTEST TILE, not the mean. blur.xray is false and the columns tile,
-#       so a window samples the wallpaper behind ITSELF. Across the same 41
-#       wallpapers the brightest window-sized tile ran about 50 levels above the
-#       whole-image mean -- median 153 against 101. A window can be anywhere, so
-#       the level has to serve the worst place you can put one.
-#
-#   LUMA, not the unweighted channel mean. `%[fx:mean]` averages R, G and B
-#       equally; on wallhaven-1klxl3 that reads 78.5 where BT.601 luma is 70.4.
-#
-# Validated against the screen on 2026-09-05: predicting the centre tile of this
-# wallpaper gave 139 against a `noct-check glass-visible` measurement of 137.4,
-# an error of 1.2%.
+# Three things it has to get right, each measured wrong first: the displayed
+# CROP rather than the file, the BRIGHTEST TILE rather than the mean (a window
+# can be anywhere, so the level has to serve the worst place you can put one),
+# and LUMA rather than the unweighted channel mean. Decision 021 has the
+# numbers. Validated against the screen 2026-09-05 to within 1.2%.
 monitor_backdrop() {
     local wall=$1 w=$2 h=$3
     [[ -f $wall ]] || return 1
     command -v magick >/dev/null 2>&1 || return 1
 
-    # Measured at an eighth of the monitor rather than full size. A tile mean is
-    # an area average, so downsampling first computes the same number -- checked
-    # on wallhaven-6lqwyq: 200 at 3440x1440 and 200 at 430x180. What it changes
-    # is the cost, and this runs from a colours hook: 998 ms at full size,
-    # 223 ms here. `jpeg:size` is most of that, because it lets libjpeg decode
-    # the 7529x4256 original at scale instead of decoding it all and throwing it
-    # away. It is ignored by every other format, harmlessly.
+    # An eighth of the monitor. A tile mean is an area average, so downsampling
+    # first computes the same number and costs 223 ms instead of 998 -- which
+    # matters because this runs from a colours hook. `jpeg:size` is most of the
+    # saving and is ignored by non-JPEG formats, harmlessly.
     #
-    # The blur is scaled to match and is nearly decorative at this size: the
-    # average is dominated by the tile, not the radius. That is exactly why a
-    # STRUCTURE estimate cannot be taken from here -- spatial variation is what
-    # downsampling destroys -- and why the solver takes sd as an argument rather
-    # than guessing it.
+    # It is also why a STRUCTURE estimate cannot come from here: spatial
+    # variation is exactly what downsampling destroys, so the solver takes sd as
+    # an argument rather than guessing it.
     local tw=$(( w / 8 )) th=$(( h / 8 ))
     (( tw < 64 )) && tw=64
     (( th < 64 )) && th=64
@@ -255,11 +210,10 @@ monitor_backdrop() {
 # backdrop -- the worst backdrop on any monitor, which is the one the level has
 # to serve: there is one `terminal` and a terminal can be on either screen.
 #
-# jq rather than a hand-rolled parser: it is already a declared dependency for
-# exactly this (tests/deps.tsv, "every check that reads hyprctl -j"). The
-# transform matters -- a rotated monitor reports its panel size, so HDMI-A-1 at
-# transform 3 is 1920x1080 in `hyprctl monitors` and 1080x1920 on the desk, and
-# cropping a wallpaper to the wrong aspect measures an image nobody sees.
+# The transform swap is load-bearing: `hyprctl monitors` reports a panel's own
+# size, so HDMI-A-1 at transform 3 is 1920x1080 there and 1080x1920 on the desk,
+# and cropping a wallpaper to the wrong aspect measures an image nobody sees.
+# tests/lib/probe.sh needs the same swap for the same reason.
 backdrop() {
     local worst=0 name w h wall b
     command -v hyprctl >/dev/null 2>&1 || return 1
@@ -286,11 +240,9 @@ backdrop() {
 # configured level: a colours hook that errors is a desktop that does not
 # repaint.
 #
-# `peek` answers from the cache and measures nothing, because reading the
-# configuration must not have side effects and must not cost half a second.
-# That rule is why `show` no longer calls apply(); measuring two wallpapers to
-# answer "what level is in effect" would break it in the same way and answer a
-# different question besides -- what is in effect is what was last APPLIED.
+# `peek` answers from the cache and measures nothing. Reading the configuration
+# must not have side effects and must not cost half a second -- and what is in
+# effect is what was last APPLIED, which is what the cache holds.
 adaptive_terminal() {
     local mode=${1:-commit}
     [[ $(setting adaptive false) == true ]] || return 1
@@ -308,16 +260,11 @@ adaptive_terminal() {
             sed -n 's/.*"alpha":\([0-9.]*\).*/\1/p')
     [[ -n $alpha ]] || return 1
 
-    # Hysteresis, and the threshold is derived rather than picked.
-    #
-    #   d(alpha)/d(backdrop) = (T - own) / (backdrop - own)^2
-    #
-    # which at a backdrop of 153 and T = 36 is 0.0009 per level. Everything
-    # downstream is written to two decimals, so a change smaller than 0.02 is
-    # literally a no-op -- and applying it still costs a `hyprctl reload` and a
-    # SIGUSR1 repaint of every terminal on screen. 0.02 is about 22 levels of
-    # backdrop at 153 and 11 at 100, i.e. it fires when the wallpaper actually
-    # changes and not when it is re-encoded.
+    # Hysteresis, derived rather than picked: everything downstream is written
+    # to two decimals, so a change smaller than 0.02 is literally a no-op, and
+    # applying it still costs a `hyprctl reload` and a SIGUSR1 repaint of every
+    # terminal on screen. That threshold is ~22 levels of backdrop at 153, i.e.
+    # it fires when the wallpaper changes and not when it is re-encoded.
     local last
     if last=$(cat "$ADAPTIVE_FILE" 2>/dev/null) && [[ -n $last ]]; then
         awk -v a="$alpha" -v b="$last" \
@@ -465,11 +412,10 @@ hl.config({
 EOF
 }
 
-# levels -- "<window> <terminal>", and nothing else. Reading the configuration
-# must not have side effects: `show` used to call apply(), so asking what the
-# levels were rewrote the generated files, reloaded Hyprland and signalled every
-# kitty. A check that has to disturb the thing it measures is not a check.
-# levels [peek] -- "<window> <terminal>", and nothing else.
+# levels [peek] -- "<window> <terminal>", and nothing else. Reading the
+# configuration must not have side effects: `show` used to call apply(), so
+# asking what the levels were rewrote the generated files, reloaded Hyprland and
+# signalled every kitty.
 levels() {
     local win term adaptive mode=${1:-commit}
     win=$(window_level)

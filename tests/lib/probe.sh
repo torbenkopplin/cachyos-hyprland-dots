@@ -1,53 +1,28 @@
 # probe.sh -- every live measurement gets its own, brand new window.
 #
-# The rule, and why it is absolute
-# --------------------------------
-# Nothing in this suite measures a window you already had open. It always
-# spawns one, measures it, and kills it.
+# Nothing in this suite measures a window you already had open. It always spawns
+# one, measures it, and kills it. That is not tidiness: a window that has been
+# open for a while is not evidence about the configuration on disk. kitty reads
+# generated-glass.conf at startup and on SIGUSR1; a Firefox-family browser reads
+# user.js exactly once, at startup. Whatever is on screen in it averages into the
+# measurement too, which is why a probe is blank on purpose.
 #
-# That is not tidiness. A window that has been open for a while is not evidence
-# about the configuration on disk:
-#
-#   * kitty reads generated-glass.conf at startup and again on SIGUSR1. A
-#     terminal started before the last `noct-glass apply` is sitting at a level
-#     that no file on this machine describes, and measuring it reports the
-#     history of the session rather than its configuration. This is not
-#     hypothetical: it is why glass-visible used to print "this terminal is at
-#     the compositor's level, not its configured one" as an aside -- the check
-#     had noticed it was measuring the wrong window and carried on anyway.
-#
-#   * a Firefox-family browser reads user.js exactly once, at startup, and never
-#     again. A running Zen is running whatever its prefs said the last time it
-#     was launched, which is the whole reason the transparency revert needs a
-#     restart to be visible.
-#
-#   * whatever is on screen in your terminal averages into the measurement. A
-#     probe is blank on purpose, so the number describes the window and not the
-#     scrollback.
-#
-# So: a check that finds no window to measure spawns one. A check that finds
-# ten does not care.
+# tests/README.md, "Two rules that shape the whole thing", is the long form.
 #
 # Browser probes and the throwaway profile
 # ----------------------------------------
 # A browser probe runs a NEW PROCESS against a THROWAWAY PROFILE seeded from the
-# artefact this repo actually installs into one: the repo's user.js.
-#
-# A new process, because a Firefox-family browser given a URL while it is
-# already running hands it to the existing process, which re-reads nothing. The
-# only way to test a pref is to start a browser that has not read one yet.
-#
-# A throwaway profile, because the real one is locked while the browser is open
-# -- so measuring the real profile would mean "close your browser and rerun",
-# every time -- and because a test that writes into a profile holding live
-# cookies is a test nobody will run twice.
+# repo's own user.js -- a new process because a Firefox-family browser handed a
+# URL while already running gives it to the existing process, which re-reads
+# nothing; a throwaway profile because the real one is locked while the browser
+# is open, and because a test that writes into a profile holding live cookies is
+# a test nobody runs twice.
 #
 # What that costs, stated plainly: a seeded profile does NOT carry Zen's
-# "transparent zen" mod or the "Zen Internet" extension, so what the probe
-# measures is a Zen with neither. Since 2026-08-19 that is also what the repo
-# configures -- the prefs those need are set false in browsers/zen/user.js -- so
+# "transparent zen" mod or the "Zen Internet" extension, so the probe measures a
+# Zen with neither. Since 2026-08-19 that is also what the repo configures, so
 # the probe and the intent agree. What it cannot tell you is whether YOUR real
-# profile still has the mod switched on. That is a look at the screen, and
+# profile still has the mod switched on -- that is a look at the screen, and
 # TESTING.md's theming section asks for it.
 
 # ---------------------------------------------------------------------------

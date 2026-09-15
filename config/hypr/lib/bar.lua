@@ -5,57 +5,34 @@
 --   a panel opens   launcher, control centre, clipboard, session menu, window
 --                   switcher -- the bar comes with it and leaves with it.
 --   SUPER+B         pins it visible for a deliberate glance.
---   the pointer      pushing the mouse at the top edge reveals it, and it
---                   retracts when the pointer leaves. Added 2026-08-19 as the
---                   mouse backup to a keyboard-first setup.
+--   the pointer     pushing the mouse at the top edge reveals it, and it
+--                   retracts when the pointer leaves.
 --
 -- Visibility is absolute -- bar-show / bar-hide -- and 10-bar.toml keeps
--- `auto_hide = false` so nothing else is deciding at the same time. That matters:
--- two systems with an opinion about the same surface is how you get a bar that
--- retracts the instant you reveal it.
+-- `auto_hide = false` so nothing else is deciding at the same time. Two systems
+-- with an opinion about the same surface is how you get a bar that retracts the
+-- instant you reveal it.
 --
--- Why the hot edge is ours and not Noctalia's
--- ------------------------------------------
--- Noctalia has `auto_hide`, and it was the obvious way to do this. It does not
--- do it. Measured on 5.0.0-beta.8 with auto_hide confirmed true in
--- `config export merged`: the bar collapses to a strip at the screen edge and
--- stays collapsed with the pointer parked inside that strip, at the top row and
--- a few pixels down, on `top` and on `overlay`, with and without reserved space.
--- Whatever `auto_hide` gates, it is not pointer proximity.
+-- Two rules earn their complexity, and decision 008 is why:
 --
--- (Caveat worth knowing before trusting that: the pointer was placed by warping
--- it and then nudging it with real relative motion events, not by a hand on a
--- mouse. If a hand-moved pointer does reveal it, this whole poll can be deleted
--- in favour of one config key.)
+--   * the open set is RECONCILED against hl.get_layers() before every decision,
+--     never maintained from events alone. A missed layer.closed would otherwise
+--     strand an address and pin the bar up for the rest of the session.
+--   * `held` is what was last ASSERTED, so it can be wrong. The guard against
+--     re-sending is bypassed whenever there is reason to doubt it -- after a
+--     prune that dropped something, when Noctalia reappears, and on SUPER+B,
+--     which makes that key a resync as well as a toggle.
 --
--- So the edge is polled here instead. hl.get_cursor_pos() is an in-process read
--- and the tick does nothing but compare two numbers until the answer changes, so
--- the cost is a comparison every HOT_EDGE_POLL_MS and an IPC call only on a
--- transition. Set BAR_HOT_EDGE = false in conf/options.lua to be rid of it.
+-- The hot edge is polled rather than subscribed because Noctalia's own
+-- `auto_hide` is not a proximity reveal -- measured, see docs/upstream.md -- and
+-- there is no "pointer entered a region" event for a surface that is not mapped
+-- there yet. hl.get_cursor_pos() is an in-process read and the tick compares two
+-- numbers until the answer changes, so the cost is a comparison every
+-- HOT_EDGE_POLL_MS and an IPC call only on a transition. BAR_HOT_EDGE = false in
+-- conf/options.lua is rid of it.
 --
--- Noctalia's panels are layer-shell surfaces and Hyprland emits layer.opened /
--- layer.closed with the surface, so the panel half needs no polling at all.
---
--- Why it used to get stuck, and what stops it now
--- ---------------------------------------------
--- Two independent mechanisms, both addressed:
---
---   1. `open` was only ever written by events. A layer.closed that never arrived
---      stranded an address in it for the rest of the session -- and the bar is
---      wanted while ANYTHING is in that set, so it stayed up. SUPER+B could not
---      rescue it either, because unpinning recomputes from the same stale set. A
---      set rather than a counter defends against double counting, which was never
---      the problem. So `open` is now reconciled against hl.get_layers() before
---      every decision: a surface that is not on screen is not open, whatever we
---      were told about it.
---
---   2. `held` records what was last ASSERTED, not what happened, so a command
---      that got lost was never retried -- the "state already matches" guard
---      suppressed the correction for good. The guard is worth keeping, since
---      re-sending bar-show re-runs the slide animation, so instead it is bypassed
---      whenever there is reason to doubt it: after a prune that actually dropped
---      something, when Noctalia reappears, and on SUPER+B -- which makes that key
---      a resync as well as a toggle, and the way out if this is ever wrong again.
+-- docs/decisions/008-the-bar-is-event-driven.md is the decision;
+-- 009 is what the bar is made of.
 
 local M = {}
 
@@ -113,7 +90,7 @@ function M.setup(noct)
     --- `force` sends even when nothing appears to have changed.
     local function apply(force)
         -- A prune that found something means the previous decision was made on
-        -- bad data, so what we think we asserted cannot be trusted either.
+        -- bad data, so `held` cannot be trusted either.
         if prune() then force = true end
 
         local want = pinned or hot or next(open) ~= nil
@@ -178,8 +155,7 @@ function M.setup(noct)
     end)
 
     --- SUPER+B: pin the bar on screen, or let it go back to following panels and
-    --- the pointer. Forced, so it doubles as a resync -- if the bar is ever stuck
-    --- in a state this file did not intend, two presses of this key end it.
+    --- the pointer. Forced, so it doubles as a resync.
     function M.toggle_pin()
         pinned = not pinned
         apply(true)

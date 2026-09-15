@@ -1,42 +1,19 @@
 -- lib/lid.lua -- the built-in panel is never the last output.
 --
--- On a docked laptop the lid switch reaches nothing. logind counts a second
--- connected display as a dock and HandleLidSwitchDocked defaults to ignore, so
--- shutting the lid leaves the built-in panel lit -- windows and all -- under a
--- closed lid. Disabling that output is the fix. Disabling it is also how you
--- lock yourself out of the session, which is what this module is really about.
+--     The panel is off only while the lid is shut AND something else is
+--     actually driving a screen.
 --
--- What went wrong, measured 2026-09-10 from the journal of the session that had
--- to be rebooted at 16:41: with the lid shut and the panel disabled, the
--- external display is the ONLY enabled output. Coming back from s2idle its DP
--- link renegotiates and Hyprland loses that output for a moment, so
--- hl.get_monitors() -- which answers with *enabled* monitors only, verified
--- through `hyprctl repl` -- goes to zero. A compositor with no outputs has
--- nowhere to put the lock screen: the session is alive, it holds the keyboard,
--- and it paints nothing. The journal signs it twice, at the instant of the
--- resume: `XWAYLAND: mode -1x-1 is not available` from Hyprland, and
--- `gdk_monitor_set_scale: assertion 'scale > 0.' failed` from a GTK client
--- being handed a monitor with no geometry.
+-- Re-decided on every monitor event, not on lid transitions alone: the case
+-- that cost a reboot -- a resume with the lid already shut, the external
+-- display gone for a moment, and Hyprland left with zero enabled outputs --
+-- produces no lid event by definition.
 --
--- Nothing recovered it either, because the only two things that reconciled the
--- panel's state were a lid transition and a config reload. Waking on the
--- external keyboard is not a transition, so that wake produced no event at all:
--- every other resume in the journal is followed within seconds by a
--- pam_unix(login:account) line from noctalia's lock screen, and that one is
--- followed by nothing for thirteen minutes, until the dock was unplugged.
+-- The asymmetry is deliberate. A lit panel under a closed lid is a thing you fix
+-- by opening the lid. A session with no outputs is a thing you can only reboot.
 --
--- So the rule here is deliberately not "off when the lid is shut". It is
---
---     the panel is off only while the lid is shut AND something else is
---     actually driving a screen
---
--- and it is re-decided on every monitor event rather than on lid transitions
--- alone. Lose the external display -- to a resume, to a pulled cable, to the
--- monitor's own power saving -- and the panel comes back by itself. A lit panel
--- under a closed lid is a thing you fix by opening the lid. A session with no
--- outputs is a thing you can only reboot.
---
--- See docs/decisions/023-the-panel-is-never-the-last-output.md.
+-- docs/decisions/023-the-panel-is-never-the-last-output.md is the decision: the
+-- journal that settled it, every upstream fact this module leans on, and why the
+-- obvious simpler forms are all wrong. Read it before changing anything here.
 
 local M = {}
 
@@ -54,24 +31,17 @@ local LID_BUTTONS = { "LID0", "LID", "LID1" }
 local panel
 
 --- Set while an hl.monitor() call is in flight. Enabling or disabling an output
---- fires monitor.added / monitor.removed, which lands straight back here, and a
---- reconcile that re-decides from a half-applied state would call hl.monitor()
---- again -- recursion, until Hyprland's dispatch depth limit of 32 stops it.
+--- fires the very events that call back into reconcile(), which would recurse
+--- until Hyprland's dispatch-depth limit of 32 stops it.
 ---
---- This is a guard and NOT a record of what was applied. The panel's state is
---- read back from Hyprland every time (see monitor_enabled), because a cached
---- one can be wrong: anything that changes an output behind this module's back
---- leaves the cache describing a session that no longer exists, and a reconcile
---- that believes it then does nothing at all. Measured 2026-09-10 -- a probe
---- that enabled the panel directly left the cache saying "off" and the next
---- reconcile agreed with itself and skipped.
+--- A guard, and NOT a record of what was applied -- the panel's state is read
+--- back from Hyprland every time. Decision 023, "The state is read, never
+--- remembered".
 ---@type boolean
 local applying = false
 
---- The deferred reconcile's timer, kept in a module-level reference on purpose:
---- an hl.timer() handle that nothing holds is collected and never fires at all.
---- Measured 2026-09-11 -- the same call with the result discarded did nothing,
---- and assigning it to anything that outlives the call made it fire.
+--- The deferred reconcile's timer. Held at module level because an hl.timer()
+--- handle that nothing holds is collected and never fires at all.
 ---@type userdata|nil
 local settle_timer
 
@@ -100,9 +70,8 @@ local function lid_shut()
 end
 
 --- Is `name` one of the outputs currently driving a screen? hl.get_monitors()
---- answers with enabled monitors only -- a disabled one is absent rather than
---- present with a flag, verified through `hyprctl repl` 2026-09-10 -- so
---- membership of that list IS the enabled state.
+--- answers with enabled monitors only, so membership of that list IS the
+--- enabled state.
 ---@param name string
 ---@return boolean
 local function monitor_enabled(name)
@@ -115,11 +84,10 @@ end
 
 --- Is anything other than the panel actually driving a screen?
 ---
---- Asked of Hyprland, not of /sys/class/drm/*/status. The old form of this read
---- the kernel and so counted a connector that is merely *connected* -- which is
---- exactly the state the external display is in for the moment after a resume
---- when it has no mode set and shows nothing. "Connected" is not "a screen you
---- can see", and it was the wrong question.
+--- Asked of Hyprland, not of /sys/class/drm/*/status: the kernel counts a
+--- connector that is merely *connected*, which is exactly what the external
+--- display is in the moment after a resume when it has no mode and shows
+--- nothing.
 ---@return boolean
 local function external_enabled()
     for _, mon in ipairs(hl.get_monitors()) do
@@ -131,14 +99,6 @@ end
 
 --- Re-decide whether the panel should be on, and act only if that is not
 --- already what Hyprland is doing.
----
---- hl.monitor() applies at runtime -- from a bind callback and from an event
---- handler, both measured, the second on 2026-09-10 by arming a handler and
---- firing it with `hyprctl output create headless`. Two contexts where it does
---- not: `hyprctl keyword monitor` is refused outright under a Lua config
---- ("keyword can't work with non-legacy parsers"), and a bare `hyprctl repl`
---- call returns without applying, which is worth knowing before using the repl
---- to test any of this.
 function M.reconcile()
     if not panel or applying then return end
 
@@ -147,8 +107,7 @@ function M.reconcile()
     if want_off == is_off then return end
 
     -- pcall so a failing hl.monitor() cannot leave the guard stuck true, which
-    -- would wedge every later reconcile -- the panel would then stay in
-    -- whatever state it happened to be in, for the rest of the session.
+    -- would wedge every later reconcile for the rest of the session.
     applying = true
     pcall(hl.monitor, want_off and { output = panel.output, disabled = true } or panel)
     applying = false
@@ -156,10 +115,9 @@ end
 
 --- Force the panel back on, whatever the lid is doing. The escape hatch.
 ---
---- This does not pin the panel on: the next monitor event reconciles as usual
---- and, with the lid shut and an external display working, turns it off again.
---- That is deliberate rather than unfinished -- the state this exists for is
---- "nothing to look at", and in that state reconcile already agrees.
+--- This does not pin the panel on: the next monitor event reconciles as usual.
+--- Deliberate rather than unfinished -- the state this exists for is "nothing to
+--- look at", and in that state reconcile already agrees.
 function M.panel_on()
     if not panel then return end
 
@@ -172,8 +130,7 @@ end
 ---
 --- Give it an explicit position rather than "auto": with auto, an output that
 --- comes back after being disabled is placed after the one that stayed, so
---- opening the lid put the laptop panel to the RIGHT of the ultrawide. Measured
---- 2026-08-26.
+--- opening the lid put the laptop panel to the RIGHT of the ultrawide.
 ---@param spec table
 function M.setup(spec)
     if type(spec) ~= "table" or type(spec.output) ~= "string" then return end
@@ -181,61 +138,48 @@ function M.setup(spec)
     panel = {}
     for k, v in pairs(spec) do panel[k] = v end
 
-    -- Not optional, and not decoration: re-applying a spec that merely omits
-    -- `disabled` does NOT clear an earlier disable. The key has to be present
-    -- and false. Measured 2026-08-26 -- eDP-1 stayed off until it was.
+    -- Not optional: re-applying a spec that merely omits `disabled` does NOT
+    -- clear an earlier disable. The key has to be present and false.
     panel.disabled = false
 
-    -- The reason this module exists. Every one of these is a moment where the
-    -- set of screens you can actually see changed, and any of them can be the
-    -- one that would otherwise leave nothing enabled.
+    -- Every one of these is a moment where the set of screens you can actually
+    -- see changed, and any of them can be the one that would otherwise leave
+    -- nothing enabled. layout_changed catches a geometry change with no add and
+    -- no remove -- an output returning from a resume with a different mode, or
+    -- none.
     hl.on("monitor.added", function() M.reconcile() end)
     hl.on("monitor.removed", function() M.reconcile() end)
-    -- A geometry change with no add and no remove: an output that comes back
-    -- from a resume with a different mode, or none, arrives as this.
     hl.on("monitor.layout_changed", function() M.reconcile() end)
 
     -- locked = true is what `bindl` means in hyprland.conf syntax: the bind has
     -- to fire with the lockscreen up, which is exactly when the lid is shut.
     --
-    -- Both switch directions run the same reconcile. There is no such thing as
-    -- "the lid closed, so turn the panel off" here -- closing the lid on an
-    -- undocked laptop must not disable the only screen there is, and the rule
-    -- at the top of this file already says so without a special case.
+    -- Both directions run the same reconcile. There is deliberately no "the lid
+    -- closed, so turn the panel off" case -- see the rule at the top.
     hl.bind("switch:on:Lid Switch", function() M.reconcile() end,
         { locked = true, description = "Lid shut: reconcile the built-in panel" })
     hl.bind("switch:off:Lid Switch", function() M.reconcile() end,
         { locked = true, description = "Lid open: reconcile the built-in panel" })
 
-    -- The escape hatch, for the state this module is meant to make impossible.
-    -- locked, so it works with the lock screen up, and it needs no screen to
-    -- press -- which is the whole point of having it.
+    -- The escape hatch. locked, so it works with the lock screen up, and it
+    -- needs no screen to press -- which is the whole point of having it.
     hl.bind(MOD .. " + CTRL + D", function() M.panel_on() end,
         { locked = true, description = "Force the built-in panel back on" })
 
-    -- A switch bind fires on a transition only, so something has to cover
-    -- logging in -- or reloading -- with the lid already shut. Three things do,
-    -- and each covers a case the others miss:
+    -- Three reconciles, each covering what the others miss. A switch bind fires
+    -- on a transition only, so something has to cover logging in -- or
+    -- reloading -- with the lid already shut:
     --
-    --   * now, at parse time. On a cold start Hyprland has not enumerated any
-    --     output yet, so external_enabled() is false and the panel comes up on:
-    --     the safe direction, corrected a moment later by the first event.
-    --   * hyprland.start, once the compositor has its outputs. This is the cold
-    --     start's real answer, and it is the hook lib/colwidth.lua uses for the
-    --     same reason.
-    --   * a one-shot timer, which is the only one that covers a RELOAD.
+    --   * now, at parse time, for a cold start (no outputs enumerated yet, so
+    --     this comes up ON: the safe direction, corrected by the first event);
+    --   * hyprland.start, once the compositor has its outputs;
+    --   * a one-shot timer, the only one of the three that covers a RELOAD.
     --
-    -- The reload case is worth spelling out, because it is what a session was
-    -- left wedged by on 2026-09-10. `hyprctl reload` destroys and recreates
-    -- every event subscription -- by design, so callbacks cannot double up --
-    -- and it re-applies the monitor rules at the same time. An output coming
-    -- back as part of that reload therefore fires monitor.added while there is
-    -- nothing subscribed to hear it, and the parse-time reconcile above has
-    -- already run, against the monitor set as it was BEFORE the reload. Neither
-    -- end of the reload sees the change. hyprland.start does not fire on a
-    -- reload either, so without this timer the panel keeps whatever state it
-    -- had -- which, coming back from an external display being re-enabled,
-    -- means lit under a shut lid with the lock screen spread across it.
+    -- The reload hole is not obvious and cost a second session: `hyprctl reload`
+    -- destroys and recreates every event subscription *and* re-applies the
+    -- monitor rules, so an output returning as part of the reload fires
+    -- monitor.added with nothing subscribed to hear it. Decision 023, "The
+    -- reload is its own hole".
     hl.on("hyprland.start", function() M.reconcile() end)
 
     settle_timer = hl.timer(function() M.reconcile() end,
