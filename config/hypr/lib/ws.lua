@@ -81,7 +81,7 @@ function M.move_to(n)
     local base = context()
     if not base then return end
     if not hl.get_active_window() then return end
-    hl.dispatch(hl.dsp.window.move({ workspace = base + n, follow = true }))
+    hl.dispatch(hl.dsp.window.move({ workspace = base + n, follow = false }))
 end
 
 ------------------------------------------------------------------------------
