@@ -94,6 +94,22 @@ noct_wait_window() {  # <jq select expression> [timeout seconds]
 # and returns a number for the wrong window. Measured: a probe painted #121212
 # reported 193 of 255 that way, and nothing about the result looked wrong.
 #
+# The bound to clamp against is the monitor AS IT SITS ON THE DESK, which is not
+# what `hyprctl monitors` reports. `width`/`height` there are the panel's own
+# dimensions, before the transform: HDMI-A-1 under `transform = 3` answers
+# 1920x1080 while occupying 1080x1920. Window coordinates are in the transformed
+# space, so clamping against the raw pair capped every y past 1080 on that screen
+# and the patch came out under the 150px floor below -- i.e. this function
+# printed nothing, and glass-visible, glass-legible, blur-stacks, browser-glass
+# and column-hop all skipped rather than failed. The same swap is in
+# bin/noct-glass's backdrop(), which needs the monitor's real shape for the same
+# reason.
+#
+# Odd transforms (1, 3, 5, 7) are the rotated quarter-turns; even ones (0, 2, 4,
+# 6) leave the axes alone. Scale is deliberately NOT applied here: it is 1 on
+# both machines, and whether grim's PNG is in panel pixels or logical ones has
+# not been measured on a scaled output. See docs/upstream.md.
+#
 # Prints nothing if what is left on screen is too small to average.
 noct_window_geom() {
     local addr=$1 shape=${2:-center}
@@ -102,6 +118,10 @@ noct_window_geom() {
         --argjson mons "$(hyprctl -j monitors 2>/dev/null)" '
         .[] | select(.address == $a) as $w
         | ($mons[] | select(.id == $w.monitor)) as $m
+        # The monitor as it sits on the desk: a quarter-turn swaps the axes.
+        | (if (($m.transform // 0) % 2) == 1
+           then { w: $m.height, h: $m.width }
+           else { w: $m.width,  h: $m.height } end) as $screen
         # The wanted rectangle, in monitor coordinates.
         | (if $shape == "page" then
              [ ($w.at[0] - $m.x + ($w.size[0]*0.25|floor)),
@@ -114,8 +134,8 @@ noct_window_geom() {
            end) as $r
         | ([$r[0], 0] | max) as $x
         | ([$r[1], 0] | max) as $y
-        | ([$r[0] + $r[2], $m.width]  | min) as $x2
-        | ([$r[1] + $r[3], $m.height] | min) as $y2
+        | ([$r[0] + $r[2], $screen.w] | min) as $x2
+        | ([$r[1] + $r[3], $screen.h] | min) as $y2
         | if ($x2 - $x) >= 200 and ($y2 - $y) >= 150
           then "\($m.name) \($x2 - $x)x\($y2 - $y)+\($x)+\($y)"
           else empty end'

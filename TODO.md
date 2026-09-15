@@ -115,21 +115,23 @@ because the decisions log is the memory.
 
 ## Bugs
 
-- [ ] **Pixel checks misjudge a rotated monitor.** `noct_window_geom`
-      (`tests/lib/probe.sh`) clips the patch against the monitor's `width` and
-      `height` as `hyprctl monitors` reports them — 1920x1080 for `HDMI-A-1` —
-      while window coordinates are in *logical* space, 1080x1920 under
-      `transform = 3`. So anything past y=1080 on that screen reads as off the
-      edge and every pixel measurement skips: `glass-visible`, `glass-legible`,
-      `blur-stacks`, `browser-glass`, and `column-hop` (which uses
-      `noct_probe_kitty` and so skips whenever the focused monitor is the portrait
-      one with a full workspace). It passes from `DP-3`; that difference is this
-      bug and nothing else.
+- [ ] **Confirm the rotated-monitor fix on the portrait screen.** `noct_window_geom`
+      (`tests/lib/probe.sh`) now swaps width and height when `transform` is odd,
+      which is what was making `glass-visible`, `glass-legible`, `blur-stacks`,
+      `browser-glass` and `column-hop` skip on `HDMI-A-1` and pass from `DP-3`.
+      Verified against a synthetic `transform = 3` monitor — the patch went from
+      empty to 756x700 — but not yet against the real portrait screen, which was
+      not attached when it was fixed. `noct-check --all` from that monitor is the
+      check.
 
-      The comment already in `noct_window_settle` diagnoses this as a probe "under
-      the fold", which is what it looks like from the inside. **Fix is to swap
-      width and height when `transform` is odd (1, 3, 5, 7)**, in one place.
-      `nav-axis` sidesteps it by never taking a pixel.
+- [ ] **A capture patch ignores monitor scale, and grim's units are unmeasured.**
+      `noct_window_geom` treats window coordinates and grim's PNG pixels as the
+      same units. That holds at `scale = 1`, which is what both machines run, so
+      nothing is wrong today. What is unknown is whether `grim -o` writes panel
+      pixels or logical ones on a scaled output — until that is measured, every
+      pixel check is presumed wrong on a monitor at any scale but 1.
+      `hyprctl output create headless` plus a scale is how to settle it without
+      owning a HiDPI screen.
 
 ## Worth exploring
 

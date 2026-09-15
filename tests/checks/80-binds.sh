@@ -173,11 +173,9 @@ nav_probe_geom() {
 
 # Spawn a tiled probe and wait for its GEOMETRY to stop changing.
 #
-# Deliberately not noct_probe_kitty: that settles on a pixel patch, and a patch
-# cannot be taken from a window whose column sits in the lower half of a portrait
-# monitor -- noct_window_geom clips against the monitor's untransformed width and
-# height, so on a `transform = 3` screen every coordinate past 1080 reads as off
-# the edge. This check never looks at a pixel, so it does not have to care.
+# Deliberately not noct_probe_kitty: that settles on a pixel patch, which needs
+# room on screen and a capture that holds still. This check compares coordinates
+# only, so it works wherever the tape happens to put the probe.
 nav_spawn_probe() {
     local title=$1 i prev= now=
     kitty --class "$NOCT_PROBE_TAPE_CLASS" --title "$title" sh -c 'clear; sleep 120' \
