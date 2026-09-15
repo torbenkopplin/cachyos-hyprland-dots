@@ -85,7 +85,7 @@ while (( $# )); do
         # rerunning something, this one decides whether you get a login screen.
         --login)    DO_LOGIN=1 ;;
         --all)      DO_LINK=1; DO_PACKAGES=1; DO_BROWSERS=1; DO_INPUT=1; DO_NVIM=1; DO_WALLPAPERS=1 ;;
-        --root)     shift; [[ $# ]] || { echo "--root needs a directory" >&2; exit 2; }; ROOT_ARG=$1 ;;
+        --root)     shift; (( $# )) || { echo "--root needs a directory" >&2; exit 2; }; ROOT_ARG=$1 ;;
         --root=*)   ROOT_ARG=${1#--root=} ;;
         # The whole header comment, found by shape rather than by line number,
         # so editing the block above cannot silently truncate --help.
