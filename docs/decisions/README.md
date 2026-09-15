@@ -31,7 +31,7 @@ So the **Settled against** sections are the load-bearing half of this directory.
 | 001 | [Deploy by symlink, one file at a time, and be reversible](001-links-not-copies.md) | 2026-08-15 |
 | 002 | [The Hyprland config is Lua, split into options, conf and lib](002-hyprland-config-is-lua.md) | 2026-08-15 |
 | 003 | [Workspace numbers are arithmetic, not a selector](003-workspace-numbers-are-arithmetic.md) | 2026-08-18 |
-| 004 | [Edges are read from the layout, not inferred from a failed dispatch](004-edges-are-read-not-inferred.md) | 2026-08-18 |
+| 004 | [Edges are read from the layout, not inferred from a failed dispatch](004-edges-are-read-not-inferred.md) — mechanism superseded by [024](024-the-edge-is-the-dispatch-that-did-nothing.md) | 2026-08-18 |
 | 005 | [Per-monitor column width, applied as focus crosses monitors](005-per-monitor-column-width.md) | 2026-08-18 |
 | 006 | [Idle has exactly one owner](006-idle-has-one-owner.md) | 2026-08-18 |
 | 007 | [Tapping SUPER is a release bind, with a fallback kept in the drawer](007-tap-super-is-a-release-bind.md) | 2026-08-15 |
@@ -51,6 +51,7 @@ So the **Settled against** sections are the load-bearing half of this directory.
 | 021 | [The colourscheme is a submodule, and its opacity is measured](021-the-colourscheme-is-a-submodule.md) | 2026-09-05 |
 | 022 | [Zen gets a number after all, and it is the mod's own](022-zen-gets-a-number-after-all.md) | 2026-09-07 |
 | 023 | [The built-in panel is never the last output](023-the-panel-is-never-the-last-output.md) | 2026-09-10 |
+| 024 | [The edge is the dispatch that did nothing](024-the-edge-is-the-dispatch-that-did-nothing.md) | 2026-08-19, written down 2026-09-15 |
 
 ## Settled against, in one place
 
@@ -76,7 +77,7 @@ The dead ends, and where the reasoning is. Read these before rebuilding one.
 | `hypridle` alongside Noctalia's idle service | Two countdowns to the same lock screen, one of them configured in a directory this repo does not manage | [006](006-idle-has-one-owner.md) |
 | Persistent workspaces, for a fixed row of pips | It is a compositor change that buys a cosmetic one and gives up the dynamic model | [017](017-workspaces-stay-dynamic.md) |
 | `rustup` in the package list | `Conflicts With: rust cargo` plus `--noconfirm` would silently swap a working toolchain for one that ships none | [015](015-pacman-first.md) |
-| Inferring an edge from a failed focus dispatch | The scrolling layout reports "no column that way" as a success and "no row that way" as an error, so only half of it is detectable | [004](004-edges-are-read-not-inferred.md) |
+| Inferring an edge from a failed focus dispatch (`ok = false`) | The scrolling layout reports "no column that way" as a success and "no row that way" as an error, so only half of it is detectable. Still in force — [024](024-the-edge-is-the-dispatch-that-did-nothing.md) reads the compositor's state after the dispatch, never its return value | [004](004-edges-are-read-not-inferred.md), [024](024-the-edge-is-the-dispatch-that-did-nothing.md) |
 | `m~n` / `m±1` for per-monitor workspaces | The first is not valid syntax and answers `ok`; the second walks only workspaces that already exist | [003](003-workspace-numbers-are-arithmetic.md) |
 | Sandboxing the installer with `HOME` | `HOME` and `XDG_CONFIG_HOME` are two different roots and overriding one relinked a live desktop into `/tmp`. `--root` instead | [012](012-installer-is-data-plus-an-engine.md) |
 

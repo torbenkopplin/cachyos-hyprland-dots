@@ -1,6 +1,10 @@
 # 004 — Edges are read from the layout, not inferred from a failed dispatch
 
-**Settled 2026-08-18**, widened **2026-08-19**. Status: in force.
+**Settled 2026-08-18**, widened **2026-08-19**. Status: **the warning is in
+force, the mechanism is not.** The index comparison described below was replaced
+on 2026-08-19 by [024](024-the-edge-is-the-dispatch-that-did-nothing.md), which dispatches and
+looks at the result. What this entry settles *against* — reading `ok` — is
+unchanged and is why 024 does not read it either.
 
 `lib/nav.lua` decides whether focus is at the end of a tape or the bottom of a
 column by reading the layout's own bookkeeping off `window.layout` —

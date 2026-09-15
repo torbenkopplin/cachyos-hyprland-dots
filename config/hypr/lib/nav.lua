@@ -12,34 +12,16 @@
 --
 -- "Whatever lies that way" is deliberately vague, because it depends on the
 -- band. A workspace is a tape of columns and a column is a stack of windows, but
--- WHICH WAY THE TAPE RUNS is per-band: conf/workspaces.lua gives each band a
--- `direction`, so a portrait monitor scrolls down while a landscape one scrolls
--- right. On a horizontal band J/K walk the column and H/L walk the tape; on a
--- vertical band it is the other way round.
+-- WHICH WAY THE TAPE RUNS is per-band (conf/workspaces.lua): on a horizontal
+-- band J/K walk the column and H/L walk the tape; on a vertical band it is the
+-- other way round.
 --
--- This file used to assume the horizontal case everywhere, and on a vertical
--- band that put both axes on the wrong structure: J reported "end of column" on
--- the first press, because each column holds one window, and jumped a workspace
--- while the next column sat visibly below. L asked for an in-column neighbour
--- that a vertical band does not have, and did nothing at all.
---
--- How the edge is detected now
--- ---------------------------
--- By asking, not by predicting. `layout("focus <dir>")` takes SCREEN directions
--- and already walks whichever structure runs that way, and at an edge it is a
--- complete no-op. Measured on both bands: focus unchanged, and not one window
--- moved -- so there is no re-centring to undo, and the only thing worth
--- inspecting is whether focus ended up somewhere else.
---
--- That is why nothing here reads WSBANDS to find the axis. A band is keyed on
--- connector name, which a laptop plugged into a monitor it has never seen cannot
--- know in advance; the compositor's own answer is true whatever the screen is
--- called. (`window.layout` carries no direction field to read either -- checked:
--- both `layout.direction` and `layout.column.direction` are nil.)
---
--- Where the axis genuinely cannot be avoided -- `swapcol`, which is
--- tape-relative rather than screen-absolute -- it is derived from the geometry
--- of the windows on the tape. See tape_forward().
+-- Nothing here reads WSBANDS to find that axis, and nothing predicts an edge.
+-- An edge is a `layout("focus <dir>")` that left the focused address unchanged
+-- -- the compositor already knows which structure runs that way, and at an edge
+-- the dispatch is a measured no-op. See
+-- docs/decisions/024-the-edge-is-the-dispatch-that-did-nothing.md, which is also
+-- why `ok` is never read and why wrap_focus/wrap_swapcol must stay false.
 --
 -- The workspace end of the handoff is band arithmetic, not a relative selector;
 -- see lib/ws.lua for why "m+1" cannot do it.
@@ -80,14 +62,10 @@ end
 --- horizontal band, "d" on a vertical one. Nil when there is only one column,
 --- in which case there is no tape to walk and no reorder to make.
 ---
---- Worked out from the windows themselves, because nothing will say it outright.
---- Column indices ascend along the tape, so the axis the index tracks IS the
---- tape. Measured on this desk:
----
----   horizontal band   col 0..3 at x -1175, -43, 1096, 2235   (y all equal)
----   vertical band     col 0..1 at y 12, 966                  (x all equal)
----
---- Geometric on purpose rather than read out of WSBANDS -- see the file header.
+--- Worked out from the windows themselves, because nothing will say it outright:
+--- column indices ascend along the tape, so the axis the index tracks IS the
+--- tape. This is the one place the axis cannot be avoided -- `swapcol` is
+--- tape-relative where `focus` is screen-absolute.
 ---@param win table
 ---@return "r"|"d"|nil
 local function tape_forward(win)
@@ -162,9 +140,8 @@ local function monitor_in_direction(dir)
 end
 
 --- Run a dispatcher and report whether it actually moved focus to a different
---- window. The address is the signal rather than the dispatcher's return value:
---- the scrolling layout reports "nothing that way" as a SUCCESS, so ok=false
---- never arrives, but the focused window genuinely does not change.
+--- window. The address is the signal, never the dispatcher's return value --
+--- decision 024.
 ---@param dispatcher table
 ---@return boolean moved
 local function focus_moved(dispatcher)
@@ -218,12 +195,10 @@ end
 --- Reorder the focused column one step in screen direction `dir`, when the tape
 --- runs that way. Returns whether the column actually moved.
 ---
---- This is the one place the tape's orientation cannot be avoided, because
---- `swapcol` is tape-relative where `focus` is screen-absolute. Measured:
---- `swapcol u` and `swapcol d` are rejected outright ("no target (invalid
---- direction?)"), and `swapcol r` on a vertical band moves the column DOWN the
---- screen. So the screen direction has to be translated into tape terms, which
---- is what tape_forward() is for.
+--- Measured: `swapcol u` and `swapcol d` are rejected outright ("no target
+--- (invalid direction?)"), and `swapcol r` on a vertical band moves the column
+--- DOWN the screen. So the screen direction has to be translated into tape
+--- terms, which is what tape_forward() is for.
 ---@param win table  known to be on a scrolling tape
 ---@param dir "l"|"r"|"u"|"d"
 ---@return boolean moved

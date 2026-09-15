@@ -137,11 +137,29 @@ It is tempting to dispatch a focus move and check whether it returned
 that way" as a *success* (it just re-centres), while "no row that way" is a
 genuine `NOT_FOUND`. Only the vertical case would be detectable.
 
-So `lib/nav.lua` reads the layout's own bookkeeping off `window.layout` instead
-— `column.index`, `index_in_column`, `#column.windows` — and compares against
-the column range on the workspace. Uniform, and it does not depend on that
-asymmetry. This is why `scrolling.wrap_focus` and `wrap_swapcol` must stay
-`false` and `general.no_focus_fallback` must stay `true`.
+So `lib/nav.lua` never reads `ok`. It dispatches `layout("focus <dir>")` and
+compares the focused window's **address** before and after: unchanged address,
+nothing that way, hand off to the monitor or the workspace. The compositor's
+state afterwards is true whichever axis the tape runs on, where the return value
+is only half true.
+
+That matters because the axis is the thing nothing will tell you.
+`layout("focus <dir>")` takes *screen* directions and already walks whichever
+structure runs that way, so it knows the axis natively — where `WSBANDS` cannot
+(a laptop has no entry for a monitor it has never been plugged into) and
+`window.layout` cannot (`layout.direction` and `layout.column.direction` are
+both nil). And at an edge that dispatch is a measured no-op, so there is no
+re-centring to undo.
+
+The moves need a different observable, because focus follows the window and the
+address is identical either way: `window_moved()` compares
+`workspace/column/row`. `swapcol` is the one place the axis genuinely cannot be
+avoided — it is tape-relative where `focus` is screen-absolute — and
+`tape_forward()` derives it from where the windows actually sit.
+
+This is why `scrolling.wrap_focus` and `wrap_swapcol` must stay `false` and
+`general.no_focus_fallback` must stay `true`: wrapping turns every edge into a
+successful move, and the edge stops being detectable at all.
 
 ### Workspace numbers are arithmetic, not a selector
 
