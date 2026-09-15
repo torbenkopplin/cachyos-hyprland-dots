@@ -21,7 +21,7 @@
 #                       that reports work is a second run that is doing work,
 #                       which means one of the two runs is wrong.
 #   backup and restore  This is what makes --unlink a real reverse, and what
-#                       lets this setup and the copy-based one in ~/repos/dots
+#                       lets this setup and the older copy-based one
 #                       swap places. If the backup half works and the restore
 #                       half does not, you find out when you want your old
 #                       config back and it is gone.

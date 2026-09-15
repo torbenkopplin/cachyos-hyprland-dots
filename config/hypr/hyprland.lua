@@ -19,8 +19,8 @@ require("conf.options")   -- must be first: defines the globals everything else 
 local CONFIG_HOME = os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")
 
 -- Machine-specific settings: monitors, GPU/host environment, and the WSBANDS
--- table conf/workspaces.lua builds workspaces from. Pattern adopted from
--- ~/repos/dots, where hosts/<hostname>/ supplies the file.
+-- table conf/workspaces.lua builds workspaces from. One file per machine, kept
+-- outside the repo -- see decision 014.
 --
 -- dofile rather than require so `hyprctl reload` always re-reads it, and pcall
 -- so a machine without one still gets a working session (Hyprland then

@@ -17,9 +17,8 @@
 --         did nothing either.
 --
 -- So the band arithmetic is done here instead, from the live monitor, and the
--- dispatchers are given absolute ids. Adopted from ~/repos/dots, where the
--- same thing is a shell script (scripts/wsnav.sh) shelling out to hyprctl for
--- every keypress; in a Lua config it is a table lookup.
+-- dispatchers are given absolute ids. In a Lua config that is a table lookup,
+-- where a hyprland.conf has to shell out to hyprctl on every keypress.
 
 local M = {}
 

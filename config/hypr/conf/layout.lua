@@ -20,9 +20,9 @@
 
 hl.config({
     scrolling = {
-        -- Off, as in ~/repos/dots: with column_width 0.333 you want a lone
-        -- window to keep its third, not snap to the whole screen every time
-        -- you close its neighbours.
+        -- Off: with column_width 0.333 you want a lone window to keep its
+        -- third, not snap to the whole screen every time you close its
+        -- neighbours.
         fullscreen_on_one_column = false,
 
         -- Default width of a new column. This is the only place the scrolling
@@ -39,7 +39,7 @@ hl.config({
         follow_focus       = true,
         follow_min_visible = 0.4,
 
-        -- Cycled by SUPER+PLUS / SUPER+MINUS. Six steps, from ~/repos/dots.
+        -- Cycled by SUPER+PLUS / SUPER+MINUS.
         explicit_column_widths = "0.25, 0.333, 0.5, 0.667, 0.75, 1.0",
 
         -- Both must stay false. Wrapping would make the tape loop around

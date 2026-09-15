@@ -37,8 +37,8 @@ the window along, and the arrow keys are bound to everything `hjkl` is.
 ### Tapping SUPER is a release-bind, and that is fine
 
 `hl.bind("SUPER + SUPER_L", …, { release = true })` is how the wiki says to
-bind a bare modifier, and it is what `~/repos/dots` has been running. The
-modmask has to name the mod being pressed — `SUPER + SUPER_L`, not `SUPER_L`.
+bind a bare modifier. The modmask has to name the mod being pressed —
+`SUPER + SUPER_L`, not `SUPER_L`.
 
 Hyprland's keybind manager has dedicated arming and sub-chord suppression for
 release binds, so this does not simply fire every time you let go of SUPER
@@ -160,8 +160,8 @@ column did nothing: both failed silently, in a config that looked correct.
 `lib/ws.lua` does the arithmetic instead — read the focused monitor, find its
 band in `WSBANDS` by connector name, dispatch the absolute id — and clamps at
 the band edges so a workspace step never lands you on another screen's numbers.
-`~/repos/dots` solves the same problem with a shell script that shells out to
-`hyprctl` on every keypress; in a Lua config it is a table lookup.
+A `hyprland.conf` has to solve the same problem with a shell script that shells
+out to `hyprctl` on every keypress; in a Lua config it is a table lookup.
 
 Workspaces stay **dynamic**: nothing is persistent, so a workspace exists while
 something is on it and the bar shows exactly those. The band only decides what
@@ -182,8 +182,8 @@ the other screen would undo your `SUPER+PLUS` resizing.
 
 Noctalia's idle service does the locking (`70-idle.toml`: lock at 10 min,
 screen off at 15, lock-and-suspend at 30). `hypridle` — which a CachyOS
-Hyprland install ships and which `~/repos/dots` enables as a user unit — does
-the same job from a config this repo does not manage, and two countdowns to the
+Hyprland install ships, and which an upgraded machine may already have enabled
+as a user unit — does the same job from a config this repo does not manage, and two countdowns to the
 same lock screen is how you end up locked out mid-video with no idea which of
 them did it. `install.sh` disables the stray unit; `systemctl --user status
 hypridle` is the check.

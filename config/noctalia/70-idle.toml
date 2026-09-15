@@ -3,7 +3,7 @@
 ## This file exists because something has to own idle, and until now two things
 ## did. Noctalia has an idle service (disabled by default, which is why it was
 ## invisible), and a CachyOS/Hyprland install also ships hypridle as a separate
-## daemon -- on a machine upgraded from ~/repos/dots that daemon was still
+## daemon -- on a machine upgraded from an older setup that daemon was still
 ## enabled, still running its old five-minute lock, and still calling scripts
 ## from a config directory this repo does not manage. Two countdowns, one
 ## screen: whichever fired first won, and neither knew what the other was

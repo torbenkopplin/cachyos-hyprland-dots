@@ -49,7 +49,7 @@ recursive        = false
 [wallpaper.monitor.DP-3]
 directory = "~/Pictures/Wallpapers/ultrawide"
 
-## Portrait. `~/repos/dots` describes an HDMI screen in portrait, which is why
+## Portrait. This desk has an HDMI screen in portrait, which is why
 ## wallpapers.conf has a 9:16 set at all.
 [wallpaper.monitor.HDMI-A-1]
 directory = "~/Pictures/Wallpapers/portrait"

@@ -23,7 +23,7 @@ system	keyd.service	enable
 
 # Noctalia's idle service is what this repo configures (70-idle.toml). hypridle
 # does the same job from a config directory the repo does not manage, and on a
-# machine that ran ~/repos/dots it is still enabled as a user unit -- so the
+# machine upgraded from an older setup it is still enabled as a user unit -- so the
 # screen locks on whichever of the two counts down first, with two different
 # sets of timeouts and only one of them written down here.
 #

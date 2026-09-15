@@ -31,7 +31,7 @@ programs free to write their own things alongside.
 
 ## Why it has to be reversible
 
-The copy-based setup in `~/repos/dots` owns some of the same paths. Anything in
+The older copy-based setup owns some of the same paths. Anything in
 the way is moved to `<path>.bak-<stamp>`, and `--unlink` puts the newest one
 back — so the two setups can swap places, one command in each direction, with no
 residue. `--status` says which of them owns each path right now.

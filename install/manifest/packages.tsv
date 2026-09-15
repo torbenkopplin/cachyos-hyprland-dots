@@ -86,8 +86,8 @@ repo	desktop	libnotify
 # hypridle is deliberately NOT here. Noctalia has its own idle service and this
 # repo configures it (config/noctalia/70-idle.toml); running hypridle as well
 # means two countdowns to the same lock screen, each unaware of the other. That
-# is not hypothetical -- it is what a machine upgraded from ~/repos/dots ends up
-# with, and services.tsv turns the leftover unit off. Nothing else here needs
+# is not hypothetical -- it is what a machine upgraded from an older setup ends
+# up with, and services.tsv turns the leftover unit off. Nothing else here needs
 # it: hyprlock stays, since it is a perfectly good fallback lock you can call by
 # hand. See docs/decisions/006-idle-has-one-owner.md.
 
@@ -272,8 +272,8 @@ repo	likely-aur	claude-code
 # when no Bibata build already provides it.
 #
 # No Bibata package exists in the repos, so this is AUR-only, and the AUR
-# variants (bibata-cursor-theme, -bin, -git, and the illogical-impulse build
-# that ~/repos/dots pulls in) all ship /usr/share/icons/Bibata-*. pacman aborts
+# variants (bibata-cursor-theme, -bin, -git, and the illogical-impulse build)
+# all ship /usr/share/icons/Bibata-*. pacman aborts
 # an entire transaction on a file conflict, so asking for one on a machine that
 # already has another would take the rest of the package step down with it --
 # which is why this is its own phase with a predicate rather than a row in

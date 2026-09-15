@@ -28,8 +28,9 @@ which is the shape of almost every real bug in this repo.
   ([014](014-two-machine-local-files.md)).
 - Workspaces stay dynamic ([017](017-workspaces-stay-dynamic.md)); the band only
   decides what number a new one gets.
-- `~/repos/dots` solved the same problem with a shell script that shelled out to
-  `hyprctl` on every keypress. In a Lua config it is a table lookup.
+- A `hyprland.conf` has to solve the same problem with a shell script that
+  shells out to `hyprctl` on every keypress. In a Lua config it is a table
+  lookup.
 
 Narrative: [design.md](../design.md#workspace-numbers-are-arithmetic-not-a-selector).
 Facts: [upstream.md](../upstream.md#hyprland).

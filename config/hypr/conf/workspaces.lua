@@ -1,9 +1,9 @@
 -- conf/workspaces.lua -- one workspace band per monitor.
 --
--- Adopted from ~/repos/dots, because the band model does something the naive
--- "N persistent workspaces per monitor" version cannot: it carries a scrolling
--- *direction* and column width per band. A portrait monitor can scroll down
--- while a landscape one scrolls right, at the same time.
+-- The band model does something the naive "N persistent workspaces per
+-- monitor" version cannot: it carries a scrolling *direction* and column width
+-- per band. A portrait monitor can scroll down while a landscape one scrolls
+-- right, at the same time.
 --
 -- Only the direction is a workspace rule, though. See lib/colwidth.lua for why
 -- the width has to be applied from an event instead.

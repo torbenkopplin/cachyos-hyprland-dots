@@ -44,5 +44,4 @@ hl.env("TERMINAL_FLOAT", TERMINAL_FLOAT)
 hl.env("EDITOR", "nvim")
 hl.env("VISUAL", "nvim")
 
--- Carried over from ~/repos/dots.
 hl.env("MANPAGER", "bat -plman")

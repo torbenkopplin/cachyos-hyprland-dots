@@ -41,9 +41,9 @@
 #                                by tests/install-fakeroot.sh and in CI -- and
 #                                it needs no environment variables and no sudo.
 #
-# --unlink is a full reverse of the linking step, so this setup and the
-# copy-based one in ~/repos/dots can be swapped back and forth: run ./install.sh
-# to take over the shared paths, --unlink to hand them back.
+# --unlink is a full reverse of the linking step, so this setup and the older
+# copy-based one can be swapped back and forth: run ./install.sh to take over
+# the shared paths, --unlink to hand them back. See docs/install.md.
 #
 # What goes where is data, not code: install/manifest/*.tsv lists the links, the
 # packages, the units, the browser files and the keyd remap, each row with the
@@ -166,8 +166,8 @@ fi
 if (( UNLINK )); then
     heading "Done"
     say "Links removed and originals restored where a backup existed."
-    note "the copy-based setup in ~/repos/dots owns these paths again;"
-    note "nothing there needs to be re-run unless you want it to re-deploy."
+    note "whatever owned these paths before owns them again; nothing there"
+    note "needs to be re-run unless you want it to re-deploy."
     report_warnings
     exit 0
 fi

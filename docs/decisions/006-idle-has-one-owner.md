@@ -9,7 +9,7 @@ screen off at 15, lock-and-suspend at 30. `hypridle` is not installed, and
 ## What settled it
 
 `hypridle` does the same job from a config directory this repo does not manage,
-and a CachyOS Hyprland install ships it — a machine upgraded from `~/repos/dots`
+and a CachyOS Hyprland install ships it — a machine upgraded from an older setup
 has it enabled as a user unit. Two countdowns to the same lock screen, with two
 different sets of timeouts and only one of them written down anywhere, is how you
 end up locked out mid-video with no idea which of them did it.

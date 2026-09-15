@@ -182,10 +182,12 @@ The second is better if you are going to live with two machines: `NOCT_HOST` has
 to be remembered on every invocation, and a real hostname is also what tells you
 which machine you are logged into.
 
-## Switching with `~/repos/dots`
+## Switching with the copy-based setup
 
-`~/repos/dots` is the older, copy-based setup (it *copies* files into `$HOME`;
-this repo symlinks them). Both manage eight of the same paths:
+The older setup this replaced *copies* files into `$HOME` where this repo
+symlinks them. It lived in `~/repos/dots`; it is not checked out on every
+machine, and nothing here requires it to be — this section is what to do on a
+machine where it still is. Both manage eight of the same paths:
 
 ```
 ~/.config/hypr/hyprland.lua                    ~/.config/fish/config.fish
@@ -202,7 +204,7 @@ Switching is one command in each direction, and a round trip is byte-exact:
 ./install.sh --unlink    # hand them back (the dots copies are restored)
 ```
 
-`--unlink` is a full reverse, so nothing needs to be re-run in `~/repos/dots`
+`--unlink` is a full reverse, so nothing needs to be re-run in the other setup
 afterwards and no `*.bak-*` residue accumulates across switches.
 
 Two things that are deliberately *not* switched:

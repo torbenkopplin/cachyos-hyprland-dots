@@ -11,7 +11,7 @@ STAT_LINKED=() STAT_FOREIGN=() STAT_ABSENT=()
 # restore_backup <path> -- move the most recent <path>.bak-* back into place.
 #
 # This is what makes --unlink a real reverse of the install rather than just a
-# delink: whatever was at the path before (typically the copy-based ~/repos/dots
+# delink: whatever was at the path before (typically the older copy-based
 # deployment) is put back, so switching between the two setups is one command in
 # each direction and leaves no residue to accumulate.
 restore_backup() {

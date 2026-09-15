@@ -8,7 +8,7 @@
 ------------------------------------------------------------------------------
 
 -- `-1` makes kitty a single instance: new windows attach to the running
--- process instead of starting another. Carried over from ~/repos/dots.
+-- process instead of starting another.
 TERMINAL     = "kitty -1"
 FILE_MANAGER = "nautilus"
 BROWSER      = "firefox"
@@ -35,8 +35,7 @@ MOD = "SUPER"
 
 KB_LAYOUT  = "se"
 KB_VARIANT = ""
--- Caps as an additional Ctrl, carried over from ~/repos/dots. ("caps:escape"
--- is the other common vim choice; you picked Ctrl, so Ctrl it is.)
+-- Caps as an additional Ctrl. ("caps:escape" is the other common vim choice.)
 KB_OPTIONS = "caps:ctrl_modifier"
 
 ------------------------------------------------------------------------------
@@ -70,8 +69,7 @@ COLUMN_WIDTH = 0.25
 -- laptop gets the direction that matches its trackpad gestures.
 TOUCHPAD_NATURAL_SCROLL = true
 
--- Cursor theme. Bibata is what ~/repos/dots already installs and what is on
--- this machine; anything under /usr/share/icons or ~/.icons with a
+-- Cursor theme. Anything under /usr/share/icons or ~/.icons with a
 -- cursors/ directory works. Set to "" to leave the theme alone and inherit
 -- whatever the system default is.
 CURSOR_THEME = "Bibata-Modern-Classic"
@@ -84,8 +82,7 @@ CURSOR_SIZE  = 24
 -- Tap SUPER on its own to open the launcher.
 --
 -- false = use the plain release bind in conf/binds.lua, which is what the
--- wiki documents for binding a bare modifier and what ~/repos/dots has been
--- running. Leave it here.
+-- wiki documents for binding a bare modifier. Leave it here.
 --
 -- true  = use lib/supertap.lua instead, which watches raw key events and
 -- requires the tap to be quick and uninterrupted. Only worth switching on if
@@ -108,11 +105,11 @@ BAR_HOT_EDGE = true
 -- Look
 ------------------------------------------------------------------------------
 
--- Tightened from the 5/20 carried over from ~/repos/dots. The outer gap is
--- what you see the blurred wallpaper through, so it has a job -- but 20px on
--- every edge costs 40px of a column's width and reads as padding rather than
--- as framing. 10 still shows the wallpaper between windows and the screen
--- edge; the inner gap only has to keep two borders from touching.
+-- Tightened from 5/20. The outer gap is what you see the blurred wallpaper
+-- through, so it has a job -- but 20px on every edge costs 40px of a column's
+-- width and reads as padding rather than as framing. 10 still shows the
+-- wallpaper between windows and the screen edge; the inner gap only has to
+-- keep two borders from touching.
 --
 -- Concretely, on the 3440px ultrawide: a third-width column goes from 1107px
 -- of usable space to 1127px, and three of them stop looking like a form.

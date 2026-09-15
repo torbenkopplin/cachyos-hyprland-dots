@@ -7,8 +7,7 @@ modmask has to name the mod being pressed — `SUPER + SUPER_L`, not `SUPER_L`.
 
 ## Why this is safe
 
-It is what the wiki says to do for a bare modifier, and what `~/repos/dots` has
-been running. Hyprland's keybind manager has dedicated arming and sub-chord
+It is what the wiki says to do for a bare modifier. Hyprland's keybind manager has dedicated arming and sub-chord
 suppression for release binds, so it does not fire every time you let go of SUPER
 after a chord.
 

@@ -26,8 +26,7 @@ into `lib/*` for the behaviour Hyprland does not have. No plugins.
 
 The navigation model needs to read the layout's own state and do arithmetic on it
 (003, 004). In `hyprland.conf` that is a shell script and a process spawn per
-keypress, which is what `~/repos/dots` does; in Lua it is a table lookup in
-process.
+keypress; in Lua it is a table lookup in process.
 
 The cost is that `hyprctl keyword` does not work at all under the Lua parser —
 see [005](005-per-monitor-column-width.md).

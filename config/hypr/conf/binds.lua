@@ -45,10 +45,10 @@ end
 -- Tap SUPER on its own to open the launcher.
 --
 -- The modmask has to name the mod being pressed ("SUPER + SUPER_L", not just
--- "SUPER_L"), which is what the wiki means by "the TARGET modmask". Carried
--- over from ~/repos/dots, where it has been in use -- with `release` as a
--- boolean rather than the string "true"; a string is truthy in Lua so both
--- work, but the boolean is what the API documents.
+-- "SUPER_L"), which is what the wiki means by "the TARGET modmask".
+--
+-- `release` is a boolean rather than the string "true": a string is truthy in
+-- Lua so both work, but the boolean is what the API documents.
 --
 -- lib/supertap.lua is the fallback if this ever fires after ordinary SUPER
 -- chords; flip SUPER_TAP_ENABLED in conf/options.lua.
@@ -157,7 +157,6 @@ bind_dir(mod .. " + CTRL", {
 
 -- Stack / unstack windows within a column. This is PaperWM's core gesture:
 -- pull the neighbouring window into my column, or push mine back out.
--- O/I from ~/repos/dots.
 hl.bind(mod .. " + O", hl.dsp.layout("consume"), { description = "Pull window into this column" })
 hl.bind(mod .. " + I", hl.dsp.layout("expel"),   { description = "Push window out to its own column" })
 hl.bind(mod .. " + SHIFT + period", hl.dsp.layout("promote"),
@@ -178,7 +177,6 @@ hl.bind(mod .. " + SHIFT + Z", hl.dsp.layout("inhibit_scroll"),
 ------------------------------------------------------------------------------
 
 -- Cycle the six preset widths from scrolling.explicit_column_widths.
--- PLUS/MINUS as in ~/repos/dots.
 hl.bind(mod .. " + plus",  hl.dsp.layout("colresize +conf"), { description = "Next column width" })
 hl.bind(mod .. " + minus", hl.dsp.layout("colresize -conf"), { description = "Previous column width" })
 
@@ -221,7 +219,7 @@ end)
 -- Window state
 ------------------------------------------------------------------------------
 
--- BACKSPACE from ~/repos/dots; Q kept as an alias.
+-- BackSpace is the primary; Q is kept as an alias.
 hl.bind(mod .. " + BackSpace", hl.dsp.window.close(), { description = "Close window" })
 hl.bind(mod .. " + Q",         hl.dsp.window.close(), { description = "Close window" })
 hl.bind(mod .. " + SHIFT + Q", hl.dsp.window.kill(),  { description = "Kill window" })
@@ -271,8 +269,7 @@ hl.bind(mod .. " + ALT + S",   hl.dsp.window.move({ workspace = "special:magic" 
 -- Applications
 ------------------------------------------------------------------------------
 
--- SUPER+T is the one from ~/repos/dots; Return is kept as an alias so both
--- habits work.
+-- SUPER+T is the primary; Return is kept as an alias so both habits work.
 hl.bind(mod .. " + T",      hl.dsp.exec_cmd(run .. TERMINAL), { description = "Terminal" })
 hl.bind(mod .. " + Return", hl.dsp.exec_cmd(run .. TERMINAL), { description = "Terminal" })
 -- Floats and sizes itself via the scratchterm window rule in conf/rules.lua.
@@ -288,7 +285,6 @@ hl.bind(mod .. " + SHIFT + B", hl.dsp.exec_cmd(run .. BROWSER),      { descripti
 hl.bind(mod .. " + A", hl.dsp.exec_cmd(NOCT .. "panel-toggle control-center"), { description = "Control centre" })
 hl.bind(mod .. " + N", hl.dsp.exec_cmd(NOCT .. "panel-toggle control-center notifications"), { description = "Notifications" })
 hl.bind(mod .. " + X", hl.dsp.exec_cmd(NOCT .. "panel-toggle clipboard"), { description = "Clipboard history" })
--- SUPER+W was wallpaper in ~/repos/dots (a script); here it is Noctalia's panel.
 hl.bind(mod .. " + W", hl.dsp.exec_cmd(NOCT .. "panel-toggle wallpaper"), { description = "Wallpaper" })
 -- Browse Wallhaven without leaving the shell, for when the local folders have
 -- nothing you want. Needs the noctalia/wallhaven plugin (60-wallpaper.toml).
