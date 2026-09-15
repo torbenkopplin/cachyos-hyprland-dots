@@ -139,6 +139,7 @@ is the test that it stays fixed.
 | `M + B` | Pin / unpin the bar |
 | `M + SHIFT + G` | Cycle frosted glass level |
 | `M + CTRL + Escape` | Lock |
+| `M + CTRL + D` | Force the built-in **d**isplay back on — laptops only, and only if the lid handling ever leaves you with no screen ([023](decisions/023-the-panel-is-never-the-last-output.md)) |
 | `M + Escape` | Session menu |
 
 ## System control — straight into the launcher

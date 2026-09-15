@@ -285,6 +285,41 @@ them: Zen is deliberately translucent and the other three deliberately are not �
 - [ ] `SUPER+CTRL+P` → Caffeine holds it awake for anything else, audio in a
       terminal included.
 
+### The lid, on a laptop with `lid.setup()` in `host.lua`
+
+[Decision 023](docs/decisions/023-the-panel-is-never-the-last-output.md). The
+rule being checked is *the panel is off only while the lid is shut **and**
+something else is actually driving a screen* — so most of these are checks that
+the panel comes **back**.
+
+- [ ] Docked, lid open: `hyprctl monitors all | grep -E '^Monitor|disabled:'`
+      shows both outputs, neither disabled.
+- [ ] **Close the lid.** The built-in panel goes dark and the external display
+      keeps everything. `disabled: true` on the panel.
+- [ ] **Open it again.** The panel comes back, and it comes back on the *left* —
+      an explicit `position` is what holds that.
+- [ ] Lid shut, then **pull the dock**. The panel comes on by itself, with no lid
+      transition to prompt it. This is the second hole 023 closed, and it is the
+      cheap way to test the rule without a suspend.
+- [ ] Lid shut and docked, let it **suspend**, then wake it **on the external
+      keyboard** — not by opening the lid. You get the lock screen and it takes
+      your password. This is the case that cost a reboot on 2026-09-10.
+- [ ] Undocked, laptop alone: **close the lid**. It suspends, and it does *not*
+      disable the only screen it has.
+- [ ] **With the lid shut, `hyprctl reload`.** The panel is still off afterwards.
+      A reload rebuilds every event subscription while it re-applies the monitor
+      rules, so this is the one case no monitor event covers — it is a 500 ms
+      timer that catches it, and a session was rebooted on 2026-09-11 for want of
+      it. Give it a second before you judge.
+- [ ] `MOD + CTRL + D` turns the panel on from a shut lid, and works with the
+      lock screen up. The escape hatch; check it before you need it.
+
+`journalctl -b -1 | grep -E 'mode -1x-1|scale > 0\.'` is the signature of the
+failure if it ever comes back: a client handed a monitor with no geometry, which
+means Hyprland had no enabled output. The Hyprland log itself is in
+`/run/user/1000/hypr/` and dies with the session, so on a session you had to
+reboot, that grep and the `pam_unix` timings are all the evidence there is.
+
 Only after `./install.sh --login`
 ([decision 016](docs/decisions/016-greetd-instead-of-plasmalogin.md)):
 
