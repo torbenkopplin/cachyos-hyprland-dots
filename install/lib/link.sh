@@ -8,6 +8,39 @@
 # --status buckets: which setup owns each managed path right now.
 STAT_LINKED=() STAT_FOREIGN=() STAT_ABSENT=()
 
+# same_target <path> <source> -- is <path> already our symlink to <source>?
+#
+# Both sides are fully resolved before they are compared, and that is the whole
+# point: the repo can be reached by more than one spelling. Here ~/repos is
+# itself a symlink to /mnt/data/repos, so install.sh run from the first spelling
+# sets REPO to ~/repos/... while `readlink -f` on the link it created answers
+# /mnt/data/repos/... -- and comparing a resolved destination against an
+# unresolved $src made every one of our own links look like somebody else's.
+#
+# Every run then "backed up" the previous run's perfectly good symlink and
+# relinked it. Two runs on 2026-09-11 left 106 stale *.bak-* files that way, and
+# one of them -- a dangling link in ~/.config/noctalia/palettes/ -- was enough to
+# empty Noctalia's custom-palette picker while the palette itself still applied.
+# It also quietly broke --unlink: restore_backup() takes the NEWEST backup, which
+# by then was a link into this repo rather than the original file it was meant to
+# put back.
+#
+# Resolve both sides or neither.
+same_target() {
+    [[ -L $1 ]] || return 1
+    [[ $(readlink -f "$1") == "$(readlink -f "$2")" ]]
+}
+
+# ours <path> -- a symlink pointing somewhere inside this repo.
+#
+# `readlink -m` rather than -f: a link left behind by a file that has since MOVED
+# within the repo is dangling, and that is exactly a case worth recognising --
+# the palette moved from config/noctalia/palettes/ to vendor/ and left one.
+ours() {
+    [[ -L $1 ]] || return 1
+    [[ $(readlink -m "$1") == "$(readlink -m "$REPO")"/* ]]
+}
+
 # restore_backup <path> -- move the most recent <path>.bak-* back into place.
 #
 # This is what makes --unlink a real reverse of the install rather than just a
@@ -44,7 +77,7 @@ link() {
     dir=$(dirname "$dst")
 
     if (( STATUS )); then
-        if [[ -L $dst && $(readlink -f "$dst") == "$src" ]]; then
+        if same_target "$dst" "$src"; then
             STAT_LINKED+=("$dst")
         elif [[ -e $dst || -L $dst ]]; then
             STAT_FOREIGN+=("$dst")
@@ -55,7 +88,7 @@ link() {
     fi
 
     if (( UNLINK )); then
-        if [[ -L $dst && $(readlink -f "$dst") == "$src" ]]; then
+        if same_target "$dst" "$src"; then
             say "unlink $(disp "$dst")"
             run rm -f "$dst"
         fi
@@ -68,12 +101,26 @@ link() {
     run mkdir -p "$dir"
 
     # Already correct? Say nothing, so reruns are quiet.
-    [[ -L $dst && $(readlink -f "$dst") == "$src" ]] && return 0
+    same_target "$dst" "$src" && return 0
 
-    # Anything else in the way is moved aside, never deleted.
+    # Anything else in the way is moved aside, never deleted -- unless it is one
+    # of our own links, which is not something a backup preserves. Git already
+    # has every byte it pointed at, and the copy left behind is worse than
+    # useless: it is another entry in a directory somebody else reads. Noctalia
+    # enumerates ~/.config/noctalia/palettes/ to fill its palette picker, and a
+    # displaced link sitting there was enough to empty it.
+    #
+    # What still gets a backup is what the rule is actually for: a file this
+    # setup did not write. CachyOS's own hyprland.lua and kitty.conf are the
+    # only copy that exists, and --unlink puts them back.
     if [[ -e $dst || -L $dst ]]; then
-        say "backup $dst -> $dst.bak-$STAMP"
-        run mv "$dst" "$dst.bak-$STAMP"
+        if ours "$dst"; then
+            say "replace $(disp "$dst")  (a link into this repo; git has it)"
+            run rm -f "$dst"
+        else
+            say "backup $dst -> $dst.bak-$STAMP"
+            run mv "$dst" "$dst.bak-$STAMP"
+        fi
     fi
 
     say "link   $(disp "$dst")"

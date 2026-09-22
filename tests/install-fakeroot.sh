@@ -32,7 +32,13 @@
 set -uo pipefail
 export LC_ALL=C
 
-REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+# `pwd -P` rather than `pwd`: the check below compares this against the output of
+# `readlink -f`, which is always physical, so a logical path here would never
+# match. On this machine ~/repos is a symlink to /mnt/data/repos, and invoking
+# the test through that spelling made all 54 links look like they pointed
+# outside the checkout. CI clones to a path with no symlinks in it, so the two
+# agreed there and the check passed while being wrong.
+REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 cd "$REPO" || exit 1
 
 KEEP=0
