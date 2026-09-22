@@ -1,10 +1,16 @@
--- lib/ws.lua -- addressing workspaces inside the focused monitor's band.
+-- lib/ws.lua -- turning a number key into a workspace id.
 --
--- conf/workspaces.lua pins workspace ids to monitors in bands of
--- WORKSPACE_BAND: monitor 0 owns 1..10, monitor 1 owns 11..20, and so on. That
--- makes "workspace 3" ambiguous on its own -- it has to mean "the third
--- workspace of whichever monitor I am looking at", or the number keys would
--- yank you to the other screen.
+-- Two models, and which one is in force depends on whether host.lua set
+-- WSBANDS. Without it -- the default, and what a laptop that docks to a
+-- different screen each week wants -- there are no bands: workspaces
+-- 1..WORKSPACE_BAND are shared by every monitor and SUPER+3 is workspace 3.
+-- With it, conf/workspaces.lua pins ids to monitors in bands of WORKSPACE_BAND,
+-- so "workspace 3" has to mean "the third workspace of whichever monitor I am
+-- looking at" or the number keys would yank you to the other screen.
+--
+-- Either way the answer is arithmetic done here rather than a selector, and
+-- that is the part that does not vary. Decision 003 for why, 025 for why bands
+-- are opt-in.
 --
 -- Hyprland has selectors that sound like they do this and do not:
 --
@@ -16,7 +22,7 @@
 --         setup, there is never a next one and J/K at the bottom of a column
 --         did nothing either.
 --
--- So the band arithmetic is done here instead, from the live monitor, and the
+-- So the arithmetic is done here instead, from the live monitor, and the
 -- dispatchers are given absolute ids. In a Lua config that is a table lookup,
 -- where a hyprland.conf has to shell out to hyprctl on every keypress.
 
@@ -26,9 +32,24 @@ local M = {}
 --- base + n.
 ---
 --- WSBANDS (from host.lua) is the authority, since that is what the workspace
---- rules were built from -- it keys on connector name, so it stays right even
---- if Hyprland hands out monitor ids in a different order after a replug. The
---- id fallback is for a machine with no host.lua, which has no bands at all.
+--- rules were built from -- it keys on connector NAME, so it stays right even if
+--- Hyprland hands out monitor ids in a different order after a replug.
+---
+--- No WSBANDS means no bands, and the base is 0 on every monitor: workspaces
+--- 1..WORKSPACE_BAND are shared, and SUPER+3 means workspace 3 wherever you are
+--- looking. That is what a laptop that meets a different screen every week
+--- wants. Unplug the external and Hyprland walks its workspaces over to the
+--- panel that is left; the numbers do not change, so there is nothing to move
+--- by hand and nothing stranded behind a number key that now means something
+--- else. See decision 025.
+---
+--- This used to fall back to `mon.id * WORKSPACE_BAND`, which banded by
+--- Hyprland's monitor id -- assignment order, not identity -- while claiming in
+--- this very comment to have no bands at all. Ids are not stable across a
+--- replug: with the lid shut, eDP-1 held id 0 while DISABLED and the one live
+--- screen was id 1, so the number keys addressed 11-20. Boot with only that
+--- screen and it becomes id 0, SUPER+1 means workspace 1, and the windows left
+--- on 11-13 are still on screen with no key that reaches them.
 ---@param mon table|nil
 ---@return integer|nil
 local function base_of(mon)
@@ -42,7 +63,7 @@ local function base_of(mon)
         end
     end
 
-    return (mon.id or 0) * WORKSPACE_BAND
+    return 0
 end
 
 --- base, current workspace id -- or nil when there is nothing sensible to act
@@ -87,10 +108,11 @@ end
 -- Relative: what J/K fall through to at the end of a column
 ------------------------------------------------------------------------------
 
---- The workspace one step up/down inside this monitor's band, or nil at the
---- band's edge. Stopping there is deliberate: the band IS the monitor, so
---- wrapping or spilling over would land you on another screen's workspaces
---- while looking at this one.
+--- The workspace one step up/down, or nil at the edge of the range. Stopping
+--- there is deliberate: under bands the band IS the monitor, so spilling over
+--- would land you on another screen's workspaces while looking at this one.
+--- Bandless the range is 1..WORKSPACE_BAND, and stopping at 10 rather than
+--- wrapping to 1 keeps J and K a walk along a line rather than a loop.
 ---
 --- Public because lib/nav.lua needs the same clamped arithmetic for the column
 --- moves on SUPER+CTRL, which are not a focus or a window step and so cannot go

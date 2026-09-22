@@ -1,21 +1,30 @@
--- conf/workspaces.lua -- one workspace band per monitor.
+-- conf/workspaces.lua -- the workspace rules.
 --
--- The band model does something the naive "N persistent workspaces per
--- monitor" version cannot: it carries a scrolling *direction* and column width
--- per band. A portrait monitor can scroll down while a landscape one scrolls
--- right, at the same time.
+-- Two shapes, and WSBANDS in host.lua decides which. It is machine-specific
+-- (monitor names and ids), so it cannot be tracked -- see the note in
+-- hyprland.lua.
+--
+-- WITHOUT it, which is the default: one unpinned set of WORKSPACE_BAND
+-- workspaces shared by every monitor. Nothing names a monitor, so nothing is
+-- tied to one, and pulling a cable moves that screen's workspaces to whatever
+-- is left with their numbers intact. That is the point -- work on the external,
+-- unplug it, carry on on the built-in panel with the same number keys and
+-- nothing to move by hand. Decision 025.
+--
+-- WITH it, one band per monitor: monitor N owns N*BAND+1 .. N*BAND+BAND, the
+-- ids alone say which monitor a workspace belongs to, and a workspace returns
+-- to its own screen when that screen comes back. The band model also carries a
+-- scrolling *direction* and column width per monitor, which the shared set has
+-- no way to express -- a portrait screen can scroll down while a landscape one
+-- scrolls right, at the same time. Worth it for a fixed desk; the wrong trade
+-- for a laptop that meets a different screen every week.
 --
 -- Only the direction is a workspace rule, though. See lib/colwidth.lua for why
 -- the width has to be applied from an event instead.
---
--- Monitor id N owns workspaces N*BAND+1 .. N*BAND+BAND, so the ids alone say
--- which monitor a workspace belongs to and a workspace never migrates.
---
--- The band table is machine-specific (monitor names and ids), so it comes from
--- host.lua as the global WSBANDS -- see the note in hyprland.lua. The fallback
--- below is what a host with no host.lua gets: one band on whichever monitor
--- Hyprland picks.
 
+-- The fallback is a single band based at 0 with no `monitor`, which is what
+-- makes the shared set shared: a rule that names no monitor pins nothing.
+-- lib/ws.lua bases its arithmetic at 0 to match.
 local bands = WSBANDS or {
     { base = 0, direction = "right", column_width = COLUMN_WIDTH },
 }
@@ -27,7 +36,10 @@ for _, band in ipairs(bands) do
             monitor   = band.monitor,
 
             -- The first workspace of each band is that monitor's home, so a
-            -- fresh login lands somewhere predictable on every screen.
+            -- fresh login lands somewhere predictable on every screen. With no
+            -- bands there is one such rule and it names no monitor, which is
+            -- Hyprland's own default anyway -- harmless, and it keeps the two
+            -- shapes building from the same loop.
             default   = (n == 1),
 
             -- Per-band scroll axis: this is the whole reason for the band model,

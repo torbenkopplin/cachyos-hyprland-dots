@@ -30,7 +30,8 @@ without separate chords there was no way to say which you meant.
 ### What "lies that way" means, per monitor
 
 A workspace is a tape of columns and a column is a stack of windows — but **which
-way the tape runs is per band**, set by `direction` in `WSBANDS`
+way the tape runs is per band**, set by `direction` in `WSBANDS` (a machine
+with no bands runs one way everywhere — [025](decisions/025-bands-are-opt-in.md))
 ([host.lua](install.md#two-machines)). So the same key walks a different
 structure depending on the screen you are looking at:
 

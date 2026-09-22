@@ -30,7 +30,7 @@ So the **Settled against** sections are the load-bearing half of this directory.
 |---|---|---|
 | 001 | [Deploy by symlink, one file at a time, and be reversible](001-links-not-copies.md) | 2026-08-15 |
 | 002 | [The Hyprland config is Lua, split into options, conf and lib](002-hyprland-config-is-lua.md) | 2026-08-15 |
-| 003 | [Workspace numbers are arithmetic, not a selector](003-workspace-numbers-are-arithmetic.md) | 2026-08-18 |
+| 003 | [Workspace numbers are arithmetic, not a selector](003-workspace-numbers-are-arithmetic.md) — bands narrowed to opt-in by [025](025-bands-are-opt-in.md) | 2026-08-18 |
 | 004 | [Edges are read from the layout, not inferred from a failed dispatch](004-edges-are-read-not-inferred.md) — mechanism superseded by [024](024-the-edge-is-the-dispatch-that-did-nothing.md) | 2026-08-18 |
 | 005 | [Per-monitor column width, applied as focus crosses monitors](005-per-monitor-column-width.md) | 2026-08-18 |
 | 006 | [Idle has exactly one owner](006-idle-has-one-owner.md) | 2026-08-18 |
@@ -52,6 +52,7 @@ So the **Settled against** sections are the load-bearing half of this directory.
 | 022 | [Zen gets a number after all, and it is the mod's own](022-zen-gets-a-number-after-all.md) | 2026-09-07 |
 | 023 | [The built-in panel is never the last output](023-the-panel-is-never-the-last-output.md) | 2026-09-10 |
 | 024 | [The edge is the dispatch that did nothing](024-the-edge-is-the-dispatch-that-did-nothing.md) | 2026-08-19, written down 2026-09-15 |
+| 025 | [Bands are opt-in; by default workspaces belong to no monitor](025-bands-are-opt-in.md) | 2026-09-22 |
 
 ## Settled against, in one place
 
@@ -67,6 +68,7 @@ The dead ends, and where the reasoning is. Read these before rebuilding one.
 | A large blur, for one uniform shade | It averages the wallpaper away: measured a lift of 3 levels of 255, i.e. nothing on screen saying the glass was on | [011](011-the-blur-is-small.md) |
 | A Hyprland bind on the MX Keys screenshot chord | A bind cannot subtract the modifiers, so the key never becomes a Print key — and one press of it fired `SUPER+SHIFT+S` *and* `SUPER+S`, so the scratchpad answers underneath whatever the chord is pointed at | [020](020-the-print-key-is-remapped-below-hyprland.md) |
 | Moving the scratchpad off `S` to free the chord | The `S` / `SHIFT+S` pair is the toggle-and-send shape the rest of the keymap is built from | [020](020-the-print-key-is-remapped-below-hyprland.md) |
+| Keying workspace bands on connector name, to fix the id instability | It still needs every monitor known in advance, and a laptop meets one it has not met most weeks | [025](025-bands-are-opt-in.md) |
 | A fixed `terminal` level | `lift = (backdrop − own) × (1 − opacity)`, so one number is ten different amounts of glass across the wallpaper folder — 9.0 to 99.0, the low end below the suite's own `LIFT_MIN` | [021](021-the-colourscheme-is-a-submodule.md) |
 | Keeping the palette here and the Lua in the nvim repo, in step by hand | They had already diverged: the palette's `_comment` credited upstream for `#00ff77`, which upstream does not have | [021](021-the-colourscheme-is-a-submodule.md) |
 | A keyring for the mail password | `secret-tool` is on PATH but nothing owns `org.freedesktop.secrets`; the only activatable name fails to launch. It needs gnome-keyring plus PAM unlock wiring under greetd, on both machines, for what one GPG key already buys | [019](019-mail-credentials-live-in-pass.md) |

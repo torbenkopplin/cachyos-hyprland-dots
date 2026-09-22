@@ -163,10 +163,16 @@ successful move, and the edge stops being detectable at all.
 
 ### Workspace numbers are arithmetic, not a selector
 
-Each monitor owns a band of ten workspace ids — monitor 0 gets 1–10, monitor 1
-gets 11–20 — so `SUPER+3` has to mean "the third workspace of the monitor I am
-looking at". Hyprland has selectors that look like they say that, and neither
-one does:
+`SUPER+3` has to resolve to a workspace id, and by default that id is simply 3:
+workspaces 1–10 are shared by every monitor and pinned to none, so pulling a
+cable carries that screen's workspaces to the one that is left without
+renumbering anything ([025](decisions/025-bands-are-opt-in.md)). A machine with
+fixed screens can opt into **bands** instead, with `WSBANDS` in `host.lua` —
+monitor 0 owning 1–10, monitor 1 owning 11–20 — and then `SUPER+3` has to mean
+"the third workspace of the monitor I am looking at".
+
+Either way it is arithmetic and not a selector, because Hyprland has selectors
+that look like they say it and neither one does:
 
 | Selector | What it actually does |
 |---|---|
@@ -176,14 +182,20 @@ one does:
 That first row is why every number key was dead and why `J` at the bottom of a
 column did nothing: both failed silently, in a config that looked correct.
 `lib/ws.lua` does the arithmetic instead — read the focused monitor, find its
-band in `WSBANDS` by connector name, dispatch the absolute id — and clamps at
-the band edges so a workspace step never lands you on another screen's numbers.
-A `hyprland.conf` has to solve the same problem with a shell script that shells
-out to `hyprctl` on every keypress; in a Lua config it is a table lookup.
+band in `WSBANDS` by connector name or take a base of 0 when there are none,
+dispatch the absolute id — and clamps at the end of the range, so a workspace
+step neither wraps nor lands you on another screen's numbers. A `hyprland.conf`
+has to solve the same problem with a shell script that shells out to `hyprctl`
+on every keypress; in a Lua config it is a table lookup.
+
+The fallback used to be `mon.id * WORKSPACE_BAND`, which banded by Hyprland's
+monitor id. Ids are assignment order, not identity — a disabled laptop panel
+still holds id 0 — so the number keys addressed a different band depending on
+what had been plugged in and when. That is [025](decisions/025-bands-are-opt-in.md).
 
 Workspaces stay **dynamic**: nothing is persistent, so a workspace exists while
-something is on it and the bar shows exactly those. The band only decides what
-number a new one gets.
+something is on it and the bar shows exactly those. The band, where there is
+one, only decides what number a new one gets.
 
 A band's other half is its **column width**, and that is not a workspace rule
 either. `layout_opts` carries the scroll `direction` and the scrolling layout

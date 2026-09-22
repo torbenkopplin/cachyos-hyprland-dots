@@ -42,20 +42,25 @@ KB_OPTIONS = "caps:ctrl_modifier"
 -- Workspaces
 ------------------------------------------------------------------------------
 
--- Workspaces are organised in per-monitor bands: monitor id N owns workspaces
--- N*WORKSPACE_BAND+1 .. N*WORKSPACE_BAND+WORKSPACE_BAND. Ten per monitor, so
--- the number keys map one-to-one (1..9 then 0).
+-- How many workspaces the number row addresses: ten, so 1..9 then 0 map
+-- one-to-one.
 --
--- The per-machine band table (which monitor, which scroll direction, which
--- column width) is the WSBANDS global from host.lua -- see
--- config/hypr/host.lua.example. conf/workspaces.lua builds the rules from it.
+-- By default that is the whole story -- workspaces 1..10 are shared by every
+-- monitor, and unplugging a screen carries its workspaces to the one that is
+-- left without renumbering anything (decision 025).
+--
+-- A machine that wants per-monitor bands instead -- monitor N owning
+-- N*WORKSPACE_BAND+1 .. N*WORKSPACE_BAND+WORKSPACE_BAND, each with its own
+-- scroll direction and column width -- opts in with the WSBANDS global in
+-- host.lua. See config/hypr/host.lua.example; conf/workspaces.lua builds the
+-- rules from it.
 WORKSPACE_BAND = 10
 
--- Default width of a new column, as a fraction of the monitor. A band in
--- host.lua overrides this for its own monitor -- a portrait screen wants halves
--- or the whole width where an ultrawide wants a third -- and lib/colwidth.lua is
--- what makes that per-monitor value stick. This is the value monitors with no
--- band of their own get.
+-- Default width of a new column, as a fraction of the monitor. With no WSBANDS
+-- this is the width, everywhere. A band in host.lua overrides it for its own
+-- monitor -- a portrait screen wants halves or the whole width where an
+-- ultrawide wants a third -- and lib/colwidth.lua is what makes that
+-- per-monitor value stick.
 COLUMN_WIDTH = 0.25
 
 ------------------------------------------------------------------------------
