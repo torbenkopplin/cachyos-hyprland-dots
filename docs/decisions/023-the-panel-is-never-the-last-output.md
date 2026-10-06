@@ -152,6 +152,51 @@ every later reconcile — the panel would keep whatever state it happened to be 
 for the rest of the session, which is precisely the failure mode this whole
 decision exists to rule out.
 
+## Off waits; on never does
+
+**2026-10-06.** Two sessions lost every client in one day — noctalia, kitty,
+Xwayland and everything on it, the portals — while Hyprland itself survived.
+Both times the journal has the same line from the clients that died:
+
+```
+12:45:27  xdg-desktop-portal-hyprland: wl_registry#2: error 0: global wl_output (96) is unavailable
+13:00:05  noctalia:                    wl_registry#2: error 0: global wl_output (73) is unavailable
+```
+
+That is a client binding an output that the compositor has already destroyed,
+which is a fatal protocol error, and every Wayland client binds every output. So
+an output that exists for only a moment is enough to take the session's clients
+down together. This module was making those outputs:
+
+* **12:45, a resume.** Lid shut, docked. The USB-C DP link to the ultrawide
+  dropped and returned dozens of times as it retrained (37 `mode -1x-1` lines
+  from Xwayland). Every drop lit the panel, every return put it out again — the
+  rule applied instantly in both directions, doubling the churn.
+* **13:00, a reload** — nothing but saving `lib/lid.lua`. `host.lua` declared
+  `eDP-1` as an ordinary enabled monitor *and* handed it to `setup()`, so the
+  reload re-applied the enabled rule, the output came up as global 73, and the
+  module's `monitor.added` handler disabled it straight away.
+
+Not a bug in the rule, which still holds. A bug in how fast it acts. Two changes:
+
+1. **Turning the panel on is immediate; turning it off is scheduled.** Off lands
+   only once `OFF_HOLD_MS` (3 s) passes with no further monitor event, and is
+   re-decided from scratch when it does. A generation counter voids any
+   turn-off already armed, so a link that keeps swinging keeps the panel lit
+   until it stops. That costs at most 3 s of panel under a shut lid, the
+   direction this decision already says to lean.
+2. **`setup()` is the panel's only monitor rule**, declared at parse time in
+   the state it should already be in, instead of a parse-time reconcile. A
+   reload with the lid shut declares it off, so it never comes up at all.
+   `host.lua` must not declare the panel itself.
+
+What this does not fix: the external output's own flapping on resume is the
+hardware, and a client that binds a DP-1 the link has just dropped still dies.
+This removes the panel's share of the churn and the reload's entirely.
+
+Not yet observed across a flapping resume. A clean save-triggered reload was
+seen afterwards (13:03), but its log has no timestamps to prove the reload ran.
+
 ## The state is read, never remembered
 
 `reconcile()` reads the panel's current state back out of `hl.get_monitors()`

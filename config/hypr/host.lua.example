@@ -46,6 +46,11 @@
 -- back after being disabled is placed after the one that stayed, so opening the
 -- lid used to put the laptop panel to the RIGHT of the ultrawide -- measured
 -- 2026-08-26.
+--
+-- And give the panel NO hl.monitor() line of its own above: lid.setup() is its
+-- monitor rule. A second one lights the panel at every reload for the lid
+-- module to put out again, and an output that comes and goes that fast takes
+-- every client down with it -- decision 023, "Off waits; on never does".
 
 -- local lid = require("lib.lid")   -- at the top of the file
 --
