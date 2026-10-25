@@ -60,9 +60,9 @@ shells where you have selected a version.
 
 ## Overlap with ~/dotfiles
 
-This repo now carries `fish`, `kitty` and `hypr`, all of which your existing
+This repo now carries `fish`, `kitty`, `hypr` and `fastfetch`, all of which your existing
 `~/dotfiles` stow repo also provides. On the new machine, only one of them
 should own each of those paths. `~/dotfiles` still holds things this repo does
-not cover at all — `gtk-3.0`, `gtk-4.0`, `kvantum`, `mpv`, `git`, `fastfetch`,
+not cover at all — `gtk-3.0`, `gtk-4.0`, `kvantum`, `mpv`, `git`,
 `quickshell`, `illogical-impulse` — so it is not redundant, just overlapping.
 Decide per directory before running both installers.
