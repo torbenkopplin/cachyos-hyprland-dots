@@ -127,6 +127,26 @@ link() {
     run ln -s "$src" "$dst"
 }
 
+# tree_files <source dir> -- the files under it that belong to the repo, NUL-
+# separated and sorted: tracked ones, plus new ones not yet added, but nothing
+# .gitignore excludes. A plain `find` deployed whatever was lying in the
+# working tree -- bin/__pycache__/*.pyc from a syntax check went into
+# ~/.local/bin and was made executable, and an editor's .swp or an install's
+# own *.bak-* in config/hypr would have gone the same way. Falls back to `find`
+# outside a git checkout, which bootstrap.sh never produces.
+tree_files() {
+    local src_root=$1 f
+    if git -C "$REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        git -C "$REPO" ls-files -z --cached --others --exclude-standard -- "${src_root#"$REPO"/}" |
+            while IFS= read -r -d '' f; do
+                # A tracked file deleted but not yet committed is still listed.
+                [[ -f $REPO/$f ]] && printf '%s\0' "$REPO/$f"
+            done | sort -z
+    else
+        find "$src_root" -type f -print0 | sort -z
+    fi
+}
+
 # link_tree <source dir> <destination dir> <executable?>
 #
 # Individual files are linked rather than the directory itself, so either
@@ -145,7 +165,7 @@ link_tree() {
         [[ $(basename "$rel") == *.example ]] && continue
         (( executable )) && { (( UNLINK || STATUS )) || run chmod +x "$file"; }
         link "$file" "$dst_root/$rel"
-    done < <(find "$src_root" -type f -print0 | sort -z)
+    done < <(tree_files "$src_root")
 }
 
 # root_path <root name> <relative destination>
