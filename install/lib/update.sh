@@ -16,6 +16,28 @@
 # Splitting the installer into install/lib/*.sh does not change that reasoning,
 # it widens it: the libraries are sourced at startup, so a pull can now also
 # rewrite a file this process has already read.
+# Hyprland reloads the moment it sees a config file change, and a pull writes
+# files one at a time -- so the reload can parse a mix of old and new files,
+# against a host.lua that already calls the new ones. lib.rotate missing and
+# lid.external() not yet defined is a config error, the emergency binds, and
+# with the lid shut no lid module to bring the panel back: twice on 2026-11-02
+# the way out was opening the laptop and running `hyprctl reload` by hand.
+#
+# So the pull happens with autoreload held, and the one reload at the end --
+# noct-glass apply in do_reapply -- sees the finished tree. That reload also
+# lets go of the hold: disable_autoreload is set at runtime only, never in the
+# config, so re-reading the config puts it back to false.
+hypr_live() { [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]] && command -v hyprctl >/dev/null 2>&1; }
+hold_autoreload() {
+    hypr_live || return 0
+    hyprctl eval 'hl.config({ misc = { disable_autoreload = true } })' >/dev/null 2>&1 \
+        || note "could not hold Hyprland's autoreload -- it may reload mid-pull"
+}
+release_autoreload() {
+    hypr_live || return 0
+    hyprctl eval 'hl.config({ misc = { disable_autoreload = false } })' >/dev/null 2>&1
+}
+
 do_update() {
     heading "Update"
 
@@ -66,7 +88,9 @@ do_update() {
     # --ff-only: a fast-forward is the only kind of update that needs no
     # decision. Anything else means the two machines have diverged, which is a
     # merge, which is not something an installer should do behind your back.
+    hold_autoreload
     if ! git -C "$REPO" pull --ff-only; then
+        release_autoreload
         warn "pull failed -- continuing with what is already on disk"
         note "diverged? 'git log --oneline --graph HEAD @{u}' shows how, and the"
         note "merge or rebase is yours to make"
@@ -87,6 +111,7 @@ do_update() {
 
     after=$(git -C "$REPO" rev-parse HEAD)
     if [[ $before == "$after" ]]; then
+        release_autoreload
         say "already up to date (${after:0:7})"
         return 0
     fi
@@ -152,7 +177,10 @@ do_reapply() {
         "$BIN_HOME/noct-glass" apply
         say "glass re-applied ($("$BIN_HOME/noct-glass" show 2>/dev/null))"
     else
-        note "noct-glass is not on $BIN_HOME yet -- skipping"
+        # noct-glass's reload is what lets go of do_update's autoreload hold;
+        # without it, reload here, once, on the finished tree.
+        note "noct-glass is not on $BIN_HOME yet -- reloading Hyprland directly"
+        hyprctl reload >/dev/null 2>&1
     fi
 
     # Re-renders every template against the palette already in force, which is
