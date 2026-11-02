@@ -120,11 +120,28 @@ do_reapply() {
     heading "Applying"
 
     if (( DRY_RUN )); then
-        say "would: noct-glass apply, then noctalia msg templates-apply"
+        say "would: systemctl --user daemon-reload, try-restart the helpers,"
+        say "       noct-glass apply, then noctalia msg templates-apply"
         return 0
     fi
 
     needs_machine "applying" || return 0
+
+    # The user units in config/systemd, and the daemons two of them run. systemd
+    # reads a unit file when it loads it, so a changed one is only true after a
+    # daemon-reload; a running Python helper keeps executing the code it started
+    # with until it is restarted. try-restart touches only what is already
+    # running, so a machine that never calls lid.setup() or rotate.setup() is
+    # not handed a daemon it has no use for. noctalia.service is reloaded and
+    # NOT restarted: that would blank the bar and the lock screen mid-install.
+    if systemctl --user show-environment >/dev/null 2>&1; then
+        systemctl --user daemon-reload \
+            && say "user units reloaded" \
+            || note "systemctl --user daemon-reload failed"
+        systemctl --user try-restart hypr-sleepwatch.service hypr-autorotate.service \
+            && say "sleep and rotation helpers restarted (where running)" \
+            || note "could not restart hypr-sleepwatch / hypr-autorotate"
+    fi
 
     if [[ -z ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
         note "no Hyprland session here -- this lands at the next login"
