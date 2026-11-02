@@ -131,10 +131,13 @@ hl.window_rule({
 -- judge a photo, grade a video or pick a colour through 10% of your desktop.
 ------------------------------------------------------------------------------
 
+-- These are Hyprland regexes, not Lua patterns: a dot is escaped `\\.`, as
+-- everywhere else in this file. `%.` -- the Lua spelling -- asks for a literal
+-- percent sign, so Loupe and OBS Studio used to fade with everything else.
 local OPAQUE_WINDOWS = {
-    "^(mpv|vlc|imv|org%.gnome%.Loupe|qimgv)$",
+    "^(mpv|vlc|imv|org\\.gnome\\.Loupe|qimgv)$",
     "^(gimp|krita|inkscape|darktable)$",
-    "^(obs|com%.obsproject%.Studio)$",
+    "^(obs|com\\.obsproject\\.Studio)$",
     "^hyprpicker$",
 }
 
