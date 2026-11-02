@@ -75,6 +75,12 @@ configs	tree	config/uwsm	config	uwsm
 # the session was started without uwsm. See config/environment.d.
 configs	tree	config/environment.d	config	environment.d
 
+# User units: noctalia.service, which autostart.lua starts so that a crashed
+# shell comes back by itself, and the helpers lib/lid.lua and lib/rotate.lua
+# start and stop. Linked per file like everything else, so
+# `systemctl --user enable` can still drop its own .wants links beside them.
+configs	tree	config/systemd	config	systemd
+
 # The launcher providers, the glass level, the wallpaper fetcher and the test
 # runner. noct-common.sh is in here too: it is sourced rather than run, but it
 # has to sit beside the scripts that source it.

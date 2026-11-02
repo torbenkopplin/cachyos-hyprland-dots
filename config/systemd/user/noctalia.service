@@ -1,0 +1,25 @@
+# noctalia.service -- the shell: bar, launcher, notifications, lock screen.
+#
+# Started by conf/autostart.lua, not enabled against a target: it needs the
+# session environment (WAYLAND_DISPLAY, HYPRLAND_INSTANCE_SIGNATURE) in the user
+# manager first, and autostart is the one place that runs after that import.
+#
+# A unit rather than a bare exec so that a crash brings it back. Started straight
+# from Hyprland, a dead Noctalia stays dead -- no bar, no wallpaper, no lock
+# screen -- until someone notices and relaunches it by hand. Unplugging a monitor
+# is what has taken it down.
+
+[Unit]
+Description=Noctalia shell
+PartOf=graphical-session.target
+After=graphical-session.target
+# A shell that crashes on every start should give up, not spin.
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+ExecStart=/usr/bin/noctalia
+# always, not on-failure: when the compositor drops it, Noctalia logs "Wayland
+# display closed" and exits 0, which on-failure counts as a clean stop.
+Restart=always
+RestartSec=1
