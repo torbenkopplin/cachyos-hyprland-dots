@@ -36,6 +36,14 @@ MANAGER = "org.freedesktop.login1.Manager"
 # How long to give Hyprland to answer. Well inside InhibitDelayMaxSec.
 HYPRCTL_TIMEOUT_S = 3
 
+# after_resume() is retried until Hyprland takes it: right after a resume is
+# when it is busiest, and a call lost there leaves every external disabled for
+# the rest of the session. It is safe to repeat -- a second call only restarts
+# the settle poll -- and pointless forever, so it stops after this many tries.
+# before_sleep() is not retried: the suspend is waiting on it.
+RESUME_TRIES = 6
+RESUME_RETRY_S = 2
+
 BEFORE_SLEEP = 'local l = package.loaded["lib.lid"]; if not l then error("lib.lid is not loaded") end; l.before_sleep()'
 AFTER_RESUME = 'local l = package.loaded["lib.lid"]; if not l then error("lib.lid is not loaded") end; l.after_resume()'
 
@@ -78,19 +86,22 @@ def hypr_eval(code, what):
         )
     except (OSError, subprocess.TimeoutExpired) as error:
         log(f"{what}: hyprctl failed: {error}")
-        return
+        return False
 
     output = (result.stdout + result.stderr).strip()
     if result.returncode != 0:
         log(f"{what}: hyprctl exited {result.returncode}: {output}")
-    else:
-        log(f"{what}: {output}")
+        return False
+    log(f"{what}: {output}")
+    return True
 
 
 class Watcher:
     def __init__(self):
         self.bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
         self.inhibitor = None
+        # The pending after_resume() retry, if any.
+        self.retry = None
         self.bus.signal_subscribe(
             LOGIND, MANAGER, "PrepareForSleep", LOGIND_PATH, None,
             Gio.DBusSignalFlags.NONE, self.on_prepare_for_sleep,
@@ -123,13 +134,29 @@ class Watcher:
     def on_prepare_for_sleep(self, _bus, _sender, _path, _iface, _signal, params):
         (going_down,) = params.unpack()
         if going_down:
+            self.cancel_retry()
             try:
                 hypr_eval(BEFORE_SLEEP, "before sleep")
             finally:
                 self.release()
         else:
             self.take()
-            hypr_eval(AFTER_RESUME, "after resume")
+            self.resume(1)
+
+    def resume(self, attempt):
+        self.retry = None
+        if hypr_eval(AFTER_RESUME, f"after resume (try {attempt})"):
+            return GLib.SOURCE_REMOVE
+        if attempt >= RESUME_TRIES:
+            log("after resume: giving up; `hyprctl reload` puts the externals back")
+            return GLib.SOURCE_REMOVE
+        self.retry = GLib.timeout_add_seconds(RESUME_RETRY_S, self.resume, attempt + 1)
+        return GLib.SOURCE_REMOVE
+
+    def cancel_retry(self):
+        if self.retry is not None:
+            GLib.source_remove(self.retry)
+            self.retry = None
 
 
 def main():

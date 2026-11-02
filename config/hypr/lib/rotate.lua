@@ -52,9 +52,15 @@ local RUNTIME = os.getenv("XDG_RUNTIME_DIR") or "/tmp"
 -- file that is there is a reading that is current, and no file means no reading.
 local ORIENTATION_FILE = RUNTIME .. "/hypr-autorotate/orientation"
 
--- Present means locked. A file rather than a variable so a reload keeps it, and
--- in the runtime directory so a reboot does not. Not inside the reader's
--- directory, which goes away whenever the reader restarts.
+-- Present means locked, and it holds the transform the panel was locked at. A
+-- file rather than a variable so a reload keeps it, and in the runtime
+-- directory so a reboot does not. Not inside the reader's directory, which goes
+-- away whenever the reader restarts.
+--
+-- The transform is written down rather than read back off the panel because a
+-- reload puts the panel upright for a moment (lib/lid.lua re-declares it from a
+-- spec with no transform), and a lock that meant "wherever it is now" would
+-- quietly become a lock at upright.
 local LOCK_FILE = RUNTIME .. "/hypr-rotation-locked"
 
 local SERVICE = "hypr-autorotate.service"
@@ -81,6 +87,14 @@ end
 ---@return boolean
 local function locked()
     return slurp(LOCK_FILE) ~= nil
+end
+
+--- The transform the lock holds, or nil if unlocked or if the lock file names
+--- none (locked while the panel was off, or written before it held one).
+---@return integer|nil
+local function locked_at()
+    local text = slurp(LOCK_FILE)
+    return text and math.tointeger(tonumber(text:match("^%s*(%d)%s*$")))
 end
 
 --- The transform the sensor asks for, or nil if it has nothing to say.
@@ -111,9 +125,16 @@ end
 --- set at runtime is gone after a reload, and Hyprland does not turn touch input
 --- with the monitor on its own -- so after a reload with the panel turned the
 --- option no longer agrees with it until something sets it again.
+---
+--- `declare` skips the "already there" test. At parse time the panel still
+--- shows the transform from before the reload, but the rules about to be
+--- applied do not have it -- lib/lid.lua has just re-declared the panel from a
+--- spec without one -- so the rule has to be declared even though nothing
+--- appears to need turning.
 ---@param t integer
-local function turn(t)
-    if current() ~= t then
+---@param declare boolean|nil
+local function turn(t, declare)
+    if declare or current() ~= t then
         local lid = package.loaded["lib.lid"]
         if not (lid and lid.transform and lid.transform(panel.output, t)) then
             local spec = {}
@@ -132,13 +153,19 @@ local function turn(t)
 end
 
 --- Re-decide which way up the panel should be, and turn it only if that is not
---- already how it is: wherever the sensor last settled, unless locked, and
---- where it is now if the sensor has nothing usable to say.
-function M.reconcile()
+--- already how it is: where the lock holds it, else wherever the sensor last
+--- settled, else where it is now. `declare` is setup()'s; see turn().
+---@param declare boolean|nil
+function M.reconcile(declare)
     if not panel then return end
 
-    local want = (not locked() and sensed()) or current()
-    if want then turn(want) end
+    local want
+    if locked() then
+        want = locked_at() or current()
+    else
+        want = sensed() or current()
+    end
+    if want then turn(want, declare) end
 end
 
 --- Freeze the panel where it is, or let it follow the sensor again.
@@ -148,7 +175,11 @@ function M.toggle_lock()
         hl.exec_cmd("notify-send -a Hyprland -t 1500 'Rotation unlocked'")
     else
         local f = io.open(LOCK_FILE, "w")
-        if f then f:close() end
+        if f then
+            local t = current()
+            if t then f:write(t, "\n") end
+            f:close()
+        end
         hl.exec_cmd("notify-send -a Hyprland -t 1500 'Rotation locked'")
     end
 
@@ -178,11 +209,13 @@ function M.setup(spec)
     -- A reload drops everything that happened during it, and puts the touch
     -- transform back to its default; see SETTLE_MS. The rule is also declared
     -- at parse time in the state it should be in, so a reload with the panel
-    -- turned does not set it upright just to turn it back.
+    -- turned does not set it upright just to turn it back. Declared
+    -- unconditionally: see turn(), and call this after lid.setup(), whose
+    -- panel rule this one has to come after to win.
     settle_timer = hl.timer(function() M.reconcile() end,
         { timeout = SETTLE_MS, type = "oneshot" })
 
-    M.reconcile()
+    M.reconcile(true)
 end
 
 return M

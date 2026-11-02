@@ -140,6 +140,11 @@ class Reader:
             log(f"could not claim the accelerometer: {error.message}")
             return
         # Not held: this is the reading the session starts from, not a turn.
+        # A hold still running from before the proxy restarted is older than
+        # this reading, and would overwrite it when it fired.
+        if self.hold is not None:
+            GLib.source_remove(self.hold)
+            self.hold = None
         report(orientation)
 
     def on_vanished(self, _bus, _name):

@@ -8,12 +8,13 @@
 hl.on("hyprland.start", function()
     -- Portals and anything DBus-activated need the session env. So does the
     -- shell, which is why it is started in the same command, after the import
-    -- has finished: two separate exec_cmds race.
+    -- has finished: two separate exec_cmds race. `;` and not `&&`: an import
+    -- that fails on one variable is a degraded session, no shell is a dead one.
     --
     -- The shell: bar, launcher, control centre, notifications, lock screen. It
     -- runs as a user unit so a crash restarts it -- see
     -- config/systemd/user/noctalia.service.
-    hl.exec_cmd("dbus-update-activation-environment --systemd --all && systemctl --user start noctalia.service")
+    hl.exec_cmd("dbus-update-activation-environment --systemd --all; systemctl --user start noctalia.service")
 
     -- The cursor theme. conf/env.lua exports XCURSOR_THEME for the apps, but
     -- Hyprland resolves its own cursor at startup from the environment it was

@@ -226,7 +226,11 @@ end
 --- Turn the panel to transform `t` -- lib/rotate.lua's rotation. Kept in the spec
 --- itself, because this module re-applies that spec on every lid change and a
 --- copy without the transform would put the panel upright again. Applied now
---- only if the panel is lit; otherwise it comes with the panel when it does.
+--- only if the panel is lit and meant to stay lit; otherwise it comes with the
+--- panel when it does. The second half matters at parse time: setup() has just
+--- declared the panel OFF if the lid is shut and docked, and lib/rotate.lua
+--- calls this straight after it -- a panel still lit inside OFF_HOLD_MS would
+--- otherwise be declared ON again by the reload.
 ---
 --- Returns false when `output` is not the panel this module was set up with, so
 --- the caller knows to apply its own rule.
@@ -237,7 +241,7 @@ function M.transform(output, t)
     if not panel or panel.output ~= output then return false end
 
     panel.transform = t
-    if monitor_enabled(panel.output) then apply(panel) end
+    if monitor_enabled(panel.output) and not want_off() then apply(panel) end
     return true
 end
 
@@ -304,6 +308,7 @@ end
 
 --- Move every recorded workspace back to its monitor, if that monitor is back.
 local function restore_homes()
+    homes_timer = nil -- fired: nothing pending for before_sleep() to keep
     for _, home in ipairs(homes) do
         if monitor_enabled(home.monitor) then
             pcall(hl.dispatch, hl.dsp.workspace.move({ workspace = home.id, monitor = home.monitor }))
@@ -327,7 +332,17 @@ function M.before_sleep()
     if parked or not panel or next(externals) == nil then return end
     if not external_enabled() then return end
 
-    take_homes()
+    -- A suspend inside HOMES_DELAY_MS of a resume finds the restore still
+    -- pending: the workspaces are still on the panel, so what take_homes()
+    -- would read now is wrong, and the list already held is the right one.
+    -- Cancel the restore -- left to fire while parked it would clear that list
+    -- -- and keep the list for the next resume.
+    if homes_timer then
+        pcall(homes_timer.set_enabled, homes_timer, false)
+        homes_timer = nil
+    else
+        take_homes()
+    end
 
     off_generation = off_generation + 1
     if not monitor_enabled(panel.output) then apply(panel) end
