@@ -85,6 +85,7 @@ if status is-interactive # Commands to run in interactive sessions can go here
   alias lt='eza -T --color=always --group-directories-first --icons' # tree listing
 
   alias pl='git pull'
+  alias pls='git stash && git pull && git stash pop'
   alias ph='git push'
   alias st='git status'
   alias co='git checkout'
