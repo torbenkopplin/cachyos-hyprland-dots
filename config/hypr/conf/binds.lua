@@ -15,9 +15,11 @@
 --   tap SUPER                   launcher
 --   SUPER + CTRL + <letter>     system control, straight into the launcher
 --
--- SHIFT means "bring the window with you" everywhere: with a direction, with a
--- number key, with the scratchpad. It used to mean that only on the number
--- keys, with CTRL doing it for directions -- the two are swapped now.
+-- SHIFT means "move the window": with a direction, with a number key, with the
+-- scratchpad. On a direction you go with it. On a number key you do not -- the
+-- window is sent and you stay where you were, so tidying something away does
+-- not cost you your place; SUPER + <n> is how you follow. It used to be SHIFT
+-- for numbers and CTRL for directions -- the two are swapped now.
 --
 -- Every directional bind is on hjkl AND on the arrow keys. They are the same
 -- bind twice, so nothing has to be remembered twice; the arrows are what you

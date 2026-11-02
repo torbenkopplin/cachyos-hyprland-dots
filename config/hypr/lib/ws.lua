@@ -95,7 +95,9 @@ function M.switch(n)
     hl.dispatch(hl.dsp.focus({ workspace = base + n }))
 end
 
---- Send the focused window to the n-th workspace of this monitor, and follow.
+--- Send the focused window to the n-th workspace of this monitor, and stay put:
+--- follow = false is deliberate (cd53fef), so moving a window out of the way
+--- does not cost you your place. M.switch(n) is how you follow.
 ---@param n integer  1..WORKSPACE_BAND
 function M.move_to(n)
     local base = context()
