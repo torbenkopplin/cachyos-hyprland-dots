@@ -109,9 +109,17 @@ local function monitor_in_direction(dir)
 
     local mons = hl.get_monitors() or {}
 
+    -- width/height are the mode the panel scans out: BEFORE the transform (a
+    -- portrait screen answers 2560x1440 while occupying 1440x2560 -- see
+    -- docs/upstream.md, and tests/lib/probe.sh, which swaps the same way) and
+    -- before the scale. position is in layout coordinates, so convert to those.
+    -- Transforms 1, 3, 5 and 7 are the quarter turns.
     local function centre(m)
         local p = m.position or {}
-        return (p.x or 0) + (m.width or 0) / 2, (p.y or 0) + (m.height or 0) / 2
+        local w, h = m.width or 0, m.height or 0
+        if (m.transform or 0) % 2 == 1 then w, h = h, w end
+        local s = (m.scale and m.scale > 0) and m.scale or 1
+        return (p.x or 0) + w / s / 2, (p.y or 0) + h / s / 2
     end
 
     local hx, hy = centre(here)
