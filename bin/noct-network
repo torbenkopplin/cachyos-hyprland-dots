@@ -55,19 +55,24 @@ list() {
         # (see bin/noct-common.sh). The cached scan list is what the applet in
         # every other desktop shows too; "Rescan" below asks for a fresh one
         # from `exec`, which has no deadline.
-        local ssids signals security seen=""
-        ssids=$(nmcli -g SSID device wifi list --rescan no 2>/dev/null | unescape)
-        signals=$(nmcli -g SIGNAL device wifi list --rescan no 2>/dev/null)
-        security=$(nmcli -g SECURITY device wifi list --rescan no 2>/dev/null | unescape)
-
-        while IFS=$'\x1f' read -r ssid signal sec; do
+        # One call, three fields per line. It used to be three calls pasted
+        # together line by line, which labels one network with another's
+        # signal and security whenever the cached list changes between them --
+        # and spent three nmcli round trips of the two-second budget. -g
+        # escapes a ':' inside a value as '\:'; SIGNAL and SECURITY never hold
+        # one, so splitting from the RIGHT is exact however odd the SSID.
+        local line rest ssid signal sec seen=""
+        while IFS= read -r line; do
+            sec=${line##*:};    rest=${line%:*}
+            signal=${rest##*:}; ssid=${rest%:*}
+            ssid=${ssid//\\:/:}
             [[ -z $ssid ]] && continue                  # hidden network
             grep -qxF "$ssid" <<<"$saved" && continue   # already offered above
             grep -qxF "$ssid" <<<"$seen" && continue    # same AP, several bands
             seen+="$ssid"$'\n'
 
             item "$ssid" "${signal}%${sec:+ · $sec}" "wifi:$ssid"
-        done < <(paste -d$'\x1f' <(echo "$ssids") <(echo "$signals") <(echo "$security"))
+        done < <(nmcli -g SSID,SIGNAL,SECURITY device wifi list --rescan no 2>/dev/null)
 
         item "Rescan"         "look for networks in range again" "rescan:"
         item "Turn Wi-Fi off" "" "radio:off"

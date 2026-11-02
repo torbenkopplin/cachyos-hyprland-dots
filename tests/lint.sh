@@ -71,7 +71,18 @@ shell_files() {
 lua_files()  { git ls-files -z '*.lua' | tr '\0' '\n'; }
 toml_files() { git ls-files -z '*.toml' | tr '\0' '\n'; }
 json_files() { git ls-files -z '*.json' | tr '\0' '\n'; }
-py_files()   { git ls-files -z '*.py'   | tr '\0' '\n'; }
+# *.py, and the extensionless commands in bin/ whose shebang names python --
+# hypr-sleepwatch and hypr-autorotate, which a *.py glob walked past and
+# shell_files rightly does not claim.
+py_files() {
+    git ls-files -z | while IFS= read -r -d '' f; do
+        case $f in
+            *.py) printf '%s\n' "$f" ;;
+            *.*)  ;;
+            *) [[ -f $f ]] && head -c 40 "$f" | grep -qE '^#!.*python' && printf '%s\n' "$f" ;;
+        esac
+    done
+}
 md_files()   { git ls-files -z '*.md'   | tr '\0' '\n'; }
 
 # ---------------------------------------------------------------------------
@@ -198,10 +209,13 @@ check_python_syntax() {
     while IFS= read -r f; do
         [[ -n $f ]] || continue
         n=$((n+1))
-        out=$(python3 -m py_compile "$f" 2>&1) || problems+=("$f: $(printf '%s' "$out" | tail -1)")
+        # compile() rather than py_compile: the same syntax check, but it
+        # writes no __pycache__ -- and one left in bin/ is a tree the installer
+        # would walk.
+        out=$(python3 -I -c 'import sys; compile(open(sys.argv[1], "rb").read(), sys.argv[1], "exec")' "$f" 2>&1) \
+            || problems+=("$f: $(printf '%s' "$out" | tail -1)")
     done < <(py_files)
-    rm -rf "$REPO/config/kitty/__pycache__" 2>/dev/null
-    verdict python-syntax "$n kittens parse" "${problems[@]}"
+    verdict python-syntax "$n Python files parse" "${problems[@]}"
 }
 
 # ---------------------------------------------------------------------------
@@ -288,7 +302,9 @@ manifest_destinations() {
                     [[ $(basename "$rel") == README.md ]] && continue
                     [[ $(basename "$rel") == *.example ]] && continue
                     printf '%s\t%s\n' "$prefix/$rel" "$f"
-                done < <(find "$src" -type f -print0 | sort -z)
+                done < <(git ls-files -z --cached --others --exclude-standard -- "$src" |
+                         while IFS= read -r -d '' f; do [[ -f $f ]] && printf '%s\0' "$f"; done |
+                         sort -z)  # the set install/lib/link.sh tree_files deploys
                 ;;
         esac
     done < <(rows links)

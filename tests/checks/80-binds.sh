@@ -326,3 +326,108 @@ check_nav_axis() {
         info "actually moved, not by comparing a row index against a column length."
     fi
 }
+
+# ---------------------------------------------------------------------------
+# column-stack
+#
+# The bug this exists for (found by reading, 2026-11-02): a column of several
+# windows is carried to another workspace one window at a time, with
+# follow = false, and then put back together with `consume` from its first
+# window -- which assumes the others arrived immediately after it. If the
+# layout puts each arrival beside the target's FOCUSED column instead, the
+# consumes pull in whatever column happens to sit next to the first window, and
+# a stranger's window ends up stacked into yours.
+#
+# column-hop never saw it: it pushes a one-window column, and there is nothing
+# to re-stack. This drives the same move_column() through SUPER+CTRL+J, which
+# goes to the next workspace on the same monitor -- so one monitor is enough.
+# ---------------------------------------------------------------------------
+
+noct_register column-stack live check_column_stack \
+    "SUPER+CTRL+J carries a two-window column to the next workspace still stacked, in order"
+
+stack_x()  { nav_probe_geom "$1" | cut -f1; }
+stack_y()  { nav_probe_geom "$1" | cut -f2; }
+stack_ws() { nav_probe_geom "$1" | cut -f3; }
+
+check_column_stack() {
+    require_cmd column-stack hyprctl kitty jq || return
+    have_eval || { skip column-stack "this Hyprland has no 'hyprctl eval' to drive the bind with"; return; }
+
+    local keep; keep=$(nav_focus_state | cut -f1)
+
+    # Two neighbouring empty workspaces in this monitor's band: n for the
+    # column, n+1 for the target. ws.switch(n) is exactly SUPER+<n>.
+    local n src= dst=
+    for n in 7 6 5; do
+        hyprctl eval "require(\"lib.ws\").switch($((n + 1)))" >/dev/null 2>&1; sleep 0.4
+        [[ $(hyprctl -j activeworkspace | jq -r '.windows') == 0 ]] || continue
+        dst=$(hyprctl -j activeworkspace | jq -r '.id')
+        hyprctl eval "require(\"lib.ws\").switch($n)" >/dev/null 2>&1; sleep 0.4
+        if [[ $(hyprctl -j activeworkspace | jq -r '.windows') == 0 ]]; then
+            src=$(hyprctl -j activeworkspace | jq -r '.id')
+            break
+        fi
+        dst=
+    done
+    if [[ -z $src || -z $dst ]]; then
+        skip column-stack "no two neighbouring empty workspaces in this monitor's band"
+        [[ -n $keep && $keep != none ]] \
+            && hyprctl dispatch "hl.dsp.focus({ window = \"address:$keep\" })" >/dev/null 2>&1
+        return
+    fi
+    info "column on workspace $src, target $dst"
+
+    # The target first: two columns, focus on the LEFT one, so a window that
+    # lands "beside the focused column" lands between them.
+    local x y a b
+    hyprctl eval "require(\"lib.ws\").switch($((n + 1)))" >/dev/null 2>&1; sleep 0.4
+    nav_spawn_probe column-stack-x || { skip column-stack "a target probe never came to rest"; return; }
+    x=$NOCT_PROBE_ADDR
+    nav_spawn_probe column-stack-y || { skip column-stack "a target probe never came to rest"; return; }
+    y=$NOCT_PROBE_ADDR
+    hyprctl dispatch "hl.dsp.focus({ window = \"address:$x\" })" >/dev/null 2>&1; sleep 0.3
+
+    # The column: A and B side by side, then B consumed under A.
+    hyprctl eval "require(\"lib.ws\").switch($n)" >/dev/null 2>&1; sleep 0.4
+    nav_spawn_probe column-stack-a || { skip column-stack "a column probe never came to rest"; return; }
+    a=$NOCT_PROBE_ADDR
+    nav_spawn_probe column-stack-b || { skip column-stack "a column probe never came to rest"; return; }
+    b=$NOCT_PROBE_ADDR
+    hyprctl dispatch "hl.dsp.focus({ window = \"address:$a\" })" >/dev/null 2>&1; sleep 0.3
+    hyprctl dispatch 'hl.dsp.layout("consume")' >/dev/null 2>&1; sleep 0.6
+
+    if [[ $(stack_x "$a") != "$(stack_x "$b")" ]] || (( $(stack_y "$a") >= $(stack_y "$b") )); then
+        skip column-stack "could not build the A-over-B column to move (consume did not stack them)"
+        return
+    fi
+
+    # From the BOTTOM window: from the top one, J swaps within the column
+    # instead of moving it.
+    hyprctl dispatch "hl.dsp.focus({ window = \"address:$b\" })" >/dev/null 2>&1; sleep 0.3
+    hyprctl eval 'require("lib.nav").column_vertical("d")' >/dev/null 2>&1; sleep 1.0
+
+    local -a problems=()
+    [[ $(stack_ws "$a") == "$dst" && $(stack_ws "$b") == "$dst" ]] \
+        || problems+=("the column did not arrive on $dst (A on $(stack_ws "$a"), B on $(stack_ws "$b"))")
+    [[ $(stack_x "$a") == "$(stack_x "$b")" ]] \
+        || problems+=("A and B arrived as two columns, not one")
+    (( $(stack_y "$a") < $(stack_y "$b") )) \
+        || problems+=("A and B arrived stacked in the wrong order")
+    [[ $(stack_x "$x") != "$(stack_x "$a")" && $(stack_x "$y") != "$(stack_x "$a")" ]] \
+        || problems+=("a target window was stacked into the moved column")
+    [[ $(stack_x "$x") != "$(stack_x "$y")" ]] \
+        || problems+=("the target's own two columns were merged")
+
+    [[ -n $keep && $keep != none ]] \
+        && hyprctl dispatch "hl.dsp.focus({ window = \"address:$keep\" })" >/dev/null 2>&1
+
+    if (( ${#problems[@]} == 0 )); then
+        pass column-stack "a two-window column arrives as one column, in order, and nothing else is stacked into it"
+    else
+        fail column-stack "${#problems[@]} finding(s) moving a two-window column"
+        local p; for p in "${problems[@]}"; do info "$p"; done
+        info "lib/nav.lua move_column() re-stacks by consuming from the first window,"
+        info "which assumes the others landed right after it on the target."
+    fi
+}

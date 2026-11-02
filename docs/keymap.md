@@ -17,8 +17,11 @@ dozen you need on the first day -- is in the [README](../README.md#the-keys-that
 | **arrows** | Every directional bind above is on the arrow keys too, same modifiers |
 | `M + Tab` | Window switcher |
 
-`SHIFT` means "bring the window with you" everywhere — with a direction, with a
-number key, with the scratchpad. (It used to be `CTRL` for directions and
+`SHIFT` means "move the window" everywhere — with a direction, with a number
+key, with the scratchpad. On a direction you go with it; on a number key you do
+not: the window is sent and you stay put, so moving something out of the way
+does not cost you your place, and `M + <n>` is how you follow. (It used to be
+`CTRL` for directions and
 `SHIFT` for numbers; the two are swapped now, which is the change to unlearn if
 you have been using this a while.)
 

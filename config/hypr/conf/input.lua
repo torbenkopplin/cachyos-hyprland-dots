@@ -42,7 +42,8 @@ hl.config({
 
     binds = {
         -- Moving a window past the edge of a monitor hands it to the next one.
-        -- conf/binds.lua relies on this for SUPER+CTRL+H/L.
+        -- SUPER+SHIFT+H/L relies on this (nav.move_horizontal). SUPER+CTRL+H/L
+        -- moves a whole column and does its own hand-off, so it does not.
         window_direction_monitor_fallback = true,
 
         workspace_back_and_forth = false,

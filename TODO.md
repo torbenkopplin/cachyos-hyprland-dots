@@ -215,10 +215,15 @@ because the decisions log is the memory.
   a branch switch or a rebase here rewrites the running session's files halfway
   through. `git worktree add ../dots-<topic>` (or `.claude/worktrees/`, which is
   ignored), then `git submodule update --init` in it -- a new worktree has an
-  empty `vendor/noirblaze`, and `tests/lint.sh` fails on it. Land the work here
-  with `git merge --ff-only` only when it is done.
+  empty `vendor/noirblaze`, and `tests/lint.sh` fails on it. Push the branch,
+  merge it through a pull request, and bring this checkout up with
+  `./install.sh --update`, which pulls with Hyprland's autoreload held and
+  reloads once on the finished tree. Never switch, rebase or merge branches
+  *here*: every one of those walks the live config through older states, and
+  the untracked `host.lua` fails to parse against them -- on 2026-11-02 that
+  meant opening the laptop and reloading by hand, twice.
   A change in a worktree is not live, and not what `noct-check` measures, until
-  then.
+  it has come in that way.
 - A fact learned about Hyprland, Noctalia, kitty or a browser goes in
   [docs/upstream.md](docs/upstream.md) with the date, the version and the check
   that holds it. A row with no check is a fact that will rot.

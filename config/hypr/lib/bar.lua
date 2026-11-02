@@ -61,6 +61,13 @@ local HOT_EDGE_KEEP_PX = 48
 
 local HOT_EDGE_POLL_MS = 250
 
+--- The hot-edge poll, held at module level like lib/lid.lua's timers. On 0.57
+--- a discarded handle measurably keeps firing, but on 0.56.2 one was collected
+--- and never fired at all -- docs/upstream.md has both -- and holding it costs
+--- nothing under either.
+---@type userdata|nil
+local edge_timer
+
 function M.setup(noct)
     -- Addresses of the panel surfaces currently open.
     local open   = {}
@@ -125,7 +132,7 @@ function M.setup(noct)
     end
 
     if BAR_HOT_EDGE then
-        hl.timer(edge_poll, { timeout = HOT_EDGE_POLL_MS, type = "repeat" })
+        edge_timer = hl.timer(edge_poll, { timeout = HOT_EDGE_POLL_MS, type = "repeat" })
     end
 
     hl.on("layer.opened", function(layer)
