@@ -1,0 +1,22 @@
+# hypr-autorotate.service -- report which way up the device is.
+#
+# Started by lib/rotate.lua on hyprland.start, not enabled against a target: it
+# is part of that mechanism, and a machine that never calls rotate.setup() has
+# no sensor worth powering. bin/hypr-autorotate has the why.
+
+[Unit]
+Description=Report device orientation to Hyprland
+PartOf=graphical-session.target
+After=graphical-session.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+# Absolute: the user manager's PATH does not include ~/.local/bin.
+ExecStart=%h/.local/bin/hypr-autorotate
+# Where the reading goes. systemd creates it on start and removes it on every
+# stop, a crash included, which is what lets lib/rotate.lua trust any file it
+# finds there.
+RuntimeDirectory=hypr-autorotate
+Restart=always
+RestartSec=1

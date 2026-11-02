@@ -108,6 +108,14 @@ repo	system	power-profiles-daemon
 # that file is in /etc and nothing reads it.
 repo	system	keyd
 
+# Rotation on a convertible. lib/rotate.lua turns the panel as the device
+# turns, and bin/hypr-autorotate is what reads the accelerometer for it -- over
+# D-Bus, from iio-sensor-proxy, which is why it needs the GObject bindings.
+# bin/hypr-sleepwatch is Python on the same bindings. Harmless on a machine with
+# no accelerometer: the proxy only starts where udev finds one.
+repo	system	iio-sensor-proxy
+repo	system	python-gobject
+
 # --- dev -------------------------------------------------------------------
 # Editor, and the tools the neovim config shells out to:
 #   fzf + bat  -> fzf-lua and its previewer

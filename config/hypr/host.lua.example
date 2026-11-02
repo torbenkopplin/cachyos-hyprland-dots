@@ -64,6 +64,26 @@
 -- lid.setup({ output = "eDP-1", mode = "preferred", position = "0x0", scale = "1" })
 
 ------------------------------------------------------------------------------
+-- Rotation, on a convertible
+------------------------------------------------------------------------------
+--
+-- The panel turns as the device turns, once the accelerometer's reading has
+-- held for a second; `MOD + CTRL + R` locks it where it is. Open as a laptop the
+-- panel reads upright, so in practice it only turns once folded.
+--
+-- lib/rotate.lua is the mechanism, and its header says why it is not limited to
+-- tablet mode. It needs iio-sensor-proxy, which the system group of the package
+-- manifest installs.
+--
+-- Hand it the SAME spec as lid.setup(), as one table: with the lid module in use
+-- the rotation goes through it, so its re-applies keep the panel turned.
+--
+-- local rotate = require("lib.rotate")   -- at the top of the file
+-- local PANEL  = { output = "eDP-1", mode = "preferred", position = "0x0", scale = "1" }
+-- lid.setup(PANEL)
+-- rotate.setup(PANEL)
+
+------------------------------------------------------------------------------
 -- Workspace bands
 ------------------------------------------------------------------------------
 --

@@ -223,6 +223,24 @@ function M.panel_on()
     apply(panel)
 end
 
+--- Turn the panel to transform `t` -- lib/rotate.lua's rotation. Kept in the spec
+--- itself, because this module re-applies that spec on every lid change and a
+--- copy without the transform would put the panel upright again. Applied now
+--- only if the panel is lit; otherwise it comes with the panel when it does.
+---
+--- Returns false when `output` is not the panel this module was set up with, so
+--- the caller knows to apply its own rule.
+---@param output string
+---@param t integer
+---@return boolean
+function M.transform(output, t)
+    if not panel or panel.output ~= output then return false end
+
+    panel.transform = t
+    if monitor_enabled(panel.output) then apply(panel) end
+    return true
+end
+
 --- Declare an external monitor, and let sleep park it. Use this instead of
 --- hl.monitor() for every rule that can match an external display -- `desc:`
 --- rules included -- so before_sleep() can disable all of them and

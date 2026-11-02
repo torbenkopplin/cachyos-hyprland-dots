@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+# hypr-autorotate -- report which way up the device is.
+#
+# Claims the accelerometer from iio-sensor-proxy, and once a reading has held
+# for HOLD_MS, writes it to $XDG_RUNTIME_DIR/hypr-autorotate/orientation and asks
+# Hyprland to reconcile. lib/rotate.lua reads the file back and decides what to
+# do with it -- nothing here knows about the lock, the panel or the touch
+# screen. Hyprland's Lua config has no D-Bus of its own, which is the only
+# reason this exists.
+#
+# The hold is what keeps a laptop from turning under you. The device never
+# says whether it is folded (lib/rotate.lua has the measurement), so the sensor
+# is followed always, and a reading that flickers past on the way to somewhere
+# else -- a lid being opened, a laptop being picked up -- never counts.
+#
+# The orientation directory is the unit's RuntimeDirectory, so systemd removes
+# the file whenever this stops -- including when it dies -- and a file that
+# exists is never a stale reading.
+#
+# Run by config/systemd/user/hypr-autorotate.service, which lib/rotate.lua starts.
+
+import os
+import subprocess
+import sys
+
+from gi.repository import Gio, GLib
+
+PROXY = "net.hadess.SensorProxy"
+PROXY_PATH = "/net/hadess/SensorProxy"
+PROPERTIES = "org.freedesktop.DBus.Properties"
+
+# How long to give Hyprland to answer.
+HYPRCTL_TIMEOUT_S = 3
+
+# How long a reading has to stay the same before it is reported, in ms.
+HOLD_MS = 1000
+
+RECONCILE = 'local r = package.loaded["lib.rotate"]; if not r then error("lib.rotate is not loaded") end; r.reconcile()'
+
+RUNTIME = os.path.join(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"), "hypr-autorotate")
+ORIENTATION_FILE = os.path.join(RUNTIME, "orientation")
+
+
+def log(message):
+    print(message, file=sys.stderr, flush=True)
+
+
+def hyprland_env():
+    """The environment for hyprctl, with a live instance signature.
+
+    Looked up per call rather than once: a restarted Hyprland has a new one,
+    and this service can outlive the instance it was started from.
+    """
+    env = dict(os.environ)
+    runtime = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+    hypr = os.path.join(runtime, "hypr")
+
+    current = env.get("HYPRLAND_INSTANCE_SIGNATURE")
+    if current and os.path.exists(os.path.join(hypr, current, ".socket.sock")):
+        return env
+
+    try:
+        live = [d for d in os.listdir(hypr) if os.path.exists(os.path.join(hypr, d, ".socket.sock"))]
+    except FileNotFoundError:
+        live = []
+    if live:
+        env["HYPRLAND_INSTANCE_SIGNATURE"] = max(live, key=lambda d: os.path.getmtime(os.path.join(hypr, d)))
+    return env
+
+
+def reconcile():
+    try:
+        result = subprocess.run(
+            ["hyprctl", "eval", RECONCILE],
+            env=hyprland_env(),
+            capture_output=True,
+            text=True,
+            timeout=HYPRCTL_TIMEOUT_S,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        log(f"reconcile: hyprctl failed: {error}")
+        return
+
+    if result.returncode != 0:
+        log(f"reconcile: hyprctl exited {result.returncode}: {(result.stdout + result.stderr).strip()}")
+
+
+def report(orientation):
+    """Write the reading where lib/rotate.lua looks for it, then ask it to look.
+
+    Written to a temporary name and renamed, so a reconcile can never read half
+    a word.
+    """
+    os.makedirs(RUNTIME, exist_ok=True)
+    partial = ORIENTATION_FILE + ".new"
+    with open(partial, "w") as f:
+        f.write(orientation + "\n")
+    os.replace(partial, ORIENTATION_FILE)
+    log(f"orientation: {orientation}")
+    reconcile()
+
+
+class Reader:
+    def __init__(self):
+        # The reading waiting out HOLD_MS, and the timer it is waiting on.
+        self.pending = None
+        self.hold = None
+        self.bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+        self.bus.signal_subscribe(
+            PROXY, PROPERTIES, "PropertiesChanged", PROXY_PATH, None,
+            Gio.DBusSignalFlags.NONE, self.on_properties_changed,
+        )
+        # Claims again whenever the proxy (re)appears: a claim does not survive
+        # iio-sensor-proxy restarting, and it may not be up yet at all.
+        Gio.bus_watch_name_on_connection(
+            self.bus, PROXY, Gio.BusNameWatcherFlags.AUTO_START,
+            self.on_appeared, self.on_vanished,
+        )
+
+    def call(self, interface, method, args=None, reply=None):
+        return self.bus.call_sync(
+            PROXY, PROXY_PATH, interface, method, args, reply,
+            Gio.DBusCallFlags.NONE, -1, None,
+        )
+
+    def get(self, name):
+        (value,) = self.call(
+            PROPERTIES, "Get", GLib.Variant("(ss)", (PROXY, name)), GLib.VariantType("(v)"),
+        ).unpack()
+        return value
+
+    def on_appeared(self, _bus, _name, _owner):
+        try:
+            if not self.get("HasAccelerometer"):
+                log("iio-sensor-proxy reports no accelerometer")
+                return
+            self.call(PROXY, "ClaimAccelerometer")
+            orientation = self.get("AccelerometerOrientation")
+        except GLib.Error as error:
+            log(f"could not claim the accelerometer: {error.message}")
+            return
+        # Not held: this is the reading the session starts from, not a turn.
+        report(orientation)
+
+    def on_vanished(self, _bus, _name):
+        log("iio-sensor-proxy is not running")
+
+    def on_properties_changed(self, _bus, _sender, _path, _iface, _signal, params):
+        interface, changed, _invalidated = params.unpack()
+        if interface == PROXY and "AccelerometerOrientation" in changed:
+            self.settle(changed["AccelerometerOrientation"])
+
+    def settle(self, orientation):
+        """Report `orientation` once nothing else has arrived for HOLD_MS."""
+        if self.hold is not None:
+            GLib.source_remove(self.hold)
+        self.pending = orientation
+        self.hold = GLib.timeout_add(HOLD_MS, self.on_held)
+
+    def on_held(self):
+        self.hold = None
+        report(self.pending)
+        return GLib.SOURCE_REMOVE
+
+
+def main():
+    Reader()
+    GLib.MainLoop().run()
+
+
+if __name__ == "__main__":
+    main()

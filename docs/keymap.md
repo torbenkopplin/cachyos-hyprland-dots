@@ -141,6 +141,7 @@ is the test that it stays fixed.
 | `M + SHIFT + G` | Cycle frosted glass level |
 | `M + CTRL + Escape` | Lock |
 | `M + CTRL + D` | Force the built-in **d**isplay back on — laptops only, and only if the lid handling ever leaves you with no screen ([023](decisions/023-the-panel-is-never-the-last-output.md)) |
+| `M + CTRL + R` | **R**otation lock — convertibles only. The panel turns with the device; this freezes it where it is ([026](decisions/026-rotation-follows-the-sensor.md)) |
 | `M + Escape` | Session menu |
 
 ## System control — straight into the launcher

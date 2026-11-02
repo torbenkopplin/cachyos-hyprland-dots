@@ -53,6 +53,7 @@ So the **Settled against** sections are the load-bearing half of this directory.
 | 023 | [The built-in panel is never the last output](023-the-panel-is-never-the-last-output.md) | 2026-09-10 |
 | 024 | [The edge is the dispatch that did nothing](024-the-edge-is-the-dispatch-that-did-nothing.md) | 2026-08-19, written down 2026-09-15 |
 | 025 | [Bands are opt-in; by default workspaces belong to no monitor](025-bands-are-opt-in.md) | 2026-09-22 |
+| 026 | [Rotation follows the sensor, because the fold cannot be seen](026-rotation-follows-the-sensor.md) | 2026-10-24 |
 
 ## Settled against, in one place
 
@@ -60,6 +61,7 @@ The dead ends, and where the reasoning is. Read these before rebuilding one.
 
 | Not doing | Because | Where |
 |---|---|---|
+| Rotating only in tablet mode | The HP ENVY x360 never tells the OS it is folded: `SW_TABLET_MODE` is advertised and never set, no device goes away, `/sys/devices/platform/hp-wmi/tablet` stays `0`, and the kernel logs nothing. The firmware cuts the keyboard off below Linux | [026](026-rotation-follows-the-sensor.md) |
 | Frosted glass on every window | The compositor cannot tell a glyph from its background, so the price is a permanent discount on every letter in every app | [010](010-glass-is-the-terminal-only.md) |
 | A `browser` level in `glass.conf`, or generated CSS in a Zen profile | Still settled against. [022](022-zen-gets-a-number-after-all.md) sets one pref the mod publishes; it does not bring back a level or a stylesheet | [013](013-zen-is-translucent-unmatched.md), [022](022-zen-gets-a-number-after-all.md) |
 | Making Zen's translucency match the desktop's | It only showed on pages that paint no background, it needed a silent specificity fight with someone else's extension, and there was no room between the two focus states | [013](013-zen-is-translucent-unmatched.md) |
