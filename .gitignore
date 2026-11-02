@@ -5,6 +5,12 @@
 .luarc-local.json
 *.swp
 
+# Worktrees. Work happens in one rather than on a branch in the main checkout,
+# because the main checkout IS the live config: ~/.config/hypr and the rest are
+# links into it, so switching or rebasing there changes the running session
+# mid-operation. Claude Code puts its worktrees here.
+.claude/worktrees/
+
 # Bytecode from the python-syntax check
 __pycache__/
 

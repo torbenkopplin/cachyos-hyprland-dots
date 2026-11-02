@@ -210,6 +210,15 @@ because the decisions log is the memory.
 
 - Keep committing as work lands, one theme per commit, so the history stays
   readable.
+- **Work in a worktree, not on a branch in this checkout.** This checkout is the
+  live config -- `~/.config/hypr`, `~/.local/bin` and the rest link into it -- so
+  a branch switch or a rebase here rewrites the running session's files halfway
+  through. `git worktree add ../dots-<topic>` (or `.claude/worktrees/`, which is
+  ignored), then `git submodule update --init` in it -- a new worktree has an
+  empty `vendor/noirblaze`, and `tests/lint.sh` fails on it. Land the work here
+  with `git merge --ff-only` only when it is done.
+  A change in a worktree is not live, and not what `noct-check` measures, until
+  then.
 - A fact learned about Hyprland, Noctalia, kitty or a browser goes in
   [docs/upstream.md](docs/upstream.md) with the date, the version and the check
   that holds it. A row with no check is a fact that will rot.
