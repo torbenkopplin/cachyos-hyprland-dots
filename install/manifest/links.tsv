@@ -81,6 +81,15 @@ configs	tree	config/environment.d	config	environment.d
 # `systemctl --user enable` can still drop its own .wants links beside them.
 configs	tree	config/systemd	config	systemd
 
+# Launcher flags for the Chromium family. Each launcher reads its own file
+# straight out of ~/.config -- brave-flags.conf, chromium-flags.conf,
+# signal-desktop-flags.conf -- so these are `file` rows into the root, not a
+# tree. They live beside the rest of each app's config; the policy files next
+# to them go through browsers.tsv instead, because those need root.
+configs	file	browsers/brave/brave-flags.conf	config	brave-flags.conf
+configs	file	browsers/chromium/chromium-flags.conf	config	chromium-flags.conf
+configs	file	config/signal/signal-desktop-flags.conf	config	signal-desktop-flags.conf
+
 # The launcher providers, the glass level, the wallpaper fetcher and the test
 # runner. noct-common.sh is in here too: it is sourced rather than run, but it
 # has to sit beside the scripts that source it.

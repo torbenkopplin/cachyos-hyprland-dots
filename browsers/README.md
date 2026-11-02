@@ -19,9 +19,16 @@ you get that data onto the new machine.
 |---|---|---|
 | `brave/policies.json` | `/etc/brave/policies/managed/` | Brave |
 | `chromium/policies.json` | `/etc/chromium/policies/managed/` | Chromium |
+| `brave/brave-flags.conf` | `~/.config/brave-flags.conf` (link) | Brave |
+| `chromium/chromium-flags.conf` | `~/.config/chromium-flags.conf` (link) | Chromium |
 | `firefox/policies.json` | `/etc/firefox/policies/` | Firefox |
 | `firefox/user.js` | every profile in `~/.mozilla/firefox/` | Firefox |
 | `zen/user.js` | every profile in `~/.config/zen/` (or `~/.zen/`) | Zen |
+
+The flags files are ordinary links from `install/manifest/links.tsv`, so a
+plain `./install.sh` deploys them; no `--browsers`, no sudo. Signal's
+matching file is `config/signal/signal-desktop-flags.conf`, because Signal is
+not a browser but runs the same engine and crashes the same way.
 
 Chromium-family policy files need root and take effect on next launch.
 Firefox-family `user.js` is read at startup and re-applies its values every
@@ -60,6 +67,23 @@ machine is the difference between resuming and rebuilding your context.
 **Chromium.** Deliberately thinner — this is the "check it in a clean engine"
 browser rather than a daily driver, so it gets telemetry off and no first-run
 nagging, and nothing else opinionated.
+
+**Why XWayland.** Brave, Chromium and Signal all run with
+`--ozone-platform=x11`. On native Wayland, Chromium's backend segfaults when
+the output a window is on is removed. Unplugging DP-1 with the lid shut, where
+DP-1 is the only enabled output until `lib/lid.lua` brings the panel back,
+killed all three within the same three seconds, six times between 2026-09-17
+and 2026-09-23 (`coredumpctl list`). Firefox and Zen, which do not share the
+engine, never appeared among those crashes. Under XWayland, the X server
+handles the output going away, and the browser never binds a Wayland output
+that can vanish under it.
+
+The cost is real: at a fractional scale, XWayland windows are rendered at 1x
+and scaled up, so text is softer than native. Delete the flag line (or the
+link) to go back to native Wayland once upstream fixes the crash. To see which
+one is live, `hyprctl clients` reports `xwayland: 1` for an XWayland window.
+This is a policy-free setting on purpose: no managed policy picks the ozone
+platform, and a flags file is one you can edit without root.
 
 **Firefox.** This is the "pure" part of Firefox-pure: Pocket, sponsored
 shortcuts, sponsored stories, snippets, the onboarding tour and the
