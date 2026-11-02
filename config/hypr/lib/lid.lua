@@ -29,6 +29,14 @@ local SETTLE_MS = 500
 -- has to swallow. Decision 023, "Off waits; on never does".
 local OFF_HOLD_MS = 3000
 
+-- After a resume, how long every external connector has to read "connected"
+-- without a break before the externals are enabled again, how often to look,
+-- and when to stop waiting and restore them anyway (an undocked laptop's
+-- connector never comes back, and its rules still have to). All in ms.
+local RESUME_STABLE_MS  = 3000
+local RESUME_POLL_MS    = 250
+local RESUME_GIVE_UP_MS = 20000
+
 -- Which ACPI lid button to read. Only one of these exists on any given machine
 -- (LID0 here), and a machine with none is a machine with no lid.
 local LID_BUTTONS = { "LID0", "LID", "LID1" }
@@ -61,6 +69,47 @@ local off_timer
 --- already armed a no-op, without relying on cancelling it.
 ---@type integer
 local off_generation = 0
+
+--- The external monitors' specs, as handed to M.external(), in the order they
+--- were declared: when two rules match one screen (a connector rule and a
+--- `desc:` rule), the one registered last wins, so after_resume() has to put
+--- them back in that order. Measured 2026-10-26, when a hash walk restored the
+--- ultrawide's "preferred" rule after its "@60" one, the ultrawide came back
+--- at 72 Hz, and the link dropped and retrained in a loop.
+---@type table[]
+local externals = {}
+
+--- Where each output's spec sits in `externals`, so a reload that registers
+--- it again replaces it rather than adding a second one.
+---@type table<string, integer>
+local external_index = {}
+
+--- True between before_sleep() disabling the externals and after_resume()
+--- giving them back. The one thing here that IS remembered: what is being
+--- remembered is a promise to undo, not the state of an output.
+---@type boolean
+local parked = false
+
+--- The post-resume poll, held for the same reason as settle_timer.
+---@type userdata|nil
+local resume_timer
+
+--- Where each workspace on an external lived when it was parked, in the order
+--- to move them back: each monitor's visible workspace last, so it is the one
+--- left showing. Hyprland only returns a workspace to the monitor it was last
+--- on, and parking makes that the panel -- measured 2026-10-06, when the
+--- ultrawide came back to an empty workspace and the windows stayed under the
+--- lid. So the homes are taken down here and put back by hand.
+---@type { id: integer, monitor: string }[]
+local homes = {}
+
+--- The one-shot that puts the workspaces back, held like the others.
+---@type userdata|nil
+local homes_timer
+
+-- How long after the externals are enabled to move their workspaces back, in
+-- ms: long enough for Hyprland to have the monitor set up to receive them.
+local HOMES_DELAY_MS = 500
 
 ---@param path string
 ---@return string|nil
@@ -174,6 +223,128 @@ function M.panel_on()
     apply(panel)
 end
 
+--- Declare an external monitor, and let sleep park it. Use this instead of
+--- hl.monitor() for every rule that can match an external display -- `desc:`
+--- rules included -- so before_sleep() can disable all of them and
+--- after_resume() can put back exactly what was declared.
+---@param spec table
+function M.external(spec)
+    if type(spec) ~= "table" or type(spec.output) ~= "string" then return end
+
+    local copy = {}
+    for k, v in pairs(spec) do copy[k] = v end
+    copy.disabled = false -- present and false; see M.setup()
+
+    local i = external_index[copy.output] or #externals + 1
+    externals[i] = copy
+    external_index[copy.output] = i
+    if not parked then hl.monitor(copy) end
+end
+
+---@param name string a connector name, e.g. "DP-1"
+---@return string|nil "connected", "disconnected", or nil if no such connector
+local function connector_status(name)
+    for card = 0, 3 do
+        local status = slurp("/sys/class/drm/card" .. card .. "-" .. name .. "/status")
+        if status then return status:match("^%s*(.-)%s*$") end
+    end
+
+    return nil
+end
+
+--- Is every external connector there is to read reading "connected"? `desc:`
+--- rules have no connector to read and do not count either way.
+---@return boolean
+local function externals_connected()
+    for _, spec in ipairs(externals) do
+        local status = connector_status(spec.output)
+        if status and status ~= "connected" then return false end
+    end
+
+    return true
+end
+
+--- Write down which workspace lives on which external, visible ones last.
+local function take_homes()
+    homes = {}
+    local visible = {}
+
+    for _, ws in ipairs(hl.get_workspaces()) do
+        local mon = ws.monitor and ws.monitor.name
+        if mon and mon ~= panel.output and not ws.special then
+            local home = { id = ws.id, monitor = mon }
+            if ws.visible then
+                visible[#visible + 1] = home
+            else
+                homes[#homes + 1] = home
+            end
+        end
+    end
+
+    for _, home in ipairs(visible) do homes[#homes + 1] = home end
+end
+
+--- Move every recorded workspace back to its monitor, if that monitor is back.
+local function restore_homes()
+    for _, home in ipairs(homes) do
+        if monitor_enabled(home.monitor) then
+            pcall(hl.dispatch, hl.dsp.workspace.move({ workspace = home.id, monitor = home.monitor }))
+        end
+    end
+    homes = {}
+end
+
+local function stop_resume_timer()
+    if resume_timer then pcall(resume_timer.set_enabled, resume_timer, false) end
+    resume_timer = nil
+end
+
+--- Called by bin/hypr-sleepwatch, through `hyprctl eval`, while logind holds the
+--- suspend for it. Light the panel, then disable every external, so the link
+--- retraining on resume happens to outputs Hyprland has no wl_output for --
+--- nothing for a client to bind, so nothing to race. Decision 023, "Park the
+--- externals across sleep".
+function M.before_sleep()
+    stop_resume_timer()
+    if parked or not panel or next(externals) == nil then return end
+    if not external_enabled() then return end
+
+    take_homes()
+
+    off_generation = off_generation + 1
+    if not monitor_enabled(panel.output) then apply(panel) end
+
+    parked = true
+    for _, spec in ipairs(externals) do
+        apply({ output = spec.output, disabled = true })
+    end
+end
+
+--- The other half: once every external connector has read "connected" for
+--- RESUME_STABLE_MS straight, or RESUME_GIVE_UP_MS has passed, put back the
+--- specs M.external() was given. The panel goes off afterwards the ordinary
+--- way, through reconcile and OFF_HOLD_MS.
+function M.after_resume()
+    stop_resume_timer()
+    if not parked then return end
+
+    local stable, waited = 0, 0
+    resume_timer = hl.timer(function()
+        waited = waited + RESUME_POLL_MS
+        stable = externals_connected() and stable + RESUME_POLL_MS or 0
+        if stable < RESUME_STABLE_MS and waited < RESUME_GIVE_UP_MS then return end
+
+        stop_resume_timer()
+        parked = false
+        for _, spec in ipairs(externals) do apply(spec) end
+
+        homes_timer = hl.timer(restore_homes, { timeout = HOMES_DELAY_MS, type = "oneshot" })
+
+        -- The guard swallowed the monitor events those calls fired.
+        M.reconcile()
+    end, { timeout = RESUME_POLL_MS, type = "repeat" })
+end
+
 --- `spec` is the panel's ordinary monitor spec -- output, mode, position, scale.
 ---
 --- Give it an explicit position rather than "auto": with auto, an output that
@@ -233,7 +404,14 @@ function M.setup(spec)
     -- monitor rules, so an output returning as part of the reload fires
     -- monitor.added with nothing subscribed to hear it. Decision 023, "The
     -- reload is its own hole".
-    hl.on("hyprland.start", function() M.reconcile() end)
+    hl.on("hyprland.start", function()
+        M.reconcile()
+
+        -- What calls before_sleep() and after_resume(). Started here rather
+        -- than enabled against a target because it is part of this mechanism:
+        -- a machine that never calls setup() has nothing for it to do.
+        hl.exec_cmd("systemctl --user start hypr-sleepwatch.service")
+    end)
 
     settle_timer = hl.timer(function() M.reconcile() end,
         { timeout = SETTLE_MS, type = "oneshot" })

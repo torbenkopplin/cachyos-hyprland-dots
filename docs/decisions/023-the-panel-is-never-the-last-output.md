@@ -107,6 +107,8 @@ All 2026-09-10 unless noted, on Hyprland 0.56.2:
 | `hl.monitor()` applies from an **event handler** | armed a handler on `monitor.added`, fired it with `hyprctl output create headless`, and `eDP-1` came back enabled |
 | `hl.monitor()` applies from a **bind callback** | 2026-08-26 |
 | `hl.monitor()` does **not** apply from `hyprctl repl` | the call returns, the output does not change — worth knowing before testing any of this from the repl |
+| `hl.monitor()` **does** apply from `hyprctl eval` | enabled and disabled a `hyprctl output create headless` output both ways, directly, no timer (2026-10-06). `eval` returns `ok` or a non-zero exit with the Lua error; `repl` returns values but does not apply |
+| a disabled output cannot be removed | `hyprctl output remove` answers "Output not found" until it is enabled again (2026-10-06) |
 | `hyprctl keyword monitor` does not work at all here | refused under a Lua config: "keyword can't work with non-legacy parsers" (2026-08-26) |
 | re-applying a spec that omits `disabled` does not clear a disable | the key has to be present and `false` (2026-08-26) |
 | enabling a **disabled** output fires `monitor.added` | so the steady-state triggers cover a re-enable, not just a hotplug (2026-09-11) |
@@ -196,6 +198,57 @@ This removes the panel's share of the churn and the reload's entirely.
 
 Not yet observed across a flapping resume. A clean save-triggered reload was
 seen afterwards (13:03), but its log has no timestamps to prove the reload ran.
+
+## Park the externals across sleep
+
+**2026-10-06**, the same day as the section above, and its other half. Holding
+the panel steady removes the panel's share of the churn on a resume; the
+external's own share is still there, because the link retraining makes Hyprland
+create and destroy DP-1's `wl_output` over and over. The upstream fix for the
+race (compositor withdraws the global, clients ack, then it is destroyed) needs
+Hyprland and every toolkit to adopt it, and as of 0.56.2 Hyprland does not.
+
+What a config can do instead: make sure DP-1 has no `wl_output` while the link
+is unstable. A **disabled** output has none, so:
+
+* **before sleep**, light the panel (the invariant: never zero outputs), then
+  disable every external. Removing an output that has existed for hours races
+  nothing — every client bound it long ago;
+* **after resume**, poll the external connectors in sysfs and enable the
+  externals once every one has read `connected` for 3 s straight, or after 20 s
+  regardless (an undocked laptop's rules still have to come back). The panel
+  then goes off the ordinary way, after `OFF_HOLD_MS`.
+
+Hyprland's Lua config has no sleep event, so the trigger is outside it:
+`bin/hypr-sleepwatch` holds a logind **delay** inhibitor, calls
+`lib.lid.before_sleep()` through `hyprctl eval` on `PrepareForSleep(true)` and
+releases it, and calls `after_resume()` on `PrepareForSleep(false)`. It can
+never be what blocks a suspend: every failure releases the inhibitor, and
+logind gives up on it after `InhibitDelayMaxSec` anyway.
+
+Externals are declared with `lid.external(spec)` rather than `hl.monitor()`, so
+the module holds the exact specs to restore — `desc:` rules included, which is
+why it parks every registered rule rather than whatever `hl.get_monitors()`
+shows. The monitor object cannot rebuild a spec: its `vrr` reads `nil` and its
+refresh rate `59.985`.
+
+**The workspaces have to be carried back by hand.** Hyprland returns a workspace
+to a monitor that comes back only if that monitor is where the workspace *last*
+was, and parking makes that the panel. Measured 2026-10-06 with a dry run
+(`before_sleep()` then `after_resume()` through `hyprctl eval`, no suspend):
+DP-1 came back to a new, empty workspace 2 while workspace 1 and its windows
+stayed on the panel under the shut lid, and opening the lid later sent them
+straight back there. So `before_sleep()` records which workspace was on which
+external, visible ones last, and `after_resume()` moves them back with
+`hl.dsp.workspace.move({ workspace, monitor })` 500 ms after the externals are
+enabled. The same dry run afterwards: workspace 1 back on DP-1, visible, no
+stray workspace, nothing dropped.
+
+`parked` is the one remembered bit in this module, and it is a promise to undo,
+not a record of an output's state. A reload while parked re-runs `host.lua`,
+which declares the externals enabled again, so a lost promise heals itself.
+
+Built and installed 2026-10-06. Not yet observed across a real suspend.
 
 ## The state is read, never remembered
 

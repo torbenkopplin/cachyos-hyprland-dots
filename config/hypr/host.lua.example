@@ -52,7 +52,14 @@
 -- module to put out again, and an output that comes and goes that fast takes
 -- every client down with it -- decision 023, "Off waits; on never does".
 
+-- With the lid module in use, declare the EXTERNAL monitors through it too --
+-- lid.external() in place of hl.monitor() above, same spec, `desc:` rules
+-- included. They are then disabled across sleep and given back once the link
+-- has settled, so a DP link retraining on resume has no wl_output to churn.
+-- bin/hypr-sleepwatch is the trigger, and setup() starts it.
+--
 -- local lid = require("lib.lid")   -- at the top of the file
+-- lid.external({ output = "DP-3", mode = "preferred", position = "1920x0", scale = "1" })
 --
 -- lid.setup({ output = "eDP-1", mode = "preferred", position = "0x0", scale = "1" })
 

@@ -1,0 +1,18 @@
+# hypr-sleepwatch.service -- park the external monitors across sleep.
+#
+# Started by lib/lid.lua on hyprland.start, not enabled against a target: it is
+# part of the lid mechanism, and a machine that never calls lid.setup() has
+# nothing for it to do. bin/hypr-sleepwatch has the why.
+
+[Unit]
+Description=Park external monitors across sleep (Hyprland)
+PartOf=graphical-session.target
+After=graphical-session.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+# Absolute: the user manager's PATH does not include ~/.local/bin.
+ExecStart=%h/.local/bin/hypr-sleepwatch
+Restart=always
+RestartSec=1

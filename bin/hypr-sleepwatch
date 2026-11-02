@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+# hypr-sleepwatch -- park the external monitors across sleep.
+#
+# Holds a logind "delay" inhibitor for sleep. When logind announces a suspend
+# (PrepareForSleep true) it asks Hyprland to light the built-in panel and
+# disable every external, then releases the inhibitor so the suspend goes ahead.
+# On the way back (PrepareForSleep false) it asks Hyprland to give the externals
+# back once their links have settled, and takes the inhibitor again.
+#
+# The work itself is lib/lid.lua's before_sleep() and after_resume(), reached
+# with `hyprctl eval`. This is only the trigger: Hyprland's Lua config has no
+# sleep event of its own.
+#
+# Why at all: a USB-C DP link retraining on resume makes Hyprland create and
+# destroy the external's wl_output many times in a few seconds, and a client
+# binding one that is already gone dies of a protocol error -- all of them
+# together. A disabled output has no wl_output, so there is nothing to race.
+# Decision 023, "Park the externals across sleep".
+#
+# It must never be what stops a suspend. Every failure here is logged and the
+# inhibitor released anyway; logind would also give up on it after
+# InhibitDelayMaxSec (5 s by default).
+#
+# Run by config/systemd/user/hypr-sleepwatch.service, which lib/lid.lua starts.
+
+import os
+import subprocess
+import sys
+
+from gi.repository import Gio, GLib
+
+LOGIND = "org.freedesktop.login1"
+LOGIND_PATH = "/org/freedesktop/login1"
+MANAGER = "org.freedesktop.login1.Manager"
+
+# How long to give Hyprland to answer. Well inside InhibitDelayMaxSec.
+HYPRCTL_TIMEOUT_S = 3
+
+BEFORE_SLEEP = 'local l = package.loaded["lib.lid"]; if not l then error("lib.lid is not loaded") end; l.before_sleep()'
+AFTER_RESUME = 'local l = package.loaded["lib.lid"]; if not l then error("lib.lid is not loaded") end; l.after_resume()'
+
+
+def log(message):
+    print(message, file=sys.stderr, flush=True)
+
+
+def hyprland_env():
+    """The environment for hyprctl, with a live instance signature.
+
+    Looked up per call rather than once: a restarted Hyprland has a new one,
+    and this service can outlive the instance it was started from.
+    """
+    env = dict(os.environ)
+    runtime = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+    hypr = os.path.join(runtime, "hypr")
+
+    current = env.get("HYPRLAND_INSTANCE_SIGNATURE")
+    if current and os.path.exists(os.path.join(hypr, current, ".socket.sock")):
+        return env
+
+    try:
+        live = [d for d in os.listdir(hypr) if os.path.exists(os.path.join(hypr, d, ".socket.sock"))]
+    except FileNotFoundError:
+        live = []
+    if live:
+        env["HYPRLAND_INSTANCE_SIGNATURE"] = max(live, key=lambda d: os.path.getmtime(os.path.join(hypr, d)))
+    return env
+
+
+def hypr_eval(code, what):
+    try:
+        result = subprocess.run(
+            ["hyprctl", "eval", code],
+            env=hyprland_env(),
+            capture_output=True,
+            text=True,
+            timeout=HYPRCTL_TIMEOUT_S,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        log(f"{what}: hyprctl failed: {error}")
+        return
+
+    output = (result.stdout + result.stderr).strip()
+    if result.returncode != 0:
+        log(f"{what}: hyprctl exited {result.returncode}: {output}")
+    else:
+        log(f"{what}: {output}")
+
+
+class Watcher:
+    def __init__(self):
+        self.bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+        self.inhibitor = None
+        self.bus.signal_subscribe(
+            LOGIND, MANAGER, "PrepareForSleep", LOGIND_PATH, None,
+            Gio.DBusSignalFlags.NONE, self.on_prepare_for_sleep,
+        )
+        self.take()
+
+    def take(self):
+        if self.inhibitor is not None:
+            return
+        try:
+            reply, fds = self.bus.call_with_unix_fd_list_sync(
+                LOGIND, LOGIND_PATH, MANAGER, "Inhibit",
+                GLib.Variant("(ssss)", (
+                    "sleep", "hypr-sleepwatch",
+                    "Park the external monitors before sleep", "delay",
+                )),
+                GLib.VariantType("(h)"), Gio.DBusCallFlags.NONE, -1, None, None,
+            )
+        except GLib.Error as error:
+            log(f"could not take the sleep inhibitor: {error.message}")
+            return
+        self.inhibitor = fds.get(reply.unpack()[0])
+
+    def release(self):
+        if self.inhibitor is None:
+            return
+        os.close(self.inhibitor)
+        self.inhibitor = None
+
+    def on_prepare_for_sleep(self, _bus, _sender, _path, _iface, _signal, params):
+        (going_down,) = params.unpack()
+        if going_down:
+            try:
+                hypr_eval(BEFORE_SLEEP, "before sleep")
+            finally:
+                self.release()
+        else:
+            self.take()
+            hypr_eval(AFTER_RESUME, "after resume")
+
+
+def main():
+    Watcher()
+    GLib.MainLoop().run()
+
+
+if __name__ == "__main__":
+    main()
