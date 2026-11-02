@@ -30,7 +30,7 @@
 #                    entire session without anything saying so.
 #   glass-visible    the frosted glass was mathematically present and visually
 #                    absent -- 7 levels of 255.
-#   keyword-inert    `hyprctl keyword` is silently a no-op under the Lua parser,
+#   keyword-inert    `hyprctl keyword` is a no-op under the Lua parser (gone in 0.57),
 #                    so an A/B test written with it measures nothing and reports
 #                    success.
 #   deps-manifest    tree-sitter-cli was never in install.sh, on a machine that

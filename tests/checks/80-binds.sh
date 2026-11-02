@@ -285,14 +285,25 @@ check_nav_axis() {
     fi
 
     # 2. From the far end there is nothing left on the tape, so it must hand off.
-    hyprctl dispatch "hl.dsp.focus({ window = \"address:$last\" })" >/dev/null 2>&1
-    sleep 0.3
-    hyprctl eval "require(\"lib.nav\").$navfn(\"$fwd\")" >/dev/null 2>&1
-    sleep 0.6
-    IFS=$'\t' read -r got_addr got_ws got_mon < <(nav_focus_state)
+    #    A horizontal band hands off to the next monitor, so with one enabled
+    #    monitor (a docked laptop with its lid shut, say) there is nowhere to go
+    #    and "nothing happened" is the right answer -- the same reason
+    #    monitor-hop and column-hop skip. A vertical band hands off to the next
+    #    workspace, which exists on any number of monitors.
+    local enabled handoff_untested=; enabled=$(hyprctl -j monitors 2>/dev/null | jq -r 'length')
+    if [[ $axis == horizontal ]] && (( enabled < 2 )); then
+        info "one enabled monitor: the hand-off at the end of the tape is not testable here"
+        handoff_untested=1
+    else
+        hyprctl dispatch "hl.dsp.focus({ window = \"address:$last\" })" >/dev/null 2>&1
+        sleep 0.3
+        hyprctl eval "require(\"lib.nav\").$navfn(\"$fwd\")" >/dev/null 2>&1
+        sleep 0.6
+        IFS=$'\t' read -r got_addr got_ws got_mon < <(nav_focus_state)
 
-    if [[ $got_ws == "$aws" && $got_addr == "$last" ]]; then
-        problems+=("at the end of the tape nothing happened -- it should hand off to the next $( [[ $axis == vertical ]] && echo workspace || echo monitor )")
+        if [[ $got_ws == "$aws" && $got_addr == "$last" ]]; then
+            problems+=("at the end of the tape nothing happened -- it should hand off to the next $( [[ $axis == vertical ]] && echo workspace || echo monitor )")
+        fi
     fi
 
     # Put the user back where they were before the probes opened.
@@ -300,7 +311,11 @@ check_nav_axis() {
         && hyprctl dispatch "hl.dsp.focus({ window = \"address:$keep\" })" >/dev/null 2>&1
 
     if (( ${#problems[@]} == 0 )); then
-        pass nav-axis "a $axis band walks its tape and only hands off at the end"
+        if [[ -n $handoff_untested ]]; then
+            pass nav-axis "a $axis band walks its tape (the hand-off needs a second monitor)"
+        else
+            pass nav-axis "a $axis band walks its tape and only hands off at the end"
+        fi
     else
         fail nav-axis "${#problems[@]} finding(s) about which axis the keys walk"
         local p; for p in "${problems[@]}"; do info "$p"; done

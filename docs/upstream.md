@@ -16,6 +16,12 @@ provider killed at a deadline with no error shown.
 Versions these were established against: **Hyprland 0.56.2**, **Noctalia
 5.0.0-beta.8**, **kitty 0.42**, **zen-browser-bin 1.21.14b**.
 
+Re-run on **Hyprland 0.57.0** on 2026-11-02 (`noct-check --all`, one monitor
+enabled): the only Hyprland fact that moved is `hyprctl keyword`'s reply, below.
+`hyprctl eval` still prints `ok` or the error and never the value. FP16
+rendering is on by default from 0.57 (`render:use_fp16 = 2`) and measured the
+same glass as `use_fp16 = 0`.
+
 ---
 
 ## Hyprland
@@ -24,7 +30,7 @@ Versions these were established against: **Hyprland 0.56.2**, **Noctalia
 |---|---|---|
 | `m~n` is **not valid syntax**. The dispatcher answers `ok` and no workspace changes — which is why every number key was dead | Disproven 2026-08-18 | [003](decisions/003-workspace-numbers-are-arithmetic.md), `lib/ws.lua` |
 | `m+1` / `m-1` walk only the workspaces that currently *exist* on the monitor — usually one | Disproven 2026-08-18 | [003](decisions/003-workspace-numbers-are-arithmetic.md) |
-| `hyprctl keyword` is a **silent no-op under the Lua parser**: "keyword can't work with non-legacy parsers. Use eval." So an A/B test written with it measures nothing and reports success | Disproven 2026-08-18 | `noct-check keyword-inert` |
+| `hyprctl keyword` is a **silent no-op under the Lua parser**: "keyword can't work with non-legacy parsers. Use eval." So an A/B test written with it measures nothing and reports success. **0.57.0 removed the legacy parser** (#15539) and the request with it: it now answers `unknown request`, still with exit status 0 | Disproven 2026-08-18; reply changed 2026-11-02 on 0.57.0 | `noct-check keyword-inert` |
 | `hyprctl eval` prints `ok` or an error, **never the value you return**. Every `return ...` check was reading its own hope. Assert instead, or write to a file with `io` (the sandbox does provide it) | Disproven 2026-08-18 | TESTING.md diagnostics |
 | A dispatcher's `window` selector does **not** take a bare address. `window = "0x…"` answers "window not found"; the hyprctl form `"address:0x…"` is what matches | Disproven 2026-08-18 | `lib/nav.lua` |
 | `column.index` and `index_in_column` are **0-based**, and `window.layout` is populated for every tiled window on a scrolling workspace | Verified 2026-08-18 | `lib/nav.lua` |

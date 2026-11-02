@@ -62,9 +62,9 @@ at the login screen bypasses the first, which is why there are two. The fix is
 
 ## 0. It loads at all
 
-- [ ] Session starts with no config-error overlay, and `hyprctl configerrors` is
+- [x] Session starts with no config-error overlay, and `hyprctl configerrors` is
       empty.
-- [ ] If the emergency binds (`SUPER+Q`/`R`/`M`) are what you get, a file failed
+- [x] If the emergency binds (`SUPER+Q`/`R`/`M`) are what you get, a file failed
       to parse — the notification says which one.
 
 ## 1. Layout and navigation — `conf/layout.lua`, `lib/nav.lua`
@@ -73,15 +73,15 @@ at the login screen bypasses the first, which is why there are two. The fix is
 band the focused monitor is on. What is left is feel and the cases a probe cannot
 reach.
 
-- [ ] Opening several windows scrolls the tape, and the animation reads as one
+- [x] Opening several windows scrolls the tape, and the animation reads as one
       movement rather than a jump — 100–250ms, no overshoot.
-- [ ] `SUPER + +` / `-` cycles the six width presets, and the one you land on is
+- [x] `SUPER + +` / `-` cycles the six width presets, and the one you land on is
       a width you would actually work at.
-- [ ] With a **floating** window focused, `SUPER+hjkl` behaves sanely rather than
+- [x] With a **floating** window focused, `SUPER+hjkl` behaves sanely rather than
       doing something clever.
-- [ ] Every navigation bind behaves identically on the **arrow keys**. They come
+- [x] Every navigation bind behaves identically on the **arrow keys**. They come
       from the same table, so a difference means a bind went missing.
-- [ ] On the **portrait** band (`direction = "down"`), the tape genuinely scrolls
+- [x] On the **portrait** band (`direction = "down"`), the tape genuinely scrolls
       vertically while the landscape band scrolls right. This is the whole reason
       for the band model over a flat list.
 
@@ -90,10 +90,10 @@ reach.
 The failure mode to watch for is the launcher *also* opening after ordinary
 chords. See [decision 007](docs/decisions/007-tap-super-is-a-release-bind.md).
 
-- [ ] Tapping and releasing `SUPER` alone opens the launcher.
-- [ ] `SUPER+J`, then releasing `SUPER`, does **not**.
-- [ ] `SUPER+T`, then releasing, does **not**.
-- [ ] `SUPER+Space` opens it as well (kept as a fallback).
+- [x] Tapping and releasing `SUPER` alone opens the launcher.
+- [x] `SUPER+J`, then releasing `SUPER`, does **not**.
+- [x] `SUPER+T`, then releasing, does **not**.
+- [x] `SUPER+Space` opens it as well (kept as a fallback).
 
 If it does misfire, set `SUPER_TAP_ENABLED = true` in `conf/options.lua`.
 

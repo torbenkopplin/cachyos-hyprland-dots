@@ -142,8 +142,11 @@ check_keyword_inert() {
     [[ -n $cur ]] || { skip keyword-inert "could not read the current opacity"; return; }
     reply=$(hyprctl keyword decoration:active_opacity "$cur" 2>&1)
 
-    if [[ $reply == *"non-legacy parsers"* ]]; then
-        pass keyword-inert "hyprctl keyword is refused, as expected under the Lua config"
+    # Two shapes of the same refusal: up to 0.56 the request existed and turned
+    # down a Lua config by name; 0.57 removed the legacy parser (hyprwm/Hyprland
+    # #15539) and the request with it, so the socket no longer knows the word.
+    if [[ $reply == *"non-legacy parsers"* || $reply == "unknown request" ]]; then
+        pass keyword-inert "hyprctl keyword is refused ($reply), as expected under the Lua config"
         info "so any A/B test must go through noct-glass, which writes the file and reloads"
     elif [[ $reply == ok ]]; then
         fail keyword-inert "hyprctl keyword now works -- the measurement could use it, and this check is obsolete"

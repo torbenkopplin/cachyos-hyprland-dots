@@ -22,8 +22,8 @@ Every check here exists because something was broken in a way that looked
 fine. The launcher answered "No results found", which is also what a working
 provider with nothing to report looks like. The frosted glass was
 mathematically present and visually absent — seven levels out of 255.
-`hyprctl keyword` is silently a no-op under the Lua parser, so an A/B test
-written with it measures nothing and reports success. `tree-sitter-cli` was
+`hyprctl keyword` was silently a no-op under the Lua parser (and since 0.57 is
+gone), so an A/B test written with it measures nothing and reports success. `tree-sitter-cli` was
 never in `install.sh`, on a machine that already had it.
 
 ## Two rules that shape the whole thing
