@@ -133,6 +133,39 @@ because the decisions log is the memory.
       `hyprctl output create headless` plus a scale is how to settle it without
       owning a HiDPI screen.
 
+- [ ] **What the review of the sleep/rotation work left open** (2026-11-02,
+      after `6dc9e9d` fixed the rest). One possible bug, two clean-ups:
+
+      1. **Noctalia may lock itself out after a logout from a session not
+         started by uwsm.** `noctalia.service` is `Restart=always`,
+         `RestartSec=1`, `StartLimitBurst=5` in 60 s. Under uwsm,
+         `graphical-session.target` stops at logout and `PartOf` takes the shell
+         down with it. Without uwsm, if nothing stops the target, Noctalia exits
+         0 ("Wayland display closed"), is restarted into a dead display five
+         times, and hits the start limit. A login inside that minute then gets
+         "start request repeated too quickly" from autostart, so no bar and no
+         lock screen. **Unconfirmed:** Hyprland 0.57 starts
+         `graphical-session.target` itself (hyprwm/Hyprland#15776), and whether
+         it also stops it on exit is the whole question. To settle it: log in via
+         `hyprland.desktop` rather than the uwsm entry, log out, and
+         `systemctl --user status noctalia graphical-session.target`. If it
+         loops, `ExecStartPre` testing for the Wayland socket or
+         `systemctl --user reset-failed noctalia` before the start in
+         `conf/autostart.lua` would fix it.
+      2. **`hyprland_env()` and `hypr_eval()` are copied** into both
+         `bin/hypr-sleepwatch` and `bin/hypr-autorotate`, and `slurp()` into both
+         `lib/lid.lua` and `lib/rotate.lua`. A shared module beside each pair
+         (`bin/` already has `noct-common.sh` for the shell scripts) keeps one
+         copy, so a fix such as picking the live instance differently lands
+         once.
+      3. **`rotate.setup()` must come after `lid.setup()`.** It reaches into the
+         lid module through `package.loaded["lib.lid"]`, so called first it
+         declares its own panel rule, and the lid module's re-applies then put
+         the panel upright. `host.lua` and `host.lua.example` have the order
+         right and the `setup()` comment says so, but nothing enforces it. One
+         owner of the panel spec, with rotation handing `lid` a field instead of
+         special-casing it, would remove both the order and the special case.
+
 ## Worth exploring
 
 - [ ] **A tracked config for `spotify_player`.** Only the package is automated
