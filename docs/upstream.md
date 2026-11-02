@@ -44,6 +44,7 @@ same glass as `use_fp16 = 0`.
 | `xray` is a **layer** rule, not a window rule. It is accepted as a window rule and ignored | Disproven 2026-08-18 | `noct-check blur-stacks` |
 | With `blur.xray`, each window samples the wallpaper behind **itself**, so two windows at an identical opacity read 4–6 levels apart over different parts of the photo | Measured 2026-08-18 | [011](decisions/011-the-blur-is-small.md) |
 | Hyprland pauses idle notifications for as long as a client holds a Wayland idle inhibitor | Protocol behaviour, assumed | [006](decisions/006-idle-has-one-owner.md) |
+| An `hl.timer()` whose handle nothing holds: on **0.56.2** a one-shot was collected and never fired ([023](decisions/023-the-panel-is-never-the-last-output.md), 2026-09-11). On **0.57.0** the `repeat` timer in `lib/bar.lua`, handle discarded, kept firing through two forced `collectgarbage("collect")` calls inside the compositor — `bar-hot-edge` passed straight after. Whether that is 0.57 (#16528, "centralize lua ref ownership") or repeat-versus-oneshot is not separated. Hold the handle anyway: it costs one line and is right under both readings | Measured 2026-11-02 on 0.57.0 | `noct-check bar-hot-edge` |
 | Gesture action `scroll_move` | Documented, **untested** | `conf/input.lua` |
 | `hyprctl reload` picks up a newly created `generated/colors.lua` | Unconfirmed — Hyprland reloads on config change, but whether it watches `require`d files is not known, hence the explicit reload | `40-templates.toml` |
 
