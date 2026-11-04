@@ -202,7 +202,7 @@ members = ["media"]
 ## thing here that changes; the fixed icons stay anchored to the screen edge.
 [[bar.default.capsule_group]]
 id      = "status"
-members = ["tray", "network", "bluetooth", "volume", "battery", "notifications", "control-center"]
+members = ["tray", "network", "bluetooth", "volume", "brightness", "battery", "notifications", "control-center"]
 
 ## ---------------------------------------------------------------------------
 ## Widgets
@@ -309,6 +309,12 @@ hide_when_no_connected_device = true
 [widget.volume]
 show_label = false
 mute_color = "outline"
+
+## Next to volume because it is the same kind of thing: a level, shown as an
+## icon, with no number on the bar (rule 3). External monitors are reached over
+## DDC/CI, see 15-brightness.toml.
+[widget.brightness]
+show_label = false
 
 ## Kept for the machines that have one: with no battery at all the widget draws
 ## nothing, so it costs this desktop a line of config and no pixels. A glyph

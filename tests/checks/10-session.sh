@@ -26,7 +26,7 @@ check_session_path() {
         pass session-path "$(tilde "$BIN_HOME") is on the shell's PATH"
     else
         fail session-path "$(tilde "$BIN_HOME") is missing from the running shell's PATH"
-        info "every /aout /ain /bt /net /power /theme entry will answer \"No results found\""
+        info "every /aout /ain /bt /net /power /bright /theme entry will answer \"No results found\""
         info "and SUPER+SHIFT+G will do nothing. Fix: ./install.sh, then log out and in."
         info "got: $(tilde "$path")"
     fi

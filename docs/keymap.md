@@ -156,6 +156,7 @@ is the test that it stays fixed.
 | `M + CTRL + B` | `/bt` | Bluetooth — connect, disconnect, scan, radio |
 | `M + CTRL + N` | `/net` | Networks — connect, disconnect, Wi-Fi in range, radio |
 | `M + CTRL + P` | `/power` | Power profile, night light, caffeine |
+| `M + CTRL + S` | `/bright` | **S**creen brightness — presets per screen, or all at once; external monitors over DDC/CI |
 | `M + CTRL + T` | `/theme` | Colour scheme — wallpaper, built-in, or your own |
 
 Inside the launcher, `Ctrl+J` / `Ctrl+K` move the selection (plain `j`/`k` go

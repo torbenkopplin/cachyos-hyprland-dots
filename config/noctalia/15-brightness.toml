@@ -1,0 +1,28 @@
+## Noctalia -- screen brightness.
+##
+## Noctalia owns brightness the way it owns volume: the hardware keys
+## (conf/binds.lua), the bar widget (10-bar.toml), the /bright launcher presets
+## (20-launcher.toml, bin/noct-brightness) and the control centre's monitor tab
+## all go through the same service, so they never disagree and they all show
+## the same OSD.
+##
+## A built-in panel is driven through its sysfs backlight and needs nothing.
+## An external monitor has no backlight device; the only way in is DDC/CI over
+## the I2C bus, which is what ddcutil is for. Off by default upstream, on here,
+## because this setup is used on a laptop that is plugged into monitors.
+##
+## Access to /dev/i2c-* comes from ddcutil's own udev rule
+## (60-ddcutil-i2c.rules, uaccess for the seat's user), so there is no i2c group
+## to join. A monitor with DDC/CI switched off in its own OSD menu cannot be
+## reached at all; `ddcutil detect` is the way to see what the bus answers.
+##
+## Two monitors with identical EDIDs (the same model twice) cannot be told apart
+## over I2C; Noctalia then controls one and logs which bus to pin. Pin it here:
+##
+##   [brightness.monitor.DP-3]
+##   ddc_bus = 5
+##
+## with the bus number from `ddcutil detect --brief`.
+
+[brightness]
+enable_ddcutil = true

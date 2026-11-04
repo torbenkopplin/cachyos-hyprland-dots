@@ -21,7 +21,7 @@
 #                       siblings through `sh -lc`. A login shell does not
 #                       rescue this -- /etc/profile only appends the system
 #                       directories, it does not add ~/.local/bin -- so every
-#                       /aout /ain /bt /net /power /theme entry comes back
+#                       /aout /ain /bt /net /power /bright /theme entry comes back
 #                       "No results found", which is also exactly what a
 #                       provider with nothing to report looks like.
 #

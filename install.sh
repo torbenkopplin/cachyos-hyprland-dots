@@ -179,7 +179,7 @@ if [[ ":$PATH:" != *":$BIN_HOME:"* ]]; then
     say "Put $BIN_HOME on your PATH for this shell -- the noct-* commands are"
     say "there. The Hyprland session gets it from ~/.config/uwsm/env, which"
     say "this script just linked, and which is read at login: until you log in"
-    say "again the launcher's /aout /ain /bt /net /power /theme entries answer"
+    say "again the launcher's /aout /ain /bt /net /power /bright /theme entries answer"
     say "\"No results found\" and SUPER+SHIFT+G does nothing."
 fi
 cat <<'EOF'
