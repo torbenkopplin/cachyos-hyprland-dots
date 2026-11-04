@@ -41,15 +41,6 @@ pkg_group() {
     return 0
 }
 
-# The cursor theme is its own phase because it has a predicate: the AUR variants
-# all ship /usr/share/icons/Bibata-*, and pacman aborts an entire transaction on
-# a file conflict, so asking for one on a machine that already has another would
-# take the rest of the package step down with it.
-cursor_packages() {
-    compgen -G '/usr/share/icons/Bibata-*' >/dev/null 2>&1 && return 0
-    pkg_group cursor
-}
-
 # Names that could not be resolved from the repositories, for the AUR pass.
 UNRESOLVED=()
 
@@ -162,7 +153,7 @@ do_packages() {
     # optimisations, so a repo package is worth preferring wherever one exists.
     local -a pkgs=()
     local p
-    while IFS= read -r p; do pkgs+=("$p"); done < <(pkg_group repo; cursor_packages)
+    while IFS= read -r p; do pkgs+=("$p"); done < <(pkg_group repo)
 
     say "repositories"
     pacman_install "${pkgs[@]}"
@@ -264,7 +255,7 @@ do_check() {
     local -a names=() missing=() unknown=()
     local p
     while IFS= read -r p; do names+=("$p"); done \
-        < <(pkg_group repo; pkg_group cursor; pkg_group login)
+        < <(pkg_group repo; pkg_group login)
 
     say "${#names[@]} names against the repositories"
     local pkg

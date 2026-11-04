@@ -335,7 +335,7 @@ check_manifest_fields() {
 
     while IFS=$'\t' read -r phase group name; do
         [[ -n ${phase:-} ]] || continue
-        case $phase in repo|cursor|npm|claude|login) ;;
+        case $phase in repo|npm|claude|login) ;;
             *) problems+=("packages.tsv: unknown phase '$phase' for $name") ;;
         esac
         [[ -n ${group:-} ]] || problems+=("packages.tsv: no group for $name")

@@ -9,7 +9,7 @@
 -- Cursor. XCURSOR_* is what GTK, Qt and XWayland read; HYPRCURSOR_* is
 -- Hyprland's own vector cursor format, which falls back to the XCursor theme
 -- of the same name when there is no hyprcursor build of it -- which is the
--- case for Bibata, so both names point at the same theme on purpose.
+-- case for Vimix, so both names point at the same theme on purpose.
 --
 -- Environment alone is not enough: Hyprland caches the cursor it started with,
 -- so conf/autostart.lua also issues `hyprctl setcursor` once the session is up.

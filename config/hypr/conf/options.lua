@@ -76,8 +76,9 @@ TOUCHPAD_NATURAL_SCROLL = true
 
 -- Cursor theme. Anything under /usr/share/icons or ~/.icons with a
 -- cursors/ directory works. Set to "" to leave the theme alone and inherit
--- whatever the system default is.
-CURSOR_THEME = "Bibata-Modern-Classic"
+-- whatever the system default is. Vimix-cursors is vimix-cursors in the
+-- repos (Vimix-white-cursors is the light one, same package).
+CURSOR_THEME = "Vimix-cursors"
 CURSOR_SIZE  = 24
 
 ------------------------------------------------------------------------------

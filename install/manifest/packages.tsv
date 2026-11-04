@@ -16,7 +16,6 @@
 # Format: phase <TAB> group <TAB> name
 #
 #   phase   repo    the main pass: pacman, then the AUR for whatever is left
-#           cursor  the same, but only when no Bibata build is already present
 #           npm     installed with npm, prefixed into ~/.local
 #           claude  npm as well, and skipped when `claude` is already on PATH
 #           login   only by ./install.sh --login
@@ -82,6 +81,11 @@ repo	desktop	hyprpolkitagent
 
 # notify-send, which every bin/noct-* script uses to report what it did.
 repo	desktop	libnotify
+
+# The cursor theme named by CURSOR_THEME in conf/options.lua. A repo package on
+# purpose: the Bibata it replaced was AUR-only and needed a phase of its own --
+# see docs/decisions/027.
+repo	desktop	vimix-cursors
 
 # hypridle is deliberately NOT here. Noctalia has its own idle service and this
 # repo configures it (config/noctalia/70-idle.toml); running hypridle as well
@@ -274,23 +278,6 @@ repo	apps	spotify-player
 repo	likely-aur	noctalia
 repo	likely-aur	satty
 repo	likely-aur	claude-code
-
-# --- cursor ----------------------------------------------------------------
-# The cursor theme named by CURSOR_THEME in conf/options.lua, installed only
-# when no Bibata build already provides it.
-#
-# No Bibata package exists in the repos, so this is AUR-only, and the AUR
-# variants (bibata-cursor-theme, -bin, -git, and the illogical-impulse build)
-# all ship /usr/share/icons/Bibata-*. pacman aborts
-# an entire transaction on a file conflict, so asking for one on a machine that
-# already has another would take the rest of the package step down with it --
-# which is why this is its own phase with a predicate rather than a row in
-# `repo`.
-#
-# Nothing breaks if it ends up not installed either: an XCURSOR_THEME that names
-# a missing theme means the pointer stays the compositor default.
-
-cursor	desktop	bibata-cursor-theme-bin
 
 # --- npm -------------------------------------------------------------------
 # Installed with npm rather than pacman, prefixed into ~/.local so they never
