@@ -258,7 +258,7 @@ resolves somewhere before a fresh machine has to find out.
 | ripgrep, fd, fzf, bat | what the neovim config calls out to (fzf-lua and its previewer) |
 | yazi, ffmpeg, 7zip, jq, poppler, imagemagick, chafa | file manager and its preview pipeline |
 | brave-bin, zen-browser-bin, chromium, firefox | browsers |
-| bibata-cursor-theme-bin (AUR) | the cursor named by `CURSOR_THEME` in `conf/options.lua`. The only entry with no repo build; if it fails you keep the default pointer and nothing else changes |
+| vimix-cursors | the cursor named by `CURSOR_THEME` in `conf/options.lua` — [decision 027](decisions/027-the-cursor-comes-from-the-repos.md) |
 | eslint, mermaid-cli (npm, into `~/.local`) | used directly by the neovim config |
 
 **`hypridle` is not installed, on purpose** — see [Idle has exactly one

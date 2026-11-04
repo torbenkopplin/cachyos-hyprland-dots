@@ -42,7 +42,7 @@ So the **Settled against** sections are the load-bearing half of this directory.
 | 012 | [The installer is a manifest plus an engine, and it has a `--root`](012-installer-is-data-plus-an-engine.md) | 2026-08-20 |
 | 013 | [Zen is translucent, and nothing here tries to make it match](013-zen-is-translucent-unmatched.md) | 2026-08-19 |
 | 014 | [Exactly two files may differ per machine](014-two-machine-local-files.md) | 2026-08-19 |
-| 015 | [pacman first, shelly preferred, the AUR as a fallback](015-pacman-first.md) | 2026-08-18 |
+| 015 | [pacman first, shelly preferred, the AUR as a fallback](015-pacman-first.md) — cursor phase retired by [027](027-the-cursor-comes-from-the-repos.md) | 2026-08-18 |
 | 016 | [greetd + noctalia-greeter, and it is opt-in](016-greetd-instead-of-plasmalogin.md) | 2026-08-19 |
 | 017 | [Workspaces stay dynamic](017-workspaces-stay-dynamic.md) | 2026-08-18 |
 | 018 | [A launcher provider gets two seconds, so it may not ask anything slow](018-providers-get-two-seconds.md) | 2026-08-18 |
@@ -54,6 +54,7 @@ So the **Settled against** sections are the load-bearing half of this directory.
 | 024 | [The edge is the dispatch that did nothing](024-the-edge-is-the-dispatch-that-did-nothing.md) | 2026-08-19, written down 2026-09-15 |
 | 025 | [Bands are opt-in; by default workspaces belong to no monitor](025-bands-are-opt-in.md) | 2026-09-22 |
 | 026 | [Rotation follows the sensor, because the fold cannot be seen](026-rotation-follows-the-sensor.md) | 2026-10-24 |
+| 027 | [The cursor comes from the repos: Vimix, not Bibata](027-the-cursor-comes-from-the-repos.md) | 2026-11-04 |
 
 ## Settled against, in one place
 

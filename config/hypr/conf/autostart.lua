@@ -21,7 +21,12 @@ hl.on("hyprland.start", function()
     -- launched with -- which is the display manager's, not this file's. One
     -- setcursor call fixes the pointer you see over the desktop and over any
     -- window that does not draw its own.
+    --
+    -- GTK apps read neither: they take the theme from gsettings, which keeps
+    -- whatever the last desktop set there until something sets it again.
     if CURSOR_THEME ~= "" then
         hl.exec_cmd(("hyprctl setcursor '%s' %d"):format(CURSOR_THEME, CURSOR_SIZE))
+        hl.exec_cmd(("gsettings set org.gnome.desktop.interface cursor-theme '%s'; gsettings set org.gnome.desktop.interface cursor-size %d")
+            :format(CURSOR_THEME, CURSOR_SIZE))
     end
 end)
