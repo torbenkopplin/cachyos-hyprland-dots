@@ -50,14 +50,24 @@ list() {
     need hyprctl || return 0
     need jq      || return 0
 
-    local -a names labels
+    # Initialised, not just declared: under `set -u` the count of a declared
+    # but never-assigned array is an unbound-variable error, and that killed
+    # the whole list whenever hyprctl found no screens.
+    local -a names=() labels=()
     local name label
+
+    # The launcher's own environment carries HYPRLAND_INSTANCE_SIGNATURE;
+    # noct-check's provider-run (env -i) does not, and without it hyprctl
+    # prints an error rather than JSON. -i 0 means "the first instance".
+    local -a hypr=(hyprctl)
+    [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]] || hypr+=(-i 0)
+
     while IFS=$'\t' read -r name label; do
         [[ -z $name ]] && continue
         is_builtin "$name" && label="Built-in screen"
         [[ -z $label ]] && label=$name
         names+=("$name") labels+=("$label")
-    done < <(hyprctl monitors -j 2>/dev/null |
+    done < <("${hypr[@]}" monitors -j 2>/dev/null |
              jq -r '.[] | select(.disabled | not) | [.name, (.model // "")] | @tsv')
 
     if (( ${#names[@]} == 0 )); then
