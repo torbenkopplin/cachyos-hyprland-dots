@@ -13,7 +13,7 @@ A keyboard-first, distraction-free Hyprland setup for CachyOS, based on
 - **One palette, everywhere** — wallpaper-derived, rendered into the terminal,
   GTK, Qt and the window borders, live.
 - **System control from the launcher** — audio devices, Bluetooth, networks,
-  power profiles and colour schemes, all without a mouse.
+  power profiles, screen brightness and colour schemes, all without a mouse.
 
 ```sh
 # fresh machine, one command
@@ -62,7 +62,7 @@ machine:
 moves the whole **column** — reorder it along the tape, and at the end of the
 tape it goes to the next workspace — and, with a letter, opens the launcher
 already filtered to one system-control provider: `O`utput, `I`nput,
-`B`luetooth, `N`etwork, `P`ower, `T`heme.
+`B`luetooth, `N`etwork, `P`ower, `S`creen brightness, `T`heme.
 
 **[→ the full keymap](docs/keymap.md)**
 

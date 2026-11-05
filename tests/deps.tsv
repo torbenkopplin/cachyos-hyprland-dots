@@ -60,6 +60,7 @@ pactl	libpulse	system	core	/aout and /ain
 nmcli	networkmanager	system	core	/net
 bluetoothctl	bluez-utils	system	core	/bt
 powerprofilesctl	power-profiles-daemon	system	core	/power
+ddcutil	ddcutil	system	optional	external monitors' brightness: Noctalia runs it for [brightness] enable_ddcutil, and /bright marks those screens "needs ddcutil" without it. Optional because a laptop on its own panel never calls it
 
 # --- editor ----------------------------------------------------------------
 nvim	neovim	dev	core	conf/env.lua EDITOR, and what aerc composes in

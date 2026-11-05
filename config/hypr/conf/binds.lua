@@ -333,6 +333,9 @@ hl.bind(mod .. " + CTRL + I", provider("/ain"),   { description = "Audio input d
 hl.bind(mod .. " + CTRL + B", provider("/bt"),    { description = "Bluetooth devices" })
 hl.bind(mod .. " + CTRL + N", provider("/net"),   { description = "Networks" })
 hl.bind(mod .. " + CTRL + P", provider("/power"), { description = "Power profile" })
+-- S for screen: D, the obvious letter, is lib/lid.lua's "force the built-in
+-- panel back on".
+hl.bind(mod .. " + CTRL + S", provider("/bright"), { description = "Screen brightness" })
 hl.bind(mod .. " + CTRL + T", provider("/theme"), { description = "Colour scheme" })
 
 ------------------------------------------------------------------------------

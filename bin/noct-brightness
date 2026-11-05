@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+# noct-brightness -- screen brightness presets for the launcher.
+#
+#   noct-brightness list           emit launcher candidates
+#   noct-brightness act "<line>"   apply the chosen level
+#
+# Noctalia does the actual work: `brightness-set <connector> <percent>` drives a
+# laptop panel through sysfs and an external monitor over DDC/CI (ddcutil, see
+# config/noctalia/15-brightness.toml), and shows its own OSD while it does. So
+# this script only has to name the screens and the levels.
+#
+# `list` may not ask Noctalia, or ddcutil, what the brightness is now: the first
+# deadlocks (the shell is blocked waiting for this list) and the second takes
+# seconds per monitor on the I2C bus. See the two-second rule in
+# bin/noct-common.sh. The screens come from hyprctl, which answers at once, and
+# the current level is shown only where it costs nothing to read -- a sysfs
+# backlight. For anything finer than a preset, the last entry opens the control
+# centre's monitor tab, which has a slider per screen.
+
+set -uo pipefail
+
+. "$(dirname "$(readlink -f "$0")")/noct-common.sh"
+
+usage() { echo "usage: $0 list | $0 act <line>" >&2; exit 2; }
+
+LEVELS=(100 75 50 25 10)
+
+# ---------------------------------------------------------------------------
+
+# A built-in panel is driven through its sysfs backlight; anything else is an
+# external monitor and goes over DDC/CI.
+is_builtin() { [[ $1 == eDP-* || $1 == LVDS-* || $1 == DSI-* ]]; }
+
+# backlight_percent -- the built-in panel's level, from sysfs. Only when there
+# is exactly one backlight device: with two (a hybrid-GPU laptop can expose
+# both) there is no cheap way to tell which one is lit, and a wrong number is
+# worse than none.
+backlight_percent() {
+    local devs=(/sys/class/backlight/*)
+    [[ ${#devs[@]} -eq 1 && -r ${devs[0]}/brightness ]] || return 1
+    local cur max
+    cur=$(<"${devs[0]}/brightness") max=$(<"${devs[0]}/max_brightness")
+    (( max > 0 )) || return 1
+    printf '%d' $(( (cur * 100 + max / 2) / max ))
+}
+
+list() {
+    provider brightness
+    begin_list
+    need hyprctl || return 0
+    need jq      || return 0
+
+    local -a names labels
+    local name label
+    while IFS=$'\t' read -r name label; do
+        [[ -z $name ]] && continue
+        is_builtin "$name" && label="Built-in screen"
+        [[ -z $label ]] && label=$name
+        names+=("$name") labels+=("$label")
+    done < <(hyprctl monitors -j 2>/dev/null |
+             jq -r '.[] | select(.disabled | not) | [.name, (.model // "")] | @tsv')
+
+    if (( ${#names[@]} == 0 )); then
+        item "No screens found" "hyprctl reported no active monitors" ""
+        return 0
+    fi
+
+    local have_ddc=1
+    command -v ddcutil >/dev/null 2>&1 || have_ddc=0
+
+    # With more than one screen, the presets for all of them come first: the
+    # usual reason to touch brightness is the room getting darker, and that
+    # applies to every screen at once.
+    local lvl
+    if (( ${#names[@]} > 1 )); then
+        for lvl in "${LEVELS[@]}"; do
+            item "All screens: ${lvl}%" "" "all:$lvl"
+        done
+    fi
+
+    local i now desc
+    for i in "${!names[@]}"; do
+        name=${names[$i]} label=${labels[$i]}
+        now=""
+        if is_builtin "$name"; then
+            now=$(backlight_percent) || now=""
+        fi
+        # The current level goes on the screen's first row only: it is a fact
+        # about the screen, not about each preset.
+        desc=$name
+        if [[ -n $now ]]; then
+            desc="$name · now ${now}%"
+        elif ! is_builtin "$name" && (( ! have_ddc )); then
+            desc="$name · needs ddcutil"
+        fi
+        for lvl in "${LEVELS[@]}"; do
+            item "$label: ${lvl}%" "$desc" "$name:$lvl"
+            [[ -n $now ]] && desc=$name
+        done
+    done
+
+    item "Monitor controls" "a slider per screen, in the control centre" "panel:monitor"
+}
+
+# ---------------------------------------------------------------------------
+
+act() {
+    provider brightness
+
+    local data target value
+    data=$(payload "$1")
+    [[ -z $data ]] && exit 0
+
+    target=${data%%:*}
+    value=${data#*:}
+
+    case "$target" in
+        panel) noctalia msg panel-open control-center "$value" >/dev/null 2>&1 ;;
+        *)
+            # A screen Noctalia cannot drive (an external monitor without
+            # DDC/CI, or one unplugged since the list was made) exits 1 with
+            # "error: ..." on stdout. activation is detached, so say it out loud
+            # rather than doing nothing.
+            local out
+            if ! out=$(noctalia msg brightness-set "$target" "$value" 2>&1); then
+                notify-send -a Brightness "Brightness" "${out#error: }" 2>/dev/null
+            fi
+            ;;
+    esac
+}
+
+# ---------------------------------------------------------------------------
+
+case "${1:-}" in
+    list) list ;;
+    act)  [[ $# -ge 2 ]] || usage; act "$2" ;;
+    *)    usage ;;
+esac

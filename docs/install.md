@@ -249,7 +249,7 @@ resolves somewhere before a fresh machine has to find out.
 | polkit **and** hyprpolkitagent | `polkit` is only the library — the agent is what shows the password prompt |
 | libnotify | `notify-send`, which every `bin/noct-*` script uses to report what it did |
 | noctalia, satty | the shell and its screenshot editor |
-| libpulse, networkmanager, bluez, power-profiles-daemon | the backends `/aout` `/ain` `/bt` `/net` `/power` shell out to — without these those providers just say "not installed" |
+| libpulse, networkmanager, bluez, power-profiles-daemon | the backends `/aout` `/ain` `/bt` `/net` `/power` shell out to (and ddcutil, for `/bright` on an external monitor) — without these those providers just say "not installed" |
 | keyd | reads `/etc/keyd/mx-keys.conf` and turns the MX Keys screenshot chord into a real `Print` key — [decision 020](decisions/020-the-print-key-is-remapped-below-hyprland.md) |
 | neovim, git, base-devel, nodejs, npm | editor, and what mason needs to build its servers |
 | fish, fisher, fastfetch | the login shell and its plugin manager |
@@ -346,7 +346,8 @@ config/hypr/
 config/noctalia/
   00-shell.toml       shell behaviour, launcher, vim keys in shell surfaces
   10-bar.toml         the bar
-  20-launcher.toml    the /aout /ain /bt /net /power providers
+  15-brightness.toml  DDC/CI for external monitors
+  20-launcher.toml    the /aout /ain /bt /net /power /bright /theme providers
   30-theme.toml       palette source (wallpaper-derived by default)
   40-templates.toml   which apps the palette is rendered into
   50-glass.toml       the colors_changed hook that runs noct-glass
@@ -387,6 +388,7 @@ bin/
   noct-bluetooth      bluetoothctl
   noct-network        NetworkManager
   noct-power          power profiles, night light, caffeine
+  noct-brightness     brightness presets per screen
   noct-theme          colour scheme picker
   noct-glass          frosted glass level, per scheme
   noct-wallfetch      fills the wallpaper folders from Wallhaven

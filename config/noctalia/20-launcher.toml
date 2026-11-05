@@ -65,6 +65,16 @@ global  = false
 command = "noct-power list"
 exec    = "noct-power act \"{selection}\""
 
+## Screen brightness presets, per screen and for all of them -- SUPER+CTRL+S
+## The last entry opens the control centre's monitor tab for a slider.
+[shell.launcher.dmenu.entry.bright]
+label   = "Brightness"
+prefix  = "bright"
+glyph   = "brightness-up"
+global  = false
+command = "noct-brightness list"
+exec    = "noct-brightness act \"{selection}\""
+
 ## Colour schemes -- SUPER+CTRL+T
 ##
 ## Switch between the wallpaper-derived palette, any built-in palette
