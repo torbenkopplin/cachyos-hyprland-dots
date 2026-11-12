@@ -192,6 +192,14 @@ repo	yazi	poppler
 repo	yazi	imagemagick
 repo	yazi	chafa
 
+# Markdown, named by config/yazi/yazi.toml. glow renders the preview pane
+# (through the piper plugin in config/yazi/package.toml) and is the Enter
+# opener. mdcat is the second opener, for a document's images, which glow cannot
+# draw. mdcat is AUR-only, built from github.com/BIRSAx2/mdcat: the original
+# swsnr/mdcat is archived and its README names that fork as the maintained one.
+repo	yazi	glow
+repo	yazi	mdcat
+
 # --- browsers --------------------------------------------------------------
 repo	browsers	chromium
 repo	browsers	firefox

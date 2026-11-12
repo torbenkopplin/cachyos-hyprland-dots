@@ -7,6 +7,12 @@
 # you press Enter on a file. `$EDITOR` is set to nvim in
 # config/hypr/conf/env.lua, so the fallback never applies in a Hyprland
 # session. See TESTING.md for the check.
+#
+# CHANGED (addition): Markdown renders with glow, in the preview pane through
+# the piper plugin (pinned in package.toml, deployed by `ya pkg install`) and
+# full-screen in glow's pager on Enter; `O` adds mdcat, for inline images.
+# Everything below is additive: rules are only prepended, so every other file
+# type still falls through to the defaults.
 
 [mgr]
 ratio        = [1, 2, 3]
@@ -16,4 +22,32 @@ show_symlink = true
 [opener]
 edit = [
 	{ run = '${EDITOR:-vi} %s', desc = "$EDITOR", for = "unix", block = true },
+]
+# CHANGED (addition): glow's pager is $PAGER, or `less -r` when that is unset.
+# block = true hands it this terminal and brings yazi back when it quits.
+markdown = [
+	{ run = 'glow -p %s1', desc = "glow", for = "unix", block = true },
+]
+# CHANGED (addition): mdcat draws a document's images inline through kitty's
+# graphics protocol, which glow cannot. Not through a pager: a pager drops the
+# images. So it prints straight to the terminal (scroll back with kitty's
+# scrollback) and waits for Enter, the way yazi's own mediainfo opener does.
+markdown-images = [
+	{ run = "clear; mdcat %s1; echo 'Press enter to exit'; read _", desc = "mdcat (images)", for = "unix", block = true },
+]
+
+# CHANGED (addition): prepended, so it wins over the default `text/*` rule that
+# a .md file would otherwise hit. That rule offers edit and reveal; both are
+# kept after glow and mdcat. Enter and `o` both run the first one, glow; `O`
+# (open --interactive, also Shift+Enter) lists all four, $EDITOR among them.
+[open]
+prepend_rules = [
+	{ url = "*.md", use = [ "markdown", "markdown-images", "edit", "reveal" ] },
+]
+
+# CHANGED (addition): piper runs the command and shows its output. $w is the
+# pane's width; CLICOLOR_FORCE=1 because glow is writing to a pipe, not a tty.
+[plugin]
+prepend_previewers = [
+	{ url = "*.md", run = 'piper -- CLICOLOR_FORCE=1 glow -w=$w -s=dark "$1"' },
 ]

@@ -98,12 +98,13 @@ same glass as `use_fp16 = 0`.
 
 | Fact | Established | Held by |
 |---|---|---|
-| Every package name in the manifest resolves on CachyOS, and the AUR fallback was never reached | Verified 2026-08-18 | `./install.sh --check` |
+| Every package name in the manifest resolves on CachyOS, and the AUR fallback was never reached | Verified 2026-08-18. No longer true from 2026-11-12: `mdcat` is AUR-only | `./install.sh --check` |
 | `shelly install standard/aur --no-confirm` authenticates through **polkit**, so it needs an agent: in a bare TTY it fails and the pacman path takes over | 2026-08-18 | [015](decisions/015-pacman-first.md) |
 | `noctalia-greeter-session` is the greetd entry point | From upstream's README; the path is resolved with `command -v` rather than hardcoded | [016](decisions/016-greetd-instead-of-plasmalogin.md) |
 | `fisher` exists as a package | If not, the installer warns rather than failing; install it by its documented one-liner and rerun | `install/manifest/packages.tsv` |
 | `uwsm start -S -F hyprland.desktop` is the right invocation | Adapted from `start-hyprland`; the original is kept as a fallback in the same file | `config/fish/auto-Hypr.fish` |
-| yazi's `%s` opener placeholder is still current | Carried over verbatim from a working config rather than modernised | `config/yazi/yazi.toml` |
+| yazi's `%s` opener placeholder is still current | Carried over verbatim from a working config rather than modernised. Still the documented form in 26.9.1, with `%s1` for the first file, and rules match on `url =` | `config/yazi/yazi.toml` |
+| `ya pkg add` and `ya pkg upgrade` write `package.toml` through a symlink and leave the link in place; `ya pkg install` deploys the pinned revisions without rewriting it, and is safe to rerun | Measured 2026-11-12, yazi 26.9.1 | `config/yazi/package.toml`, `do_yazi_plugins` |
 | Wallhaven result counts hold over time | Measured 2026-08-15; the 21:9 Dragon Ball supply was 4 and can only grow | `wallpapers.conf` |
 
 ## Measurement itself
