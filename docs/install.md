@@ -257,6 +257,7 @@ resolves somewhere before a fresh machine has to find out.
 | claude-code | tried as a package, npm as fallback |
 | ripgrep, fd, fzf, bat | what the neovim config calls out to (fzf-lua and its previewer) |
 | yazi, ffmpeg, 7zip, jq, poppler, imagemagick, chafa | file manager and its preview pipeline |
+| glow, mdcat | Markdown in yazi: glow for the preview pane and Enter, mdcat for inline images under `O` |
 | brave-bin, zen-browser-bin, chromium, firefox | browsers |
 | vimix-cursors | the cursor named by `CURSOR_THEME` in `conf/options.lua` — [decision 027](decisions/027-the-cursor-comes-from-the-repos.md) |
 | eslint, mermaid-cli (npm, into `~/.local`) | used directly by the neovim config |
@@ -302,7 +303,8 @@ launcher, where nothing has sourced a version manager.
 
 Every name above was checked against the enabled CachyOS repos on 2026-08-18 and
 all of them resolve there — including `brave-bin`, `zen-browser-bin`, `noctalia`,
-`satty` and `claude-code`, so the AUR pass is currently never reached. The
+`satty` and `claude-code`, so the AUR pass was never reached. `mdcat`, added
+2026-11-12, is the first name that only the AUR has. The
 installer still cannot verify names at runtime, so a failed batch retries
 package-by-package and anything unresolved is listed in a warning summary at the
 end. **Read that summary** rather than assuming a clean run.
@@ -374,7 +376,8 @@ config/fish/
 config/starship/
   starship.toml       carried over
 config/yazi/
-  yazi.toml           carried over from the Ubuntu setup
+  yazi.toml           carried over from the Ubuntu setup, plus Markdown (glow, mdcat)
+  package.toml        plugin pins; `ya pkg install` restores the plugins from this
 browsers/
   README.md           what is versioned here, and what deliberately is not
   brave|chromium|firefox/policies.json

@@ -12,7 +12,9 @@
 #                         GUI changes to ~/.local/state/noctalia/settings.toml,
 #                         a different tree -- so the app can never clobber a
 #                         tracked file or replace a link.
-#   ~/.config/yazi/*      read-only as far as yazi is concerned.
+#   ~/.config/yazi/*      yazi only reads its config. `ya pkg add/upgrade`
+#                         rewrite package.toml through the link, on purpose:
+#                         the new pin lands in the repo. plugins/ is ya's own.
 #   ~/.local/bin/noct-*   plain scripts.
 #
 # Format: section <TAB> kind <TAB> source <TAB> root <TAB> destination

@@ -16,7 +16,7 @@ because none of these programs write to the paths they read:
 |---|---|
 | `~/.config/hypr/*` | Hyprland only ever reads its config |
 | `~/.config/noctalia/*` | Noctalia saves GUI changes to `~/.local/state/noctalia/settings.toml`, a different tree — so the app cannot clobber a tracked file or replace a link |
-| `~/.config/yazi/*` | read-only as far as yazi is concerned |
+| `~/.config/yazi/*` | yazi only reads its config. `ya pkg add` and `ya pkg upgrade` rewrite `package.toml` through the link, which is the point: the new pin lands in the repo as a diff. The plugins themselves go to `plugins/`, which is not tracked |
 | `~/.local/bin/noct-*` | plain scripts |
 
 The one exception found the hard way is Noctalia's **built-in kitty template**,

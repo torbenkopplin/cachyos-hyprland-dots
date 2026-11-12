@@ -1,5 +1,5 @@
 # session.sh -- the parts of the setup that are neither a file nor a package:
-# the login shell, the units, and the neovim config.
+# the login shell, the units, the neovim config, and yazi's plugins.
 
 # ---------------------------------------------------------------------------
 # Fish
@@ -67,6 +67,41 @@ do_fish() {
         say "fisher: installed plugins from fish_plugins"
     else
         warn "fisher update failed -- check 'fisher list' in a fish shell"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Yazi plugins
+#
+# The same shape as fish's: config/yazi/package.toml is the source of truth and
+# `ya pkg install` deploys the revisions it pins into ~/.config/yazi/plugins/,
+# which is yazi's own directory and not tracked. It runs after linking, because
+# ya reads package.toml from ~/.config/yazi and the link has to be there first.
+#
+# Without it the config still loads, and the Markdown preview pane shows an
+# error where the rendered file should be.
+#
+# `ya pkg add` and `ya pkg upgrade` rewrite package.toml through the link (yazi
+# 26.9.1, measured 2026-11-12), so a new or upgraded plugin shows up here as a
+# diff to commit. `ya pkg install` only reads it.
+# ---------------------------------------------------------------------------
+
+do_yazi_plugins() {
+    command -v ya >/dev/null 2>&1 || { note "ya not installed, skipping yazi plugins"; return 0; }
+
+    heading "Yazi plugins"
+
+    needs_machine "yazi plugins" || return 0
+
+    if (( DRY_RUN )); then
+        say "would: ya pkg install  (installs everything in package.toml)"
+        return 0
+    fi
+
+    if ya pkg install >/dev/null 2>&1; then
+        say "ya: installed plugins from package.toml"
+    else
+        warn "ya pkg install failed -- run it to see why; the .md preview needs piper"
     fi
 }
 

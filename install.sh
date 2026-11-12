@@ -150,6 +150,9 @@ fi
 
 (( DO_NVIM ))     && do_nvim
 (( DO_LINK ))     && do_link
+# After linking: ya reads package.toml from ~/.config/yazi, so the link has to
+# exist first. Not under --status or --unlink, which also set DO_LINK.
+(( DO_LINK && ! STATUS && ! UNLINK )) && do_yazi_plugins
 (( DO_BROWSERS ))   && do_browsers
 (( DO_INPUT ))      && do_input
 (( DO_WALLPAPERS )) && do_wallpapers

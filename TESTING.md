@@ -226,6 +226,11 @@ are the ones nothing declares:
 - [ ] `ctrl+f` opens the search kitten.
 - [ ] `y` opens yazi and leaves the shell in the directory you quit from; Enter on
       a text file opens it in neovim.
+- [ ] Hovering a `.md` file in yazi shows it rendered (headings, a boxed table,
+      `•` bullets), not raw Markdown. An error in the pane instead means piper
+      is missing: run `ya pkg install`. Enter opens it in glow's pager and `q`
+      comes back to yazi; `O` (Shift+o) offers glow, mdcat (images inline),
+      `$EDITOR` and reveal.
 - [ ] `nvm --version` works **in fish** (this is nvm.fish, not the bash one), and
       `node --version` works with no nvm version selected.
 - [ ] `cargo --version` and `claude --version` work; `~/.cargo/bin` is on `PATH`.

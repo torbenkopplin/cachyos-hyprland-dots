@@ -77,6 +77,8 @@ yazi	yazi	yazi	optional	the file manager bind
 ffmpeg	ffmpeg	yazi	optional	yazi's video previews
 7z	7zip	yazi	optional	yazi's archive previews
 chafa	chafa	yazi	optional	yazi's image previews in a terminal
+glow	glow	yazi	optional	yazi's Markdown preview (through the piper plugin) and its Enter opener for .md
+mdcat	mdcat	yazi	optional	yazi's second .md opener, the one that shows a document's images inline in kitty
 jq	jq	yazi	core	every check that reads hyprctl -j, and noct-wallfetch
 magick	imagemagick	yazi	core	yazi's previews, and every measurement this suite takes off the screen
 
