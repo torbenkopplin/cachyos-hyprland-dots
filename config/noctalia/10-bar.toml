@@ -236,7 +236,7 @@ inactive_pill_size        = 1.0
 pill_scale                = 0.9
 focused_color             = "primary"
 occupied_color            = "on_surface_variant"
-empty_color               = "outline"
+empty_color               = "outline_variant"
 
 [widget.gap]
 type   = "spacer"
@@ -308,7 +308,7 @@ hide_when_no_connected_device = true
 
 [widget.volume]
 show_label = false
-mute_color = "outline"
+mute_color = "outline_variant"
 
 ## Next to volume because it is the same kind of thing: a level, shown as an
 ## icon, with no number on the bar (rule 3). External monitors are reached over
