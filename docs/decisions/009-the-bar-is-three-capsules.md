@@ -1,7 +1,11 @@
 # 009 — The bar is three centred capsules of Noctalia's own card material
 
 **Settled 2026-08-20**, after building and looking at every alternative.
-Status: in force.
+Status: **the styling rules are in force, the form is not.** On 2026-11-15
+[028](028-the-bar-is-one-pill.md) replaced the capsules with one glass pill,
+because Noctalia 5.5 honours a capsule's fill and opacity — the fact the
+"Settled against" section below rests on held for 5.0.0-beta.8 and no longer
+does.
 
 The bar surface itself is invisible — no fill, no border, no slab welded to the
 screen edge. What you see are capsules in the **centre** of the screen:

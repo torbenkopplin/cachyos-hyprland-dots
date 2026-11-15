@@ -31,47 +31,32 @@
 ## Because it is summoned rather than lived with, it is worth putting real
 ## information on it -- this is a HUD, not decoration.
 ##
-## Form: three separate capsules, pushed apart
-## -------------------------------------------
-## Navigation at the start, the clock in the centre, status at the end, each in
-## its own capsule with nothing drawn between them. The bar surface itself is
-## invisible -- `background_opacity = 0.0` -- so what you see is three islands
-## over the wallpaper, not a strip with content on it.
+## Form: one glass pill that is exactly as wide as what is in it
+## --------------------------------------------------------------
+## Decision 028. The bar SURFACE spans the monitor and draws nothing at all; the
+## one thing you see is a single capsule group in the centre lane, made of the
+## same glass as the panels it opens. A capsule sizes itself to its content, so
+## the pill grows when a workspace opens and shrinks when it closes, on every
+## monitor, at every scale -- there is no width anywhere in this file.
 ##
-## This is the third form in a day and the reasoning is worth keeping, because
-## every alternative is ruled out by something measured rather than by taste.
+## That is the whole trick, and it took Noctalia 5.5 to make it possible: on
+## 5.0.0-beta.8 a group capsule drew opaque `surface_variant` whatever fill or
+## opacity it was given (decision 009). On 5.5 both are honoured -- measured
+## 2026-11-15 with a red fill: (255,0,0) at 1.0, (183,4,8) at 0.7.
 ##
-##   Three opaque capsules, adjacent, centred. The original. Read as one clump
-##   with seams, and the media capsule restated the window title verbatim.
+## Two other ways of getting a pill were built and are NOT how this works:
 ##
-##   One full-width glass shape. Tried, and it is the only way to get the panels'
-##   material: `[shell.panel] transparency_mode = "glass"` made the panels
-##   translucent, and the bar surface is the only thing here that takes an
-##   opacity. It looked right and it is not what was wanted -- a continuous strip
-##   spanning 3440px, with the content either huddled in the middle or stretched
-##   to the corners.
+##   `margin_ends` as a percentage. Works on 5.5 (per end: "40%" is a 384px
+##   bar on a 1920px screen), but a percentage follows the SCREEN, not the
+##   content -- 688px of mostly empty glass on a 3440 ultrawide, 216px that
+##   cannot hold the widgets on a 1080 portrait panel.
 ##
-##   One glass shape, but SMALLER. This is the one that cannot be built. There is
-##   no width key on a bar; `margin_ends` is the only lever, it is absolute pixels,
-##   and it is shared by every monitor. At 1200 the 3440px bar becomes a pleasant
-##   1064px island and the 1080px portrait bar collapses to w = 0. "25%" is not a
-##   percentage -- it rendered as a flat 88px on both. `monitor = "DP-3"` passes
-##   validation and is then ignored: the bar drew on both screens anyway. A second
-##   `[bar.<name>]` block DOES work and can carry its own margin_ends, but it
-##   inherits nothing -- around twenty styling keys and the whole lane list would
-##   have to be duplicated and kept in sync -- and it would hard-code a pixel width
-##   to one particular screen, which is exactly the trap `WSBANDS` already is for a
-##   machine that gets plugged into unfamiliar monitors.
-##
-## So: separate shapes, which means capsules, which means opaque. A capsule cannot
-## be glass (see below), and that is the price. What it buys is a form with no
-## resolution baked into it at all -- capsules size to their content and the lanes
-## place them by proportion, so this looks the same on an ultrawide, on the
-## portrait panel, and on a laptop that has never been seen before.
-##
-## The blur comes from the layer rule in conf/hypr/conf/rules.lua, whose
-## ignore_alpha = 0.5 is what keeps the *transparent* part of the bar from being
-## blurred along with the capsules.
+##   `margin_ends` in pixels, worked out per monitor by the compositor and
+##   written to a generated file. It does follow any monitor, but it is a fixed
+##   box, and the workspace row is dynamic (decision 017): too many workspaces
+##   overflow it, too few leave glass at both ends. Recomputing it on every
+##   change is not an option either -- every config reload tears the bar down
+##   and builds it again (Noctalia's log: "creating #0 ... on eDP-1").
 
 [bar.default]
 position = "top"
@@ -82,127 +67,91 @@ show_on_workspace_switch = false   # workspace changes must not flash the bar
 reserve_space            = false   # no exclusive zone: full-height windows
 layer                    = "overlay"  # visible even over a fullscreen window
 
-## 30 rather than 34: the bar is summoned, not lived with, so it should read
-## as an overlay rather than as a piece of furniture. At this height the clock
-## and the widget glyphs are still full size -- the padding around them is what
-## went.
-thickness          = 30
-
-## Inset like a window, on all three sides. margin_ends is the distance from the
-## left and right screen edges, margin_edge the distance from the top one.
-margin_edge  = 10
-margin_ends  = 10
-
-## The bar surface IS the shape, as of 2026-08-19, and it is the same material as
-## the panels this shell opens -- which is the whole point of the change.
+## The surface: full width, and invisible. margin_ends = 0 is deliberate -- the
+## surface is the box the pill is centred in and is clipped to, so a narrower
+## surface would just be a second place to run out of room.
 ##
-## 0.76 is measured, not chosen. With `[shell.panel] transparency_mode = "glass"`
-## the launcher's body rendered at grey 41 over a backdrop measuring 115, and the
-## palette's `surface` is #121212 = 18, so
-##
-##   alpha = (41 - 115) / (18 - 115) = 0.76
-##
-## Re-measure it if you change transparency_mode: open the launcher, sample its
-## body and the same patch with it closed, and solve that again.
+## Nothing outside the pill is drawn, blurred or darkened: with the pill shown,
+## the strip either side of it was pixel-identical to the screen with the bar
+## hidden (2026-11-15). The blur is the layer rule in conf/rules.lua, and its
+## ignore_alpha = 0.5 is what confines it to the pill -- see the opacity below.
 background_opacity   = 0.0
-border_width         = 0
+border_width         = 0          # it would outline the invisible surface: a full-width line
+margin_ends          = 0
 concave_edge_corners = false
-radius_top_left      = 12
-radius_top_right     = 12
-radius_bottom_left   = 12
-radius_bottom_right  = 12
 
-## Capsules are the visible surfaces, and they are opaque whether you like it or
-## not. A GROUP capsule is drawn as `surface_variant` no matter what is asked for:
-## `capsule_fill` and `capsule_opacity` are read, reported by
-## `config export merged`, and then ignored -- set to #ff0000 at 0.30, reloaded,
-## and the capsule came out pixel-identical at 53,53,55. `shadow` and
-## `contact_shadow` go the same way.
-##
-## That is the whole reason this bar does not match the panels' glass. It is not an
-## oversight and it is not tuneable from here; it would need Noctalia to honour the
-## keys it already accepts, or a theme-level surface alpha.
-##
-## That is not a compromise, as it happens. #323232 opaque is exactly what a
-## Noctalia popup's cards are made of -- sampled off the running control centre,
-## whose body is #101010 with #323232 cards at a corner radius of 12 -- so the
-## bar's capsules and the panels it opens are the same material by construction.
-## A popup reads solid rather than glassy: the frosted glass belongs to the
-## windows behind, not to the shell's own furniture.
-##
-## What does apply to a group capsule is the geometry: radius, padding, and
-## thickness as a fraction of the bar's own height, so the capsule sits inside it
-## with air around rather than filling it edge to edge.
-## `shadow` and `contact_shadow` join capsule_fill on the list of keys that are
-## read and then ignored for a group capsule: set true, reloaded, and the capsules
-## came out pixel-identical over a dark window. Left false rather than left in
-## looking like they do something.
-capsule              = true
-capsule_padding      = 10
-capsule_radius       = 12
-capsule_thickness    = 0.8
+## 6px off the top edge, so the pill floats rather than hangs. lib/bar.lua's
+## HOT_EDGE_KEEP_PX has to clear margin_edge + thickness (40) -- raise it if
+## either of these grows.
+margin_edge = 6
 
-## padding is the bar's inner inset and, with no capsules, the only thing keeping
-## the widgets off the glass edge. Set to the corner radius on purpose: at 12 the
-## end-most icon clears the corner's arc, at 8 it grazes it, at 0 it touches. It
-## insets horizontally without shrinking the glyphs -- checked at 8 and 14.
-padding        = 0
-widget_spacing = 10
+## The pill IS the bar's height: capsule_thickness 1.0 on a 34px bar. Taller than
+## the 24px capsules the three-capsule bar had, because a lone pill needs some
+## glass above and below its content to read as an object rather than as a
+## highlight behind a row of text. The glyphs are the same size as before.
+thickness         = 34
+capsule_thickness = 1.0
 
+capsule         = true
+capsule_padding = 10
+capsule_radius  = 12    # the workspace pills inside take this; fully round at their size
+padding         = 0
+widget_spacing  = 10
+
+## `shadow` draws nothing for this bar: set true, the strip outside the pill came
+## out pixel-identical. Left false rather than left looking like it does something.
 shadow          = false
 hover_highlight = true
 font_weight     = 500
 
-## Lanes hold "group:<id>", and a group is a CONTAINER -- that is what draws each
-## capsule. Lanes also accept bare widget ids, and that is worth knowing because it
-## is the difference between the two forms: with groups the bar reads 49-60 grey
-## where they are and the backdrop in between (three shapes), with bare widget ids
-## it draws no containers at all (one shape, or none). Groups here, deliberately.
-##
-## A "group:<id>" naming no capsule_group below is dropped with a warning at load.
-## An unreferenced capsule_group is fine and validate passes -- which is why
-## `media` can keep its group without appearing anywhere.
-##
-## `media` is deliberately in no lane, and that is rule 3 below applied to the bar
-## itself -- nothing may state what something else already states. A browser tab is
-## both the focused window and the media source, so the media widget spent its
-## width restating `active_window` verbatim: measured on the portrait bar, "Reddit
-## - The heart of the internet" appeared twice, filling most of 1060px to say one
-## thing.
-##
-## There is no way to configure that away. `max_length` will not go below 40
-## (validate: "below minimum 40"), so it cannot be shortened to a stub, and the
-## widget has no art-only mode -- at 0 it renders the album art plus a literal
-## ellipsis. So it comes out of the lanes instead. Now-playing lives in the control
-## centre, SUPER+A; add "media" to a lane to bring it back.
-##
-## Widget ids are arbitrary -- `type` is what names the widget -- which is how
-## `date` below can be a second clock. Upstream's own type spelling is
-## inconsistent on purpose: most are snake_case, "control-center" is not.
-start  = ["group:navigation"]
-center = ["group:time"]
-end    = ["group:status"]
+start  = []
+center = ["group:pill"]
+end    = []
 
-## Where you are, and what you are looking at -- in that order of importance,
-## which the colours below reinforce.
-[[bar.default.capsule_group]]
-id      = "navigation"
-members = ["workspaces", "gap", "active_window"]
+## The rest of the surface is not a dead strip across the top of every window.
+## Measured: it renders nothing; this makes it take nothing either, so a click
+## beside the pill reaches the tab bar or title underneath.
+[bar.default.dead_zone]
+click_through = true
 
-## Time, then date at half the emphasis.
+## Where you are, what time it is, and the state of the machine, in that order.
+## The `gap` spacers do the separating; dividers were tried (a `text` widget
+## holding a dot) and only added width -- the sections already look different.
+##
+## The material is the panels' material, by measurement rather than by eye: with
+## `[shell.panel] transparency_mode = "glass"` the launcher's body rendered at
+## grey 41 over a backdrop measuring 115, and the palette's `surface` is
+## #121212 = 18, so
+##
+##   alpha = (41 - 115) / (18 - 115) = 0.76
+##
+## Re-measure it if you change transparency_mode: open the launcher, sample its
+## body and the same patch with it closed, and solve that again. Keep it above
+## conf/rules.lua's ignore_alpha (0.5) -- below that Hyprland stops blurring the
+## pill and it turns into tinted clear glass. `noct-check bar-pill-config` holds
+## that line, and `noct-check bar-pill` measures the blur on screen.
+##
+## The hairline border is what keeps a dark pill visible over a dark wallpaper;
+## without it the shape all but disappears and only the glyphs are left. It is
+## the same outline the control centre draws around itself, so the pill and the
+## panel that opens under it read as one family.
+##
+## radius = 17 is half the height: a true pill, not a rounded rectangle.
+##
+## `media` and `active_window` are in no lane. Media restated the window title
+## verbatim; the window title would make the pill change width on every focus
+## change. Add either to `members` to bring it back.
 [[bar.default.capsule_group]]
-id      = "time"
-members = ["clock", "date"]
-
-[[bar.default.capsule_group]]
-id      = "media"
-members = ["media"]
-
-## System state and the one button. The tray leads because its width is the only
-## thing here that changes; the fixed icons stay anchored to the screen edge.
-[[bar.default.capsule_group]]
-id      = "status"
-members = ["tray", "network", "bluetooth", "volume", "brightness", "battery", "notifications", "control-center"]
+id           = "pill"
+members      = ["workspaces", "gap", "clock", "date", "gap",
+                "tray", "network", "bluetooth", "volume", "brightness",
+                "battery", "notifications", "control-center"]
+fill         = "surface"
+opacity      = 0.76
+radius       = 17
+padding      = 14
+border       = "outline_variant"
+border_width = 1
 
 ## ---------------------------------------------------------------------------
 ## Widgets
@@ -215,11 +164,15 @@ members = ["tray", "network", "bluetooth", "volume", "brightness", "battery", "n
 ##      category has no way left to say "here".
 ##   2. Two text levels. `on_surface` for what you read (the clock, the
 ##      workspace you are on), `on_surface_variant` for what you glance at (the
-##      window title, the date, the track). Weight follows: 600 for the clock,
-##      the bar default of 500 for everything else.
+##      date, the status icons). Weight follows: 600 for the clock, the bar
+##      default of 500 for everything else.
 ##   3. Nothing states in words what its icon already says. The network widget
 ##      was printing `enp4s0` and the battery a percentage for a mouse; both are
 ##      icons now, with the detail in the tooltip and the panel behind them.
+##
+## The status icons are quieted one widget at a time, not with the group's
+## `foreground` key: that overrides every member's own colour, and took the
+## accent off the control-centre button with it.
 ## ---------------------------------------------------------------------------
 
 ## Numbers rather than dots: the bar is summoned rather than watched, so when it
@@ -238,29 +191,17 @@ focused_color             = "primary"
 occupied_color            = "on_surface_variant"
 empty_color               = "outline_variant"
 
+## The space between sections of the pill.
 [widget.gap]
 type   = "spacer"
-length = 12
+length = 16
 
-## The bar is hidden while you work, so when it does appear the window title is
-## useful context rather than permanent noise -- give it room, but keep it a
-## shade quieter than the workspace it belongs to.
-## text_only, not icon_and_text: the widget draws a window glyph before the title
-## either way -- that one is not optional -- so asking for the app icon as well
-## gets you two icons for one window. The title is the context; the glyph in front
-## of it is enough of a marker.
-## min_length = max_length is what keeps the cluster still. Centred content grows
-## in both directions, so a variable-width title would slide the clock and the
-## status icons sideways every time you changed window. A fixed box does not.
+## Not in the pill (see the capsule group). If it goes back in, give it a fixed
+## box -- min_length = max_length -- or the pill changes width with every window
+## you focus and the clock slides with it.
 [widget.active_window]
 display      = "text_only"
-## The capsule hugs the title now. This used to be min_length = max_length = 260,
-## a fixed box so a centred cluster would not slide sideways as you changed
-## windows -- but the capsules sit in start/centre/end lanes since 2026-08-20, so
-## the clock and the status icons are anchored and cannot move. All that grows is
-## this capsule's right edge, which is where a title belongs anyway. max_length
-## still truncates so one long title cannot push into the clock.
-min_length   = 0
+min_length   = 260
 max_length   = 260
 title_scroll = "on_hover"
 color        = "on_surface_variant"
@@ -272,16 +213,15 @@ format      = "{:%H:%M}"
 font_weight = 600
 color       = "on_surface"
 
-## A second clock, as the date: same capsule, half the emphasis. A date is
-## something you check, not something you read.
+## A second clock, as the date: half the emphasis. A date is something you
+## check, not something you read.
 [widget.date]
 type        = "clock"
 format      = "{:%a %d %b}"
 font_weight = 400
 color       = "on_surface_variant"
 
-## Title only, capped. The artist doubles the width for something the sound has
-## already told you.
+## Not in the pill (see the capsule group). Title only, capped.
 [widget.media]
 hide_when_no_media = true
 hide_artist        = true
@@ -299,15 +239,18 @@ match_adjacent_spacing = true
 ## address and the speed are all in the panel this opens.
 [widget.network]
 show_label = false
+color      = "on_surface_variant"
 
 ## Hidden when nothing is connected, rather than a permanently dead glyph.
 ## SUPER+CTRL+B reaches the devices either way.
 [widget.bluetooth]
 show_label                    = false
 hide_when_no_connected_device = true
+color                         = "on_surface_variant"
 
 [widget.volume]
 show_label = false
+color      = "on_surface_variant"
 mute_color = "outline_variant"
 
 ## Next to volume because it is the same kind of thing: a level, shown as an
@@ -315,9 +258,10 @@ mute_color = "outline_variant"
 ## DDC/CI, see 15-brightness.toml.
 [widget.brightness]
 show_label = false
+color      = "on_surface_variant"
 
 ## Kept for the machines that have one: with no battery at all the widget draws
-## nothing, so it costs this desktop a line of config and no pixels. A glyph
+## nothing, so it costs a desktop a line of config and no pixels. A glyph
 ## rather than a percentage, and `error` for the warning -- the one other colour
 ## allowed here, because a flat battery is a state you need told rather than a
 ## category being decorated.
@@ -325,11 +269,14 @@ show_label = false
 display_mode  = "glyph"
 show_label    = false
 label_content = "percent"
+color         = "on_surface_variant"
 warning_color = "error"
 
-## Silent unless there is something to say.
+## Silent unless there is something to say. The unread dot is its own state
+## colour; the bell itself is quiet like the rest.
 [widget.notifications]
 hide_when_no_unread = true
+color               = "on_surface_variant"
 
 ## The one button, and the only other thing allowed to use the accent.
 [widget.control-center]

@@ -32,7 +32,7 @@
 -- conf/options.lua is rid of it.
 --
 -- docs/decisions/008-the-bar-is-event-driven.md is the decision;
--- 009 is what the bar is made of.
+-- 028 is what the bar is made of.
 
 local M = {}
 
@@ -54,8 +54,8 @@ local HOT_EDGE_REVEAL_PX = 6
 
 -- ...and how far the pointer may then travel before it counts as leaving. This
 -- has to clear the bar itself or the bar would retract as you reached for it:
--- 10-bar.toml puts it at `margin_edge` 10 with `thickness` 30, so it occupies
--- 10..40 below the monitor's top edge, and this is that plus slack. Raise it if
+-- 10-bar.toml puts it at `margin_edge` 6 with `thickness` 34, so it occupies
+-- 6..40 below the monitor's top edge, and this is that plus slack. Raise it if
 -- either of those numbers grows.
 local HOT_EDGE_KEEP_PX = 48
 

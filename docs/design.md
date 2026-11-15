@@ -60,40 +60,47 @@ Notifications and OSDs are deliberately excluded — a notification must not dra
 the bar on screen with it.
 
 It is also made of the same material as the panels it opens. The bar surface
-itself is invisible — no fill, no border, no slab welded to the screen edge — and
-what you see are four **capsules** in the *centre* of the screen: navigation,
-time, media, status. A summoned HUD should be one thing you look at, not three
-things in the far corners of an ultrawide.
+spans the monitor and draws nothing — no fill, no border, no slab welded to the
+screen edge — and what you see is one **pill** in the centre: the workspaces,
+the clock and date, and the status icons, in a single capsule group. A summoned
+HUD should be one thing you look at, not three things in the far corners of an
+ultrawide.
 
-Those capsules are Noctalia's own card material, and not by coincidence: sampled
-off the running control centre, a popup is `#101010` with `#323232` cards at a
-corner radius of 12, and a group capsule is drawn as opaque `surface_variant`
-(`#323232`) at whatever radius you ask for. So matching the shell meant setting
-one number — the radius — and deleting two that turned out to do nothing.
+A capsule sizes itself to its content, so the pill grows when a workspace opens
+and shrinks when one closes, on any monitor and at any scale — there is no
+width anywhere in the config. That is what makes it work on a laptop that
+meets monitors it has never seen
+([decision 028](decisions/028-the-bar-is-one-pill.md)). Two ways of sizing the
+bar itself were built and dropped: `margin_ends` as a percentage follows the
+screen rather than the content, and a width computed per monitor is a fixed box
+around a dynamic workspace row.
 
-The window title is given a **fixed** width. Centred content grows in both
-directions, so a variable-width title would slide the clock and the status icons
-sideways every time you changed window.
+The pill is the panels' glass, by measurement: `surface` at 0.76, solved from
+the launcher's body over a known backdrop, with the hairline `outline_variant`
+border the control centre draws round itself. The border is what keeps a dark
+pill visible over a dark wallpaper.
 
-Inside them the styling is three rules, and they are what separate a bar that
+Inside it the styling is three rules, and they are what separate a bar that
 was *designed* from a bar that merely *works*:
 
 1. **One accent.** `primary` marks the workspace you are on and the button that
    opens the control centre. Nothing else. A bar that colours every widget by
    category has spent the only signal it had for "here".
 2. **Two text levels.** `on_surface` at weight 600 for the clock — the one thing
-   you look at deliberately — and `on_surface_variant` at 400–500 for the date,
-   the window title and the track, which you only glance at.
+   you look at deliberately — and `on_surface_variant` for the date and the
+   status icons, which you only glance at.
 3. **No word that an icon already says.** The network widget was printing
    `enp4s0`, the battery a percentage; both are icons now, with the detail in the
    panel behind them. Notifications appear only when something is unread.
 
-Media has a capsule of its own because its width follows the track title, and in
-a shared capsule that shuffled the whole status row sideways every few minutes.
+The window title and the media track are left out of the pill: either would
+change its width every time the window or the track did.
 
-The blur behind them is the layer rule in `conf/rules.lua`, and
-`ignore_alpha = 0.5` is what keeps the transparent part of the bar from being
-blurred along with the capsules.
+The blur behind it is the layer rule in `conf/rules.lua`. Its `ignore_alpha =
+0.5` is what keeps the invisible rest of the bar from being blurred along with
+the pill — and it is a hard cut-off, so the pill's opacity has to stay above it.
+At 0.40 the windows behind showed through sharp. `noct-check bar-pill-config`
+holds that line in the config, and `noct-check bar-pill` measures it on screen.
 
 ### Why the blur is small
 
