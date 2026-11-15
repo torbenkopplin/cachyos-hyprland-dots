@@ -36,7 +36,7 @@ So the **Settled against** sections are the load-bearing half of this directory.
 | 006 | [Idle has exactly one owner](006-idle-has-one-owner.md) | 2026-08-18 |
 | 007 | [Tapping SUPER is a release bind, with a fallback kept in the drawer](007-tap-super-is-a-release-bind.md) | 2026-08-15 |
 | 008 | [The bar is event-driven, reconciled, and answers the pointer](008-the-bar-is-event-driven.md) | 2026-08-18 |
-| 009 | [The bar is three centred capsules of Noctalia's own card material](009-the-bar-is-three-capsules.md) | 2026-08-20 |
+| 009 | [The bar is three centred capsules of Noctalia's own card material](009-the-bar-is-three-capsules.md) — form superseded by [028](028-the-bar-is-one-pill.md), styling rules in force | 2026-08-20 |
 | 010 | [Frosted glass is the terminal and nothing else](010-glass-is-the-terminal-only.md) | 2026-08-19 |
 | 011 | [The blur is small, so the wallpaper stays visible through a terminal](011-the-blur-is-small.md) | 2026-08-19 |
 | 012 | [The installer is a manifest plus an engine, and it has a `--root`](012-installer-is-data-plus-an-engine.md) | 2026-08-20 |
@@ -55,6 +55,7 @@ So the **Settled against** sections are the load-bearing half of this directory.
 | 025 | [Bands are opt-in; by default workspaces belong to no monitor](025-bands-are-opt-in.md) | 2026-09-22 |
 | 026 | [Rotation follows the sensor, because the fold cannot be seen](026-rotation-follows-the-sensor.md) | 2026-10-24 |
 | 027 | [The cursor comes from the repos: Vimix, not Bibata](027-the-cursor-comes-from-the-repos.md) | 2026-11-04 |
+| 028 | [The bar is one glass pill, and it is as wide as its content](028-the-bar-is-one-pill.md) | 2026-11-15 |
 
 ## Settled against, in one place
 
@@ -67,7 +68,9 @@ The dead ends, and where the reasoning is. Read these before rebuilding one.
 | A `browser` level in `glass.conf`, or generated CSS in a Zen profile | Still settled against. [022](022-zen-gets-a-number-after-all.md) sets one pref the mod publishes; it does not bring back a level or a stylesheet | [013](013-zen-is-translucent-unmatched.md), [022](022-zen-gets-a-number-after-all.md) |
 | Making Zen's translucency match the desktop's | It only showed on pages that paint no background, it needed a silent specificity fight with someone else's extension, and there was no room between the two focus states | [013](013-zen-is-translucent-unmatched.md) |
 | A browser-parity gate in the suite | A deliberately translucent Zen *is* a spread, so the gate could only fire on the intended state. Retired, not exempted — and not kept as a metric either, because a baseline tolerance is the same gate under another name | [013](013-zen-is-translucent-unmatched.md) |
-| A small glass island instead of a bar | A capsule draws opaque whatever you ask; the only surface that takes an opacity spans the monitor; the only width lever is absolute pixels and shared between screens | [009](009-the-bar-is-three-capsules.md) |
+| ~~A small glass island instead of a bar~~ — built after all | Settled against on 5.0.0-beta.8, where a capsule drew opaque whatever you asked. Noctalia 5.5 honours a capsule's fill and opacity, and the island is now the bar | [009](009-the-bar-is-three-capsules.md), [028](028-the-bar-is-one-pill.md) |
+| Sizing the bar with `margin_ends` as a percentage | It follows the screen, not the content: the setting that fits a 1920 laptop is 688px of mostly empty glass on a 3440 ultrawide and too narrow for the widgets on a 1080 portrait panel | [028](028-the-bar-is-one-pill.md) |
+| A pill width computed per monitor and written to a generated file | It follows any monitor, but it is a fixed box and the workspace row is dynamic — and recomputing on change means a config reload, which rebuilds the bar each time | [028](028-the-bar-is-one-pill.md) |
 | A large blur, for one uniform shade | It averages the wallpaper away: measured a lift of 3 levels of 255, i.e. nothing on screen saying the glass was on | [011](011-the-blur-is-small.md) |
 | A Hyprland bind on the MX Keys screenshot chord | A bind cannot subtract the modifiers, so the key never becomes a Print key — and one press of it fired `SUPER+SHIFT+S` *and* `SUPER+S`, so the scratchpad answers underneath whatever the chord is pointed at | [020](020-the-print-key-is-remapped-below-hyprland.md) |
 | Moving the scratchpad off `S` to free the chord | The `S` / `SHIFT+S` pair is the toggle-and-send shape the rest of the keymap is built from | [020](020-the-print-key-is-remapped-below-hyprland.md) |

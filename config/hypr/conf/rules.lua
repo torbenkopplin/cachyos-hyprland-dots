@@ -192,6 +192,13 @@ hl.window_rule({
 -- Blur its surfaces, and disable Hyprland's own layer animations for them so
 -- they don't fight Noctalia's slide animation -- which matters here because
 -- the bar is animated in and out constantly by lib/bar.lua.
+--
+-- ignore_alpha is what makes the bar a pill rather than a frosted strip: the
+-- bar's surface spans the monitor at alpha 0, and only the pill drawn on it is
+-- opaque enough to be blurred. It is a hard cut-off, not a fade -- a pill at
+-- 0.40 under this 0.5 let the windows behind through sharp (2026-11-15) -- so
+-- the pill's opacity in 10-bar.toml has to stay above it. noct-check
+-- bar-pill-config reads both numbers.
 ------------------------------------------------------------------------------
 
 hl.layer_rule({

@@ -107,11 +107,27 @@ because the decisions log is the memory.
       `rm` fails with "No such file or directory", which reads exactly like
       "there was nothing to remove". Done on both profiles on this machine.
 
-- [ ] **Say which of these three numbers to move, if any.** `ROUNDING = 2`
-      (`conf/options.lua`), `capsule_radius = 12` (`10-bar.toml`), and
-      `blur_brightness = 1.00` (`glass.conf`). The last is the dial between "one
-      uniform shade" and "you can see the wallpaper's shape through a window" —
-      [decision 011](docs/decisions/011-the-blur-is-small.md).
+- [ ] **Say which of these two numbers to move, if any.** `ROUNDING = 2`
+      (`conf/options.lua`) and `blur_brightness = 1.00` (`glass.conf`). The
+      second is the dial between "one uniform shade" and "you can see the
+      wallpaper's shape through a window" —
+      [decision 011](docs/decisions/011-the-blur-is-small.md). The bar's radius
+      is no longer one of them: the pill is fully round by construction
+      ([decision 028](docs/decisions/028-the-bar-is-one-pill.md)).
+
+- [ ] **After this bar change comes in with `--update`, clear the Settings UI's
+      copy of the bar**, on any machine where its bar page was used. It saves
+      to `~/.local/state/noctalia/settings.toml`, and that file wins over
+      `10-bar.toml`: until its `[bar.default]` table and the
+      `[[bar.default.capsule_group]]` tables under it are deleted, you keep
+      seeing the old experiment, not the pill. Close the Settings window first.
+      `noct-check bar-pill-config` says when it is clean.
+
+- [ ] **Run `noct-check bar-pill` docked**, on the 4K and on the 5K ultrawide.
+      It has only been measured on the laptop panel at scale 1. It converts by
+      the ratio of the capture's width to the bar layer's, which is right
+      whether `grim -g` writes layout or panel pixels on a scaled output — the
+      open question under **Bugs** — but that has not been seen on one.
 
 ## Bugs
 
@@ -195,12 +211,6 @@ because the decisions log is the memory.
       will drift from it silently.
 
 ## Waiting on upstream
-
-- [ ] **If the bar capsules should ever be glass**, the only routes left are
-      Noctalia honouring `capsule_opacity` (it accepts and ignores it today) or a
-      theme-level surface alpha. Worth a look when Noctalia moves past
-      5.0.0-beta.8 —
-      [decision 009](docs/decisions/009-the-bar-is-three-capsules.md).
 
 - [ ] **Nothing verifies the greeter's appearance sync from a script.** It is a
       GUI action in beta.8; `noctalia msg greeter-sync` does not exist. Worth
