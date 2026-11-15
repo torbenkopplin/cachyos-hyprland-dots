@@ -124,7 +124,10 @@ decision 020, and `sudo keyd monitor -t` is the measurement that would close it.
 
 ## 3. The bar — `lib/bar.lua` + `10-bar.toml`
 
-`noct-check bar-hot-edge` measures the pointer reveal and the stuck case.
+`noct-check bar-hot-edge` measures the pointer reveal and the stuck case;
+`noct-check bar-pill` measures the pill — centred, narrower than the screen,
+translucent and blurred — and `bar-pill-config` that nothing in the Settings UI
+is overriding it.
 
 - [ ] No bar at login, and windows use the **full** screen height — no reserved
       gap at the top.
@@ -135,10 +138,15 @@ decision 020, and `sudo keyd monitor -t` is the measurement that would close it.
 - [ ] `SUPER+B` pins it; again releases it. Both presses force, so this doubles as
       a resync — if the bar is ever stuck, two presses end it.
 - [ ] It renders **above** a fullscreen window.
-- [ ] It reads as **one thing you look at**, centred, rather than three things in
-      the far corners. One accent, two text levels, and no widget stating in words
-      what its icon already says. See
-      [decision 009](docs/decisions/009-the-bar-is-three-capsules.md).
+- [ ] It reads as **one thing you look at**: a single glass pill, centred, the
+      same material as the control centre that opens under it. One accent, two
+      text levels, and no widget stating in words what its icon already says. See
+      [decision 028](docs/decisions/028-the-bar-is-one-pill.md).
+- [ ] Open and close a workspace with the bar pinned: the pill **grows and
+      shrinks** with it, on the laptop panel and on an external monitor.
+- [ ] With the bar up, click a window's tab bar or title **beside** the pill. The
+      click lands on the window — the invisible rest of the bar lets it through
+      (`dead_zone.click_through`). Not measured by the suite.
 
 ## 4. Workspaces — `conf/workspaces.lua` + `host.lua`
 
