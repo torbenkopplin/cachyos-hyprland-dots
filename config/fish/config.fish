@@ -81,8 +81,9 @@ if status is-interactive # Commands to run in interactive sessions can go here
   # CHANGED: batcat -> bat. Debian renames the binary because of a clash with
   # its own `bat` package; Arch has no such clash and ships it as `bat`.
   alias cat='bat --paging=never --theme="base16"'
-  alias ls='eza -al --color=always --group-directories-first --icons' # preferred listing
-  alias lt='eza -T --color=always --group-directories-first --icons' # tree listing
+  # --icons takes an optional value; without `=auto` eza swallows the path after it.
+  alias ls='eza -al --color=always --group-directories-first --icons=auto' # preferred listing
+  alias lt='eza -T --color=always --group-directories-first --icons=auto' # tree listing
 
   alias pl='git pull'
   alias pls='git pull --autostash' # stash, pull, re-apply -- and only if there was something to stash
