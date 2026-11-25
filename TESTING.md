@@ -239,7 +239,7 @@ See [decision 029](docs/decisions/029-designs-bundle-shape-and-material.md).
 - [ ] Under Flat, `/theme` → toggle dark/light: both read well, and the shape
       stays square.
 - [ ] **Back to Glass:** noirblaze, gradient border, round glass pill, frosted
-      terminal, Adwaita Sans in the shell — the look before any design was picked.
+      terminal, Adwaita Sans in the shell and GTK apps, JetBrains Mono in kitty.
 - [ ] `noct-check bar-pill-config` passes under both.
 - [ ] The pick survives a restart of Noctalia and of Hyprland.
 

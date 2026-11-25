@@ -8,3 +8,11 @@
 label       = "Glass"
 description = "frosted terminal, glass pill, gradient border"
 palette     = "custom noirblaze"
+
+# One set of fonts everywhere: 00-shell.toml's and kitty.conf's, carried on to
+# GTK and Qt, so switching back from another design is not a mixture.
+[fonts]
+ui            = "Adwaita Sans"
+mono          = "JetBrainsMono Nerd Font"
+size          = 11
+terminal_size = 12
