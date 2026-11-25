@@ -516,71 +516,8 @@ check_no_secrets() {
 check_designs() {
     command -v python3 >/dev/null 2>&1 || { skip designs "no python3"; return; }
     local out
-    out=$(python3 -I - config/noct-design config/noctalia <<'PY'
-import sys, tomllib
-from pathlib import Path
-
-design_dir, noct_dir = map(Path, sys.argv[1:3])
-KNOWN = {
-    "design":   {"label", "description", "palette"},
-    "hyprland": {"rounding", "border_size", "gaps_in", "gaps_out", "border", "inactive_alpha"},
-    "glass":    {"window", "terminal", "adaptive", "blur_size", "blur_passes",
-                 "blur_brightness", "blur_contrast", "blur_vibrancy", "blur_xray"},
-    "pill":     {"fill", "opacity", "radius", "padding", "border", "border_width"},
-    "noctalia": None,
-}
-KINDS = {"builtin", "custom", "wallpaper", "community"}
-
-def load(p):
-    with open(p, "rb") as f:
-        return tomllib.load(f)
-
-def merge(a, b):
-    out = dict(a)
-    for k, v in b.items():
-        out[k] = merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
-    return out
-
-def flat(d, prefix=""):
-    for k, v in d.items():
-        if isinstance(v, dict):
-            yield from flat(v, f"{prefix}{k}.")
-        else:
-            yield f"{prefix}{k}"
-
-def has(d, path):
-    for part in path.split("."):
-        if not isinstance(d, dict) or part not in d:
-            return False
-        d = d[part]
-    return True
-
-tracked = {}
-for f in sorted(noct_dir.glob("*.toml")):
-    tracked = merge(tracked, load(f))
-
-files = sorted(design_dir.glob("*.toml"))
-if not any(f.stem == "glass" for f in files):
-    print(f"{design_dir}/glass.toml is missing: it is the design in effect before any is picked")
-for f in files:
-    d = load(f)
-    for table, keys in d.items():
-        if table not in KNOWN:
-            print(f"{f}: [{table}] is read by nothing")
-        elif KNOWN[table] is not None:
-            for k in sorted(set(keys) - KNOWN[table]):
-                print(f"{f}: [{table}] {k} is read by nothing")
-    palette = d.get("design", {}).get("palette", "")
-    if palette and palette.split(" ", 1)[0] not in KINDS:
-        print(f"{f}: palette '{palette}' is not '<{'|'.join(sorted(KINDS))}> <name>'")
-    if d.get("hyprland", {}).get("border", "gradient") not in ("flat", "gradient"):
-        print(f"{f}: [hyprland] border is flat or gradient")
-    # Switching back restores a key the Settings UI saved from the tracked value.
-    for path in flat(d.get("noctalia", {})):
-        if not has(tracked, path):
-            print(f"{f}: {path} has no value in {noct_dir}/*.toml, so another design cannot restore it")
-PY
-) || { fail designs "could not read the designs: $out"; return; }
+    out=$(python3 -I bin/noct-design.py check config/noct-design config/noctalia 2>&1) \
+        || { fail designs "could not read the designs: $out"; return; }
     local -a problems=()
     local line
     while IFS= read -r line; do [[ -n $line ]] && problems+=("$line"); done <<<"$out"

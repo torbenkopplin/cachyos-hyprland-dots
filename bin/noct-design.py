@@ -1,0 +1,227 @@
+#!/usr/bin/env python3
+"""noct-design.py -- the TOML half of bin/noct-design.
+
+  noct-design.py render <design.toml> <design dir> <config home> <state home>
+  noct-design.py check  <design dir> <tracked noctalia dir>
+
+`render` writes the generated files and prints one IPC call per line for
+noct-design to run. `check` is tests/lint.sh designs.
+"""
+
+import sys
+import tomllib
+from pathlib import Path
+
+KINDS = {"builtin", "custom", "wallpaper", "community"}
+
+# What each table may hold, by who reads it. None: any Noctalia key.
+KNOWN = {
+    "design":   {"label", "description", "palette"},
+    "noctalia": None,
+    "pill":     {"fill", "opacity", "radius", "padding", "border", "border_width"},
+    "hyprland": {"rounding", "border_size", "gaps_in", "gaps_out", "border", "inactive_alpha"},
+    "glass":    {"window", "terminal", "adaptive", "blur_size", "blur_passes",
+                 "blur_brightness", "blur_contrast", "blur_vibrancy", "blur_xray"},
+}
+
+GENERATED = "90-design.toml"
+
+
+def load(path):
+    with open(path, "rb") as f:
+        return tomllib.load(f)
+
+
+def merge(base, over):
+    """Tables merge, everything else replaces -- lists too, as Noctalia does."""
+    out = dict(base)
+    for k, v in over.items():
+        out[k] = merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
+    return out
+
+
+def paths(d, prefix=""):
+    """Every dotted key path to a non-table value."""
+    for k, v in d.items():
+        if isinstance(v, dict):
+            yield from paths(v, f"{prefix}{k}.")
+        else:
+            yield f"{prefix}{k}"
+
+
+def get(d, path):
+    for part in path.split("."):
+        if not isinstance(d, dict) or part not in d:
+            return None
+        d = d[part]
+    return d
+
+
+def tracked_noctalia(noct_dir):
+    """The tracked Noctalia config, merged in Noctalia's order, without ours."""
+    merged = {}
+    for f in sorted(Path(noct_dir).glob("*.toml")):
+        if f.name != GENERATED:
+            merged = merge(merged, load(f))
+    return merged
+
+
+# --- writing ------------------------------------------------------------------
+
+def literal(v):
+    """A TOML value, which is also what `noctalia msg config-set` takes."""
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        return repr(v)
+    if isinstance(v, str):
+        if "'" not in v:
+            return f"'{v}'"
+        return '"' + v.replace("\\", "\\\\").replace('"', '\\"') + '"'
+    if isinstance(v, list):
+        return "[" + ", ".join(literal(x) for x in v) + "]"
+    raise ValueError(f"cannot write {v!r} as TOML")
+
+
+def is_table_list(v):
+    return isinstance(v, list) and v and all(isinstance(x, dict) for x in v)
+
+
+def emit(d, path=()):
+    """TOML lines for a table: scalars, then sub-tables, then arrays of tables."""
+    lines = [f"{k} = {literal(v)}" for k, v in d.items()
+             if not isinstance(v, dict) and not is_table_list(v)]
+    for k, v in d.items():
+        if isinstance(v, dict):
+            sub = emit(v, path + (k,))
+            # A table holding only tables needs no header of its own.
+            if not sub or sub[0] != "":
+                sub = ["", f"[{'.'.join(path + (k,))}]"] + sub
+            lines += sub
+    for k, v in d.items():
+        if is_table_list(v):
+            for item in v:
+                lines += ["", f"[[{'.'.join(path + (k,))}]]"] + emit(item, path + (k,))
+    return lines
+
+
+def write(path, text):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(text)
+    tmp.replace(path)
+
+
+def write_or_remove(path, text):
+    if text is None:
+        path.unlink(missing_ok=True)
+    else:
+        write(path, text)
+
+
+# --- render -------------------------------------------------------------------
+
+def with_pill(noct, tracked, pill):
+    """[pill] merged into the bar's centre capsule group, the whole list written.
+
+    A later capsule_group list replaces the earlier one (measured 2026-11-25,
+    Noctalia 5.6.0), so a partial group would drop the members.
+    """
+    bar = get(tracked, "bar.default") or {}
+    centre = bar.get("center", [])
+    if len(centre) != 1 or not str(centre[0]).startswith("group:"):
+        sys.exit(f"[pill]: the bar's centre lane is {centre}, not one capsule group")
+    gid = centre[0][len("group:"):]
+    groups = bar.get("capsule_group", [])
+    if not any(g.get("id") == gid for g in groups):
+        sys.exit(f"[pill]: no capsule_group has id '{gid}'")
+    groups = [dict(g, **pill) if g.get("id") == gid else g for g in groups]
+    return merge(noct, {"bar": {"default": {"capsule_group": groups}}})
+
+
+def render(design_path, design_dir, config_home, state_home):
+    design_path = Path(design_path)
+    noct_dir = Path(config_home) / "noctalia"
+    state_dir = Path(state_home) / "noctalia"
+
+    design = load(design_path)
+    tracked = tracked_noctalia(noct_dir)
+    header = (f"Generated by noct-design from ~/.config/noct-design/{design_path.stem}.toml."
+              " Edit that and run `noct-design apply`.")
+
+    noct = dict(design.get("noctalia", {}))
+    if design.get("pill"):
+        noct = with_pill(noct, tracked, design["pill"])
+    write_or_remove(noct_dir / GENERATED,
+                    "\n".join([f"# {header}"] + emit(noct)) + "\n" if noct else None)
+
+    hypr = design.get("hyprland", {})
+    body = "\n".join(f"    {k} = {literal(v).replace(chr(39), chr(34))}," for k, v in hypr.items())
+    write_or_remove(Path(config_home) / "hypr" / "generated" / "design.lua",
+                    f"-- {header}\nreturn {{\n{body}\n}}\n" if hypr else None)
+
+    glass = design.get("glass", {})
+    body = "\n".join(f"{k} = {literal(v)}" for k, v in glass.items())
+    write_or_remove(state_dir / "design-glass.conf",
+                    f"# {header}\n{body}\n" if glass else None)
+
+    # The Settings UI layer loads after every .toml. For a key it holds, set
+    # this design's value over IPC, or the tracked one: every key any design
+    # sets, so switching back undoes what the last design did.
+    settings = state_dir / "settings.toml"
+    state = load(settings) if settings.exists() else {}
+    keys = set()
+    for f in sorted(Path(design_dir).glob("*.toml")):
+        keys |= set(paths(load(f).get("noctalia", {})))
+    for path in sorted(keys):
+        held = get(state, path)
+        if held is None:
+            continue
+        want = get(noct, path)
+        if want is None:
+            want = get(tracked, path)
+        if want is None:
+            print(f"noct-design: the Settings UI holds {path} = {held!r} and nothing names a value to restore",
+                  file=sys.stderr)
+        elif want != held:
+            print(f"config-set {path} {literal(want)}")
+
+    palette = design.get("design", {}).get("palette", "")
+    if palette:
+        print(f"palette {palette}")
+
+
+# --- check --------------------------------------------------------------------
+
+def check(design_dir, noct_dir):
+    """One line per problem; nothing when every design is sound."""
+    tracked = tracked_noctalia(noct_dir)
+    files = sorted(Path(design_dir).glob("*.toml"))
+    if not any(f.stem == "glass" for f in files):
+        print(f"{design_dir}/glass.toml is missing: it is the design in effect before any is picked")
+    for f in files:
+        d = load(f)
+        for table, keys in d.items():
+            if table not in KNOWN:
+                print(f"{f}: [{table}] is read by nothing")
+            elif KNOWN[table] is not None:
+                for k in sorted(set(keys) - KNOWN[table]):
+                    print(f"{f}: [{table}] {k} is read by nothing")
+        palette = d.get("design", {}).get("palette", "")
+        if palette and palette.split(" ", 1)[0] not in KINDS:
+            print(f"{f}: palette '{palette}' is not '<{'|'.join(sorted(KINDS))}> <name>'")
+        if d.get("hyprland", {}).get("border", "gradient") not in ("flat", "gradient"):
+            print(f"{f}: [hyprland] border is flat or gradient")
+        for path in paths(d.get("noctalia", {})):
+            if get(tracked, path) is None:
+                print(f"{f}: {path} has no value in {noct_dir}/*.toml, so another design cannot restore it")
+
+
+if __name__ == "__main__":
+    cmd, args = (sys.argv[1], sys.argv[2:]) if len(sys.argv) > 1 else ("", [])
+    if cmd == "render" and len(args) == 4:
+        render(*args)
+    elif cmd == "check" and len(args) == 2:
+        check(*args)
+    else:
+        sys.exit(__doc__)
