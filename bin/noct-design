@@ -1,0 +1,263 @@
+#!/usr/bin/env bash
+# noct-design -- swap the whole look: palette, shape and material in one pick.
+#
+#   noct-design list           emit launcher candidates (/design)
+#   noct-design act "<line>"   switch to the picked design
+#   noct-design set <name>     switch by name
+#   noct-design apply          re-render the active design, after editing it
+#   noct-design show           print the active design and what it wrote
+#
+# A design is one TOML file in ~/.config/noct-design/ (tracked ones in
+# config/noct-design/). Each table reaches one program, as a generated file the
+# tracked config is merged under:
+#
+#   [noctalia]  ~/.config/noctalia/90-design.toml, after every tracked .toml
+#   [pill]      the same file: the bar's centre capsule group, over 10-bar.toml's
+#   [hyprland]  ~/.config/hypr/generated/design.lua, read by lib/design.lua
+#   [glass]     ~/.local/state/noctalia/design-glass.conf, read by noct-glass
+#   palette     `noctalia msg color-scheme-set`
+#
+# A table the design leaves out writes no file, so the tracked value stands.
+# docs/theming.md#designs is the long form.
+
+set -uo pipefail
+
+. "$(dirname "$(readlink -f "$0")")/noct-common.sh"
+
+usage() { sed -n '3,7s/^# \{0,1\}//p' "$0" >&2; exit 2; }
+
+CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
+STATE_HOME=${XDG_STATE_HOME:-$HOME/.local/state}
+
+DESIGN_DIR="$CONFIG_HOME/noct-design"
+ACTIVE_FILE="$STATE_HOME/noctalia/design"
+
+active() { cat "$ACTIVE_FILE" 2>/dev/null || printf 'glass'; }
+
+# ---------------------------------------------------------------------------
+
+list() {
+    provider design
+    begin_list
+
+    local current file id label desc
+    current=$(active)
+    for file in "$DESIGN_DIR"/*.toml; do
+        [[ -e $file ]] || continue
+        id=$(basename "$file" .toml)
+        label=$(_toml_get "$file" design label) || label=$id
+        desc=$(_toml_get "$file" design description) || desc=""
+        [[ $id == "$current" ]] && label="● $label"
+        item "$label" "$desc" "$id"
+    done
+}
+
+# render <file> -- write the generated files, and print one IPC call per line
+# for the caller to run: "config-set <path> <toml value>" for a key the
+# Settings UI saved (that layer loads after every .toml and would win), and
+# "palette <kind> <name>".
+render() {
+    python3 -I - "$1" "$DESIGN_DIR" "$CONFIG_HOME" "$STATE_HOME" <<'PY'
+import os, sys, tomllib
+from pathlib import Path
+
+design_path, design_dir, config_home, state_home = map(Path, sys.argv[1:5])
+noct_dir   = config_home / "noctalia"
+noct_out   = noct_dir / "90-design.toml"
+hypr_out   = config_home / "hypr" / "generated" / "design.lua"
+glass_out  = state_home / "noctalia" / "design-glass.conf"
+state_file = state_home / "noctalia" / "settings.toml"
+
+def load(p):
+    with open(p, "rb") as f:
+        return tomllib.load(f)
+
+def merge(base, over):
+    # Tables merge, everything else replaces: arrays included, which is what
+    # Noctalia does (a later capsule_group list replaces the earlier one).
+    out = dict(base)
+    for k, v in over.items():
+        out[k] = merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
+    return out
+
+def flat(d, prefix=""):
+    for k, v in d.items():
+        p = f"{prefix}{k}"
+        if isinstance(v, dict):
+            yield from flat(v, p + ".")
+        else:
+            yield p, v
+
+def get(d, path):
+    for part in path.split("."):
+        if not isinstance(d, dict) or part not in d:
+            return None
+        d = d[part]
+    return d
+
+def literal(v):
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        return repr(v)
+    if isinstance(v, str):
+        return "'" + v + "'" if "'" not in v else '"' + v.replace("\\", "\\\\").replace('"', '\\"') + '"'
+    if isinstance(v, list):
+        return "[" + ", ".join(literal(x) for x in v) + "]"
+    raise ValueError(f"cannot write {v!r} as TOML")
+
+def emit(d, path=()):
+    # Scalars first, then sub-tables, then arrays of tables, as TOML requires.
+    lines = []
+    scalars = {k: v for k, v in d.items() if not isinstance(v, dict)
+               and not (isinstance(v, list) and v and all(isinstance(x, dict) for x in v))}
+    for k, v in scalars.items():
+        lines.append(f"{k} = {literal(v)}")
+    for k, v in d.items():
+        if isinstance(v, dict):
+            sub = emit(v, path + (k,))
+            # A table holding only tables needs no header of its own.
+            head = ["", f"[{'.'.join(path + (k,))}]"] if not sub or not sub[0] == "" else []
+            lines += head + sub
+    for k, v in d.items():
+        if isinstance(v, list) and v and all(isinstance(x, dict) for x in v):
+            for item in v:
+                lines += ["", f"[[{'.'.join(path + (k,))}]]"] + emit(item, path + (k,))
+    return lines
+
+def write(path, text):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(text)
+    tmp.replace(path)
+
+design = load(design_path)
+name = design_path.stem
+header = f"Generated by noct-design from ~/.config/noct-design/{name}.toml. Edit that and run `noct-design apply`."
+
+tracked = {}
+for f in sorted(noct_dir.glob("*.toml")):
+    if f.name != noct_out.name:
+        tracked = merge(tracked, load(f))
+
+# --- Noctalia --------------------------------------------------------------
+noct = dict(design.get("noctalia", {}))
+pill = design.get("pill", {})
+if pill:
+    bar = get(tracked, "bar.default") or {}
+    centre = bar.get("center", [])
+    gid = centre[0][len("group:"):] if len(centre) == 1 and str(centre[0]).startswith("group:") else None
+    groups = bar.get("capsule_group", [])
+    if gid is None or not any(g.get("id") == gid for g in groups):
+        sys.exit(f"[pill]: the bar's centre lane is {centre}, not one capsule group")
+    groups = [dict(g, **pill) if g.get("id") == gid else g for g in groups]
+    noct = merge(noct, {"bar": {"default": {"capsule_group": groups}}})
+
+if noct:
+    write(noct_out, "\n".join([f"# {header}"] + emit(noct)) + "\n")
+else:
+    noct_out.unlink(missing_ok=True)
+
+# --- Hyprland ---------------------------------------------------------------
+hypr = design.get("hyprland", {})
+if hypr:
+    body = "\n".join(f"    {k} = {literal(v).replace(chr(39), chr(34))}," for k, v in hypr.items())
+    write(hypr_out, f"-- {header}\nreturn {{\n{body}\n}}\n")
+else:
+    hypr_out.unlink(missing_ok=True)
+
+# --- Glass ------------------------------------------------------------------
+glass = design.get("glass", {})
+if glass:
+    body = "\n".join(f"{k} = {literal(v)}" for k, v in glass.items())
+    write(glass_out, f"# {header}\n{body}\n")
+else:
+    glass_out.unlink(missing_ok=True)
+
+# --- Keys the Settings UI saved -----------------------------------------------
+# Every key any design sets: switching back must undo what the last one did.
+# The value is this design's, else the tracked one.
+state = load(state_file) if state_file.exists() else {}
+keys = set()
+for f in sorted(design_dir.glob("*.toml")):
+    keys |= {p for p, _ in flat(load(f).get("noctalia", {}))}
+for path in sorted(keys):
+    held = get(state, path)
+    if held is None:
+        continue
+    want = get(noct, path)
+    if want is None:
+        want = get(tracked, path)
+    if want is None:
+        print(f"warn the Settings UI holds {path} = {held!r} and neither this design nor the tracked config names a value for it", file=sys.stderr)
+    elif want != held:
+        print(f"config-set {path} {literal(want)}")
+
+palette = design.get("design", {}).get("palette", "")
+if palette:
+    print(f"palette {palette}")
+PY
+}
+
+# switch <name>
+switch() {
+    local name=$1 file="$DESIGN_DIR/$1.toml" out line
+    [[ -f $file ]] || { echo "noct-design: no design '$name' in $DESIGN_DIR" >&2; return 1; }
+
+    out=$(render "$file") || {
+        notify-send -a Design -u critical "Could not switch design" "$name" 2>/dev/null
+        return 1
+    }
+    mkdir -p "$(dirname "$ACTIVE_FILE")"
+    printf '%s' "$name" >"$ACTIVE_FILE"
+
+    local palette=""
+    while IFS= read -r line; do
+        case $line in
+            "config-set "*)
+                line=${line#config-set }
+                noctalia msg config-set "${line%% *}" "${line#* }" >/dev/null 2>&1 ;;
+            "palette "*) palette=${line#palette } ;;
+        esac
+    done <<<"$out"
+
+    noctalia msg config-reload >/dev/null 2>&1
+
+    # A new palette re-renders the templates and fires colors_changed, which
+    # runs noct-glass. The same palette does neither, so both are asked for.
+    if [[ -n $palette && $palette != "$(noct_scheme 2>/dev/null)" ]]; then
+        noctalia msg color-scheme-set "${palette%% *}" "${palette#* }" >/dev/null 2>&1
+    else
+        noctalia msg templates-apply >/dev/null 2>&1
+    fi
+    noct-glass apply
+}
+
+act() {
+    provider design
+    local id
+    id=$(payload "$1")
+    [[ -n $id ]] && switch "$id"
+}
+
+show() {
+    local name file
+    name=$(active)
+    file="$DESIGN_DIR/$name.toml"
+    printf '%s  %s\n' "$name" "$(_toml_get "$file" design description 2>/dev/null)"
+    local f
+    for f in "$CONFIG_HOME/noctalia/90-design.toml" \
+             "$CONFIG_HOME/hypr/generated/design.lua" \
+             "$STATE_HOME/noctalia/design-glass.conf"; do
+        [[ -f $f ]] && printf '  wrote %s\n' "${f/#$HOME/\~}"
+    done
+}
+
+case "${1:-}" in
+    list)  list ;;
+    act)   [[ $# -ge 2 ]] || usage; act "$2" ;;
+    set)   [[ $# -ge 2 ]] || usage; switch "$2" ;;
+    apply) switch "$(active)" ;;
+    show)  show ;;
+    *)     usage ;;
+esac

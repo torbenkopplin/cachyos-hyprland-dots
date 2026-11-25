@@ -1,0 +1,46 @@
+# A design: palette, shape and material in one pick. Switched by noct-design
+# (/design in the launcher, SUPER+CTRL+A). docs/theming.md#designs has the format.
+#
+# Flat: square corners, nothing translucent, one solid accent. Gruvbox because
+# it has a light and a dark variant that both hold up; /theme can swap the
+# palette afterwards and the shape stays.
+
+[design]
+label       = "Flat"
+description = "square, opaque, solid border, Gruvbox"
+palette     = "builtin Gruvbox"
+
+# Merged over the tracked Noctalia config, as ~/.config/noctalia/90-design.toml.
+[noctalia.shell]
+font_family                 = "Liberation Mono"
+corner_radius_scale         = 0.0
+popup_shadows               = false
+settings_window_translucent = false
+
+[noctalia.shell.panel]
+transparency_mode = "solid"
+
+[noctalia.bar.default]
+compositor_blur = false
+capsule_radius  = 0
+margin_edge     = 0
+
+# The bar's centre capsule group, over 10-bar.toml's (members and all).
+[pill]
+opacity = 1.0
+radius  = 0
+fill    = "surface_container"
+border  = "outline"
+
+# Window borders and corners; read by config/hypr/lib/design.lua.
+[hyprland]
+rounding       = 0
+border_size    = 2
+border         = "flat"     # "gradient" is the tracked default
+inactive_alpha = 1.0        # 0.15 is the tracked hairline
+
+# Levels in glass.conf's terms. Both at 1.0 also switches the blur off.
+[glass]
+window   = 1.0
+terminal = 1.0
+adaptive = false

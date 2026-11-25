@@ -88,3 +88,13 @@ glyph   = "palette"
 global  = false
 command = "noct-theme list"
 exec    = "noct-theme act \"{selection}\""
+
+## Swap the whole look -- palette, corners, borders, glass -- in one pick. The
+## designs are TOML files in ~/.config/noct-design/; see docs/theming.md#designs.
+[shell.launcher.dmenu.entry.design]
+label   = "Design"
+prefix  = "design"
+glyph   = "layout-board"
+global  = false
+command = "noct-design list"
+exec    = "noct-design act \"{selection}\""

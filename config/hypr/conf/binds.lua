@@ -337,6 +337,8 @@ hl.bind(mod .. " + CTRL + P", provider("/power"), { description = "Power profile
 -- panel back on".
 hl.bind(mod .. " + CTRL + S", provider("/bright"), { description = "Screen brightness" })
 hl.bind(mod .. " + CTRL + T", provider("/theme"), { description = "Colour scheme" })
+-- A for appearance: D is lib/lid.lua's, and the hjkl letters are bind_dir's.
+hl.bind(mod .. " + CTRL + A", provider("/design"), { description = "Design" })
 
 ------------------------------------------------------------------------------
 -- Hardware keys

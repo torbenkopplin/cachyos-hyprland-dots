@@ -18,6 +18,12 @@ font_family           = "Adwaita Sans"
 corner_radius_scale   = 1.0
 settings_show_advanced = true
 
+## The Glass design's values for keys another design changes. noct-design
+## restores a key the Settings UI saved from the value named here, so every key
+## a design in config/noct-design sets needs one (tests/lint.sh designs).
+popup_shadows               = true
+settings_window_translucent = true
+
 ## Noctalia registers as the polkit agent, so authentication prompts are
 ## keyboard-navigable shell dialogs rather than a stray GTK window.
 polkit_agent          = true
@@ -94,6 +100,7 @@ enabled = true
 [shell.panel]
 session_placement = "floating"
 session_position  = "center"
+transparency_mode = "glass"   # the bar pill's 0.76 in 10-bar.toml is measured against this
 
 [audio]
 enable_overdrive = true

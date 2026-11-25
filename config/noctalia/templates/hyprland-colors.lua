@@ -9,6 +9,15 @@
 -- {{ ... }} is Noctalia's template syntax. Available colour roles and formats
 -- are listed at https://docs.noctalia.dev/noctalia/theming/templates/
 
+-- The roles the borders use, as hex without '#'. A global, so lib/design.lua can
+-- draw a design's own border style from the same palette.
+PALETTE = {
+    primary         = "{{ colors.primary.default.hex_stripped }}",
+    tertiary        = "{{ colors.tertiary.default.hex_stripped }}",
+    outline         = "{{ colors.outline.default.hex_stripped }}",
+    outline_variant = "{{ colors.outline_variant.default.hex_stripped }}",
+}
+
 hl.config({
     general = {
         col = {
@@ -22,21 +31,18 @@ hl.config({
             -- The table form is Lua's. A single "rgb(a) rgb(b) 45deg" string is
             -- hyprland.conf syntax and is not parsed by a Lua config.
             --
-            -- For a flat border instead, make this one string:
-            --   active_border = "rgb({{ colors.primary.default.hex_stripped }})",
+            -- A design with `border = "flat"` replaces this with one string
+            -- (lib/design.lua).
             active_border = {
-                colors = {
-                    "rgb({{ colors.primary.default.hex_stripped }})",
-                    "rgb({{ colors.tertiary.default.hex_stripped }})",
-                },
-                angle = 45,
+                colors = { "rgb(" .. PALETTE.primary .. ")", "rgb(" .. PALETTE.tertiary .. ")" },
+                angle  = 45,
             },
 
             -- Unfocused borders are a hairline: present enough to delimit a
             -- column, quiet enough to ignore. The trailing 26 is ~15% alpha --
             -- deliberately far below the focused border, since telling the two
             -- apart at a glance is the border's entire job.
-            inactive_border = "rgba({{ colors.outline_variant.default.hex_stripped }}26)",
+            inactive_border = "rgba(" .. PALETTE.outline_variant .. "26)",
         },
     },
 })

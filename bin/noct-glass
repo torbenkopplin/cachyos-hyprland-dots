@@ -27,7 +27,8 @@
 # by one.
 #
 # Two files: glass.conf is tracked and applies everywhere, glass.local.conf is
-# this machine's own and wins outright.
+# this machine's own and wins outright. A design (noct-design) can name levels
+# too, and those win over both.
 #
 # Decisions 010 (glass is the terminal only), 011 (the blur is small) and 021
 # (the adaptive level) are why. docs/theming.md is the long form.
@@ -59,6 +60,11 @@ LEVELS_FILE="$CONFIG_HOME/noctalia/glass.conf"
 # by default, and read after the tracked file so it wins. See
 # glass.local.conf.example.
 LOCAL_FILE="$CONFIG_HOME/noctalia/glass.local.conf"
+
+# The active design's [glass] levels, written by noct-design. Read before both
+# files above: picking a design is the newer, more specific choice. A design
+# that names no level (Glass) writes no file, and the two files govern.
+DESIGN_FILE="$STATE_HOME/noctalia/design-glass.conf"
 
 OVERRIDE_FILE="$STATE_HOME/noctalia/glass-override"
 
@@ -134,7 +140,7 @@ setting() {
     local what=$1 fallback=$2 scheme file
     scheme=$(current_scheme) || scheme=
 
-    for file in "$LOCAL_FILE" "$LEVELS_FILE"; do
+    for file in "$DESIGN_FILE" "$LOCAL_FILE" "$LEVELS_FILE"; do
         [[ -f $file ]] || continue
         [[ -n $scheme ]] && read_from "$file" "$scheme.$what" && return 0
         read_from "$file" "$what" && return 0
@@ -512,6 +518,7 @@ case "${1:-apply}" in
         if [[ -z $marker && $(setting adaptive false) == true && -f $ADAPTIVE_FILE ]]; then
             marker="  [adaptive]"
         fi
+        [[ -z $marker && -f $DESIGN_FILE ]] && marker="  [design]"
         [[ -z $marker && -f $LOCAL_FILE ]] && marker="  [glass.local.conf]"
         # Deliberately unquoted: levels() prints the two numbers separated by a
         # space, and they are two arguments here.

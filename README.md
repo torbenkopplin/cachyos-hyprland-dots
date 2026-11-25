@@ -55,6 +55,7 @@ machine:
 | `M + O` / `I` | Pull the next window into this column / push it back out |
 | `M + +` / `-` | Cycle column width |
 | `M + CTRL + T` | `/theme` — switch colour scheme |
+| `M + CTRL + A` | `/design` — switch the whole look (Glass, Flat) |
 | `M + W` | Wallpaper picker |
 | `M + Escape` | Session menu |
 
@@ -97,6 +98,8 @@ Colours come from the wallpaper:
 
 `/theme` (`M + CTRL + T`) switches between that, ten built-in palettes, and
 your own — **noirblaze** ships here, ported from the neovim colourscheme.
+`/design` (`M + CTRL + A`) swaps the shape and material along with the palette:
+**Glass** is the look described below, **Flat** is square, opaque and Gruvbox.
 Frosted glass is the terminal and nothing else. The compositor can frost every
 window, but it cannot tell a window's text from its background and fades both, so
 that was dropped on 2026-08-19: apps are opaque and kitty — the one window that

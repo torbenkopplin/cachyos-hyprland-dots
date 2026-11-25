@@ -182,6 +182,7 @@ check_bar_pill_config() {
     local bar=$NOCT_REPO/config/noctalia/10-bar.toml
     local rules=$NOCT_REPO/config/hypr/conf/rules.lua
     local settings=${XDG_STATE_HOME:-$HOME/.local/state}/noctalia/settings.toml
+    local design=${XDG_CONFIG_HOME:-$HOME/.config}/noctalia/90-design.toml
     require_file bar-pill-config "$bar"   "this checkout has no bar config"   || return
     require_file bar-pill-config "$rules" "this checkout has no layer rules" || return
 
@@ -195,16 +196,22 @@ check_bar_pill_config() {
     fi
 
     local out
-    out=$(python3 -I - "$bar" "$settings" "$ignore" <<'PY'
+    out=$(python3 -I - "$bar" "$settings" "$ignore" "$design" <<'PY'
 import os, sys, tomllib
 
-bar_path, settings_path, ignore = sys.argv[1], sys.argv[2], float(sys.argv[3])
+bar_path, settings_path, ignore, design_path = sys.argv[1], sys.argv[2], float(sys.argv[3]), sys.argv[4]
 
 def problem(msg):
     print(msg)
 
 with open(bar_path, "rb") as f:
     bar = tomllib.load(f).get("bar", {}).get("default", {})
+
+# The active design (noct-design) loads after 10-bar.toml; its capsule_group
+# list replaces the tracked one whole.
+if os.path.exists(design_path):
+    with open(design_path, "rb") as f:
+        bar = {**bar, **tomllib.load(f).get("bar", {}).get("default", {})}
 
 bg = bar.get("background_opacity", 1.0)
 if bg != 0:
@@ -225,7 +232,12 @@ else:
         problem(f"{centre[0]} names no capsule_group, so Noctalia drops it and draws nothing")
     else:
         op = pill.get("opacity", 1.0)
-        if not ignore < op < 1:
+        if not bar.get("compositor_blur", True):
+            # A solid design: nothing is blurred, so anything below 1 is clear glass.
+            if op != 1:
+                problem(f"the pill's opacity is {op} with compositor_blur off: "
+                        f"the windows behind it show through sharp")
+        elif not ignore < op < 1:
             problem(f"the pill's opacity is {op}. It has to be above conf/rules.lua's "
                     f"ignore_alpha ({ignore}), or Hyprland stops blurring it, and below 1, "
                     f"or it is paint")
@@ -251,7 +263,7 @@ PY
     done <<<"$out"
 
     if (( ${#problems[@]} == 0 )); then
-        pass bar-pill-config "one capsule group in the centre, opacity between ignore_alpha $ignore and 1, nothing overriding it"
+        pass bar-pill-config "one capsule group in the centre, its opacity right for its blur (ignore_alpha $ignore), nothing overriding it"
         return
     fi
 

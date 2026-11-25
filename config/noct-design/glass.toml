@@ -1,0 +1,10 @@
+# A design: palette, shape and material in one pick. Switched by noct-design
+# (/design in the launcher, SUPER+CTRL+A). docs/theming.md#designs has the format.
+#
+# Glass is the tracked config as it stands: every value it does not name here
+# comes from 00-shell.toml, 10-bar.toml, conf/options.lua and glass.conf.
+
+[design]
+label       = "Glass"
+description = "frosted terminal, glass pill, gradient border"
+palette     = "custom noirblaze"

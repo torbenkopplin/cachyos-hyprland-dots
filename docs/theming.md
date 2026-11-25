@@ -13,6 +13,69 @@ app's own config format through templates, and pokes the app to reload.
                   + 22 terminal roles)
 ```
 
+## Designs
+
+A palette changes colour. A **design** changes the look: palette, corners,
+borders, the bar's shape and whether anything is translucent, in one pick.
+`/design` in the launcher (**`SUPER+CTRL+A`**) lists them and marks the active
+one with `●`.
+
+| Design | Palette | Shape | Material |
+|---|---|---|---|
+| **Glass** | noirblaze | 2px corners, gradient focus border, hairline elsewhere, round pill | frosted terminal and pill, everything else opaque |
+| **Flat** | Gruvbox | square everywhere, solid accent border, visible frame on every window, square bar | nothing translucent, no blur, no shadows |
+
+Glass is the tracked config as it stands; everything below this section
+describes it. After picking a design, `/theme` still swaps the palette and the
+dark/light toggle still works. The shape stays.
+
+**What a design file holds.** One TOML file per design in
+`config/noct-design/` (deployed to `~/.config/noct-design/`; drop another one
+there and it appears in the list):
+
+```toml
+[design]
+label       = "Flat"
+description = "square, opaque, solid border, Gruvbox"
+palette     = "builtin Gruvbox"       # <builtin|custom|wallpaper|community> <name>
+
+[noctalia.shell]                      # any Noctalia key, over the tracked .toml files
+corner_radius_scale = 0.0
+
+[pill]                                # the bar's capsule group, over 10-bar.toml's
+radius  = 0
+opacity = 1.0
+
+[hyprland]                            # rounding, border_size, gaps_in, gaps_out,
+rounding = 0                          # border = "flat" | "gradient", inactive_alpha
+border   = "flat"
+
+[glass]                               # any glass.conf key; window = terminal = 1.0
+window   = 1.0                        # also switches the blur off
+terminal = 1.0
+```
+
+Edit the active one and run `noct-design apply`. `noct-design show` prints which
+generated files it wrote. Each table becomes one file that loads after the
+tracked config, so a key a design leaves out keeps its tracked value. Decision
+[029](decisions/029-designs-bundle-shape-and-material.md) explains why it works
+this way. Three rules, all held by `tests/lint.sh designs`:
+
+- **`[pill]` names only what changes.** Noctalia replaces a list from a later
+  file instead of merging it, so `noct-design` writes the whole capsule group
+  from `10-bar.toml` with the design's keys merged in.
+- **Every `[noctalia]` key needs a tracked value.** The Settings UI saves to a
+  layer that wins over every `.toml`. For a key saved there, `noct-design` sets
+  the design's value over IPC, or the tracked value when switching back, and it
+  needs one to switch back to. That is why `00-shell.toml` names
+  `transparency_mode`, `popup_shadows` and `settings_window_translucent`.
+- **A design's `[glass]` wins over `glass.local.conf`.** Picking a design is the
+  newer choice. Glass names no levels, so under Glass the machine's own file
+  governs as before.
+
+Switching rebuilds the bar once, because Noctalia rebuilds it on every config
+reload.
+
 ## Switching scheme
 
 `/theme` in the launcher (**`SUPER+CTRL+T`**) lists everything and marks the

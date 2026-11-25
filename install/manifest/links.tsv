@@ -62,6 +62,10 @@ configs	tree	config/fastfetch	config	fastfetch
 # file is what stops it.
 configs	file	vendor/noirblaze/dist/noirblaze.json	config	noctalia/palettes/noirblaze.json
 
+# Designs for bin/noct-design. Not under ~/.config/noctalia: they are TOML, and
+# a .toml there is Noctalia config.
+configs	tree	config/noct-design	config	noct-design
+
 # aerc.conf only. accounts.conf is NOT tracked -- it names mail addresses,
 # server names and a credential command -- so config/aerc/ ships an .example
 # to copy, which the linker skips by the same rule that skips

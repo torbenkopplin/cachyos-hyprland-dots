@@ -224,6 +224,24 @@ See [decision 010](docs/decisions/010-glass-is-the-terminal-only.md) and
       window with it. `noct-glass show` says `[override: SUPER+SHIFT+G]` while one
       is held; changing scheme clears it.
 
+### Designs — `bin/noct-design` + `config/noct-design/`
+
+See [decision 029](docs/decisions/029-designs-bundle-shape-and-material.md).
+
+- [ ] `/design` (`SUPER+CTRL+A`) lists **Glass** and **Flat**, with `●` on the
+      active one.
+- [ ] **Flat:** window corners are square, the focused border is one solid colour,
+      every other window has a visible frame, and the bar is a square box with no
+      blur behind it. Launcher, control centre and notifications have square
+      corners and are not translucent. Terminals are opaque. `noct-glass show`
+      says `window 1.0  terminal 1.0  [design]`.
+- [ ] Under Flat, `/theme` → toggle dark/light: both read well, and the shape
+      stays square.
+- [ ] **Back to Glass:** noirblaze, gradient border, round glass pill, frosted
+      terminal, Adwaita Sans in the shell — the look before any design was picked.
+- [ ] `noct-check bar-pill-config` passes under both.
+- [ ] The pick survives a restart of Noctalia and of Hyprland.
+
 ## 8. kitty, fish and the tools
 
 `noct-check deps-installed` covers everything declared in `tests/deps.tsv`. These
