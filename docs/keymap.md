@@ -158,6 +158,7 @@ is the test that it stays fixed.
 | `M + CTRL + P` | `/power` | Power profile, night light, caffeine |
 | `M + CTRL + S` | `/bright` | **S**creen brightness — presets per screen, or all at once; external monitors over DDC/CI |
 | `M + CTRL + T` | `/theme` | Colour scheme — wallpaper, built-in, or your own |
+| `M + CTRL + A` | `/design` | Design — palette, corners, borders and glass in one pick |
 
 Inside the launcher, `Ctrl+J` / `Ctrl+K` move the selection (plain `j`/`k` go
 into the search box, since you are typing).

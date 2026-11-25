@@ -13,6 +13,93 @@ app's own config format through templates, and pokes the app to reload.
                   + 22 terminal roles)
 ```
 
+## Designs
+
+A palette changes colour. A **design** changes the look: palette, corners,
+borders, the bar's shape and whether anything is translucent, in one pick.
+`/design` in the launcher (**`SUPER+CTRL+A`**) lists them and marks the active
+one with `●`.
+
+| Design | Palette | Shape | Material |
+|---|---|---|---|
+| **Glass** | noirblaze | 2px corners, gradient focus border, hairline elsewhere, round pill, JetBrains Mono in every app | frosted terminal and pill, everything else opaque |
+| **Flat** | Gruvbox, `retrobox` in neovim | square everywhere, no gaps, solid accent border, visible frame on every window, a thin square bar with equal workspace boxes, Fantasque in every app | nothing translucent, no blur, no shadows |
+
+Glass is the tracked config as it stands; everything below this section
+describes it. After picking a design, `/theme` still swaps the palette and the
+dark/light toggle still works. The shape stays.
+
+**What a design file holds.** One TOML file per design in
+`config/noct-design/` (deployed to `~/.config/noct-design/`; drop another one
+there and it appears in the list):
+
+```toml
+[design]
+label       = "Flat"
+description = "square, opaque, solid border, Gruvbox"
+palette     = "builtin Gruvbox"       # <builtin|custom|wallpaper|community> <name>
+
+[noctalia.shell]                      # any Noctalia key, over the tracked .toml files
+corner_radius_scale = 0.0
+
+[pill]                                # the bar's capsule group, over 10-bar.toml's
+radius  = 0
+opacity = 1.0
+
+[hyprland]                            # rounding, border_size, gaps_in, gaps_out,
+rounding = 0                          # border = "flat" | "gradient", inactive_alpha
+border   = "flat"
+
+[glass]                               # any glass.conf key; window = terminal = 1.0
+window   = 1.0                        # also switches the blur off
+terminal = 1.0
+
+[nvim]                                # for an nvim config that reads it, below
+colorscheme = "retrobox"
+
+[fonts]                               # ui: shell, GTK, Qt. mono: kitty, GTK and Qt fixed
+ui            = "FantasqueSansM Nerd Font"
+mono          = "FantasqueSansM Nerd Font"
+size          = 11                    # GTK and Qt, in points
+terminal_size = 13                    # kitty
+```
+
+**Neovim** lives in its own repo, so the design reaches it as a file it can
+read: `~/.local/state/noctalia/design-nvim.lua`, which returns the `[nvim]` table
+and is absent when the design has none. After a switch, `noct-design` calls the
+global `NoctDesign()` in every running neovim that defines one. The nvim config
+(`torbenkopplin/nvimrc`, `init.lua`) reads the file at startup, defines
+`NoctDesign()`, and falls back to noirblaze with a warning when the file does
+not load or names a colorscheme that is not installed.
+
+Edit the active design and run `noct-design apply`; that re-applies its palette
+too, over a later `/theme` pick. `noct-design show` prints which generated files
+it wrote. Decision [029](decisions/029-designs-bundle-shape-and-material.md)
+explains why it works this way. What a switch does:
+
+- **A table the design leaves out writes no file**, so the tracked config
+  stands. `[pill]` names only what changes: Noctalia replaces a list from a
+  later file instead of merging it, so `noct-design` writes the whole capsule
+  group from `10-bar.toml` with the design's keys merged in.
+- **What a design overrides elsewhere, it gives back.** Noctalia's Settings UI
+  saves to a layer that wins over every `.toml`, and GTK and Qt keep their fonts
+  in gsettings and `kdeglobals`. A design that sets a key held there saves the
+  old value (`design-saved.json` and `design-fonts.saved` in
+  `~/.local/state/noctalia/`), and the next switch restores it first, before
+  the new design sets its own. Both shipped designs set fonts, so your own font
+  comes back only under a design without `[fonts]`. A Settings value changed by
+  hand while a design is active is replaced by the saved one on the next switch.
+- **A design's `[glass]` wins over `glass.local.conf`.** Picking a design is the
+  newer choice. Glass names no levels, so under Glass the machine's own file
+  governs as before.
+- **Nothing is written until the design checks out.** `tests/lint.sh designs`
+  runs the same check: unknown tables and keys, values of the wrong type or out
+  of range (a Noctalia key must have a tracked value and is typed like it), and
+  a `[pill]` that no longer finds the bar's capsule group.
+
+Switching rebuilds the bar once, because Noctalia rebuilds it on every config
+reload.
+
 ## Switching scheme
 
 `/theme` in the launcher (**`SUPER+CTRL+T`**) lists everything and marks the
@@ -279,7 +366,8 @@ cp config/noctalia/glass.local.conf.example ~/.config/noctalia/glass.local.conf
 ```
 
 Absent by default, which means "use the tracked levels". Present, it wins
-outright — **both** of its keys before **either** of `glass.conf`'s, so a bare
+over `glass.conf` outright (a design's `[glass]` still wins over it; see
+[Designs](#designs)) — **both** of its keys before **either** of `glass.conf`'s, so a bare
 `window` set locally beats a per-scheme `window` in the tracked file. Without
 that ordering, a machine that had said "no compositor transparency here" would
 get it back the moment you switched to the one scheme that overrides it.

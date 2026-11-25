@@ -56,16 +56,18 @@ repo	desktop	playerctl
 repo	desktop	grim
 
 # Fonts, all three named because something reads each of them:
-#   ttf-jetbrains-mono-nerd  kitty's font_family, and the glyphs starship and
-#                            eza draw their icons from
-#   adwaita-fonts            Adwaita Sans, the shell's UI face (00-shell.toml).
-#                            Usually present as a GNOME dependency, which is
-#                            not a thing to rely on
+#   ttf-jetbrains-mono-nerd  the setup's one font: kitty's and the shell's, and
+#                            the glyphs starship and eza draw their icons from
+#   adwaita-fonts            GTK's default font (gsettings), in effect until a
+#                            design sets one. Usually present as a GNOME
+#                            dependency, which is not a thing to rely on
 #   noto-*                   everything else, emoji included
+#   ttf-fantasque-nerd       the Flat design's [fonts] (config/noct-design/flat.toml)
 repo	desktop	noto-fonts
 repo	desktop	noto-fonts-emoji
 repo	desktop	ttf-jetbrains-mono-nerd
 repo	desktop	adwaita-fonts
+repo	desktop	ttf-fantasque-nerd
 
 # options.lua sets LAUNCH_PREFIX = "uwsm app -- ", so without uwsm every single
 # app bind fails. Clear LAUNCH_PREFIX instead if you do not want it.

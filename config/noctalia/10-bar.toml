@@ -101,6 +101,7 @@ widget_spacing  = 10
 ## `shadow` draws nothing for this bar: set true, the strip outside the pill came
 ## out pixel-identical. Left false rather than left looking like it does something.
 shadow          = false
+compositor_blur = true    # the pill's frost; the Flat design turns it off
 hover_highlight = true
 font_weight     = 500
 

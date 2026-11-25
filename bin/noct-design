@@ -1,0 +1,220 @@
+#!/usr/bin/env bash
+# noct-design -- swap the whole look: palette, shape and material in one pick.
+#
+#   noct-design list           emit launcher candidates (/design)
+#   noct-design act "<line>"   switch to the picked design
+#   noct-design set <name>     switch by name
+#   noct-design apply          re-render the active design, after editing it
+#   noct-design show           print the active design and what it wrote
+#
+# A design is one TOML file in ~/.config/noct-design/ (tracked ones in
+# config/noct-design/). Each table reaches one program, as a generated file the
+# tracked config is merged under:
+#
+#   [noctalia]  ~/.config/noctalia/90-design.toml, after every tracked .toml
+#   [pill]      the same file: the bar's centre capsule group, over 10-bar.toml's
+#   [hyprland]  ~/.config/hypr/generated/design.lua, read by lib/design.lua
+#   [glass]     ~/.local/state/noctalia/design-glass.conf, read by noct-glass
+#   [nvim]      ~/.local/state/noctalia/design-nvim.lua, read by an nvim config
+#   palette     `noctalia msg color-scheme-set`
+#
+# A table the design leaves out writes no file, so the tracked value stands.
+# What a design overrides in Noctalia's Settings UI layer and in GTK and Qt is
+# saved, and the next switch gives it back. docs/theming.md#designs is the long form.
+
+set -uo pipefail
+
+HERE=$(dirname "$(readlink -f "$0")")
+. "$HERE/noct-common.sh"
+
+usage() { sed -n '4,8s/^# \{0,1\}//p' "$0" >&2; exit 2; }
+
+CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
+STATE_HOME=${XDG_STATE_HOME:-$HOME/.local/state}
+
+DESIGN_DIR="$CONFIG_HOME/noct-design"
+ACTIVE_FILE="$STATE_HOME/noctalia/design"
+
+active() { cat "$ACTIVE_FILE" 2>/dev/null || printf 'glass'; }
+
+# ---------------------------------------------------------------------------
+
+list() {
+    provider design
+    begin_list
+
+    local current file id label desc
+    current=$(active)
+    for file in "$DESIGN_DIR"/*.toml; do
+        [[ -e $file ]] || continue
+        id=$(basename "$file" .toml)
+        label=$(_toml_get "$file" design label) || label=$id
+        desc=$(_toml_get "$file" design description) || desc=""
+        [[ $id == "$current" ]] && label="● $label"
+        item "$label" "$desc" "$id"
+    done
+}
+
+# render <file> -- check the design, write the generated files and print the
+# IPC calls to make; writes nothing on an error (bin/noct-design.py).
+render() {
+    python3 -I "$HERE/noct-design.py" render "$1" "$DESIGN_DIR" "$CONFIG_HOME" "$STATE_HOME"
+}
+
+fail() {
+    echo "${1#noct-design: }" | sed 's/^/noct-design: /' >&2
+    notify-send -a Design -u critical "Could not switch design" "$1" 2>/dev/null
+    return 1
+}
+
+# switch <name>
+switch() {
+    local name=$1 out line palette="" failed=0
+    [[ $name =~ ^[A-Za-z0-9_-]+$ ]] || { fail "'$name' is not a design name"; return; }
+    local file="$DESIGN_DIR/$name.toml"
+    [[ -f $file ]] || { fail "no design '$name' in $DESIGN_DIR"; return; }
+
+    # One switch at a time: two would save each other's fonts as the originals.
+    mkdir -p "$STATE_HOME/noctalia"
+    exec 9>"$STATE_HOME/noctalia/design.lock"
+    flock -n 9 || { fail "another switch is running"; return; }
+
+    # Its errors and warnings start with "noct-design:"; every other line is a call.
+    out=$(render "$file" 2>&1) || { fail "$out"; return; }
+    printf '%s' "$name" >"$ACTIVE_FILE"
+
+    restore_fonts
+    while IFS= read -r line; do
+        case $line in
+            "noct-design: "*) echo "$line" >&2 ;;
+            "config-set "*)
+                line=${line#config-set }
+                noctalia msg config-set "${line%% *}" "${line#* }" >/dev/null 2>&1 \
+                    || { echo "noct-design: config-set ${line%% *} failed" >&2; failed=1; } ;;
+            "fonts "*)   app_fonts "${line#fonts }" ;;
+            "palette "*) palette=${line#palette } ;;
+        esac
+    done <<<"$out"
+
+    noctalia msg config-reload >/dev/null 2>&1
+
+    # A new palette re-renders the templates and fires colors_changed, which
+    # runs noct-glass. The same palette does neither, so both are asked for.
+    if [[ -n $palette && $palette != "$(noct_scheme 2>/dev/null)" ]]; then
+        noctalia msg color-scheme-set "${palette%% *}" "${palette#* }" >/dev/null 2>&1 \
+            || { echo "noct-design: palette '$palette' could not be set" >&2; failed=1; }
+    else
+        noctalia msg templates-apply >/dev/null 2>&1
+    fi
+    noct-glass apply
+    nvim_reload
+
+    (( failed )) && notify-send -a Design -u critical "Design '$name' only partly applied" \
+        "a Settings value or the palette could not be set; see noct-design set $name" 2>/dev/null
+    return "$failed"
+}
+
+# GTK and Qt fonts. A design's [fonts] saves each value it replaces, and the
+# next switch puts them back first, so a design only ever undoes its own change.
+FONTS_SAVED="$STATE_HOME/noctalia/design-fonts.saved"
+GTK=org.gnome.desktop.interface
+
+# qt_font <key> [value] -- write a kdeglobals [General] font; no value deletes it.
+qt_font() {
+    if [[ -n ${2:-} ]]; then
+        kwriteconfig6 --file kdeglobals --group General --key "$1" "$2"
+    else
+        kwriteconfig6 --file kdeglobals --group General --key "$1" --delete
+    fi
+}
+
+restore_fonts() {
+    [[ -f $FONTS_SAVED ]] || return 0
+    local where key value
+    while IFS=$'\t' read -r where key value; do
+        case $where in
+            gtk) command -v gsettings >/dev/null 2>&1 && gsettings set "$GTK" "$key" "$value" ;;
+            qt)  command -v kwriteconfig6 >/dev/null 2>&1 && qt_font "$key" "$value" ;;
+        esac
+    done <"$FONTS_SAVED"
+    rm -f "$FONTS_SAVED"
+}
+
+# app_fonts "<ui>|<mono>|<size>" -- running GTK apps follow at once, Qt apps on
+# restart. With no size, each font keeps the size it has.
+app_fonts() {
+    local ui mono size
+    IFS='|' read -r ui mono size <<<"$1"
+    local -a changes=()
+    [[ -n $ui ]]   && changes+=("gtk font-name $ui" "gtk document-font-name $ui"
+                                "qt font $ui" "qt menuFont $ui" "qt toolBarFont $ui")
+    [[ -n $mono ]] && changes+=("gtk monospace-font-name $mono" "qt fixed $mono")
+
+    mkdir -p "$(dirname "$FONTS_SAVED")"
+    local entry where key family now pt
+    for entry in "${changes[@]}"; do
+        where=${entry%% *}; entry=${entry#* }; key=${entry%% *}; family=${entry#* }
+        case $where in
+            gtk) command -v gsettings >/dev/null 2>&1 || continue
+                 now=$(gsettings get "$GTK" "$key")
+                 printf 'gtk\t%s\t%s\n' "$key" "$now" >>"$FONTS_SAVED"
+                 pt=${now%\'}; pt=${pt##* }
+                 [[ $pt =~ ^[0-9.]+$ ]] || pt=11
+                 gsettings set "$GTK" "$key" "$(gvariant_string "$family ${size:-$pt}")" ;;
+            qt)  command -v kwriteconfig6 >/dev/null 2>&1 || continue
+                 now=$(kreadconfig6 --file kdeglobals --group General --key "$key" 2>/dev/null)
+                 printf 'qt\t%s\t%s\n' "$key" "$now" >>"$FONTS_SAVED"
+                 pt=$(cut -d, -f2 <<<"$now")
+                 [[ $pt =~ ^[0-9.]+$ ]] || pt=11
+                 # Qt 6's font string: family, point size, then normal weight, upright.
+                 qt_font "$key" "$family,${size:-$pt},-1,5,400,0,0,0,0,0,0,0,0,0,0,1" ;;
+        esac
+    done
+}
+
+# gvariant_string <text> -- quoted for `gsettings set`, which parses its value.
+gvariant_string() {
+    local s=${1//\\/\\\\}
+    printf "'%s'" "${s//\'/\\\'}"
+}
+
+# nvim_reload -- every running neovim re-reads design-nvim.lua, if its config
+# defines the global NoctDesign() (docs/theming.md#designs); others are untouched.
+nvim_reload() {
+    command -v nvim >/dev/null 2>&1 || return 0
+    local sock
+    for sock in "${XDG_RUNTIME_DIR:-/tmp}"/nvim.*.0; do
+        [[ -S $sock ]] || continue
+        timeout 2 nvim --server "$sock" \
+            --remote-expr "luaeval('NoctDesign and NoctDesign() or \"\"')" >/dev/null 2>&1
+    done
+}
+
+act() {
+    provider design
+    local id
+    id=$(payload "$1")
+    [[ -n $id ]] && switch "$id"
+}
+
+show() {
+    local name file
+    name=$(active)
+    file="$DESIGN_DIR/$name.toml"
+    printf '%s  %s\n' "$name" "$(_toml_get "$file" design description 2>/dev/null)"
+    local f
+    for f in "$CONFIG_HOME/noctalia/90-design.toml" \
+             "$CONFIG_HOME/hypr/generated/design.lua" \
+             "$STATE_HOME/noctalia/design-glass.conf"; do
+        [[ -f $f ]] && printf '  wrote %s\n' "${f/#$HOME/\~}"
+    done
+}
+
+case "${1:-}" in
+    list)  list ;;
+    act)   [[ $# -ge 2 ]] || usage; act "$2" ;;
+    set)   [[ $# -ge 2 ]] || usage; switch "$2" ;;
+    apply) switch "$(active)" ;;
+    show)  show ;;
+    *)     usage ;;
+esac

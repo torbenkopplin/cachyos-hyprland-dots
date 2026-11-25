@@ -56,6 +56,7 @@ So the **Settled against** sections are the load-bearing half of this directory.
 | 026 | [Rotation follows the sensor, because the fold cannot be seen](026-rotation-follows-the-sensor.md) | 2026-10-24 |
 | 027 | [The cursor comes from the repos: Vimix, not Bibata](027-the-cursor-comes-from-the-repos.md) | 2026-11-04 |
 | 028 | [The bar is one glass pill, and it is as wide as its content](028-the-bar-is-one-pill.md) | 2026-11-15 |
+| 029 | [A design bundles palette, shape and material, and is swapped whole](029-designs-bundle-shape-and-material.md) | 2026-11-25 |
 
 ## Settled against, in one place
 

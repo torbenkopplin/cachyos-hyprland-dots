@@ -107,3 +107,8 @@ grim	grim	desktop	core	every measurement starts with a screenshot
 fc-match	fontconfig	-	core	kitty-appearance asks it what font kitty would ACTUALLY be handed; a substituted font is the most likely reason two machines do not match
 lspci	pciutils	-	optional	the environment check records the GPU with it, because the blur is a shader and two vendors' shaders are not the same shader
 stty	coreutils	-	core	the kitty probe reports the grid it was given with it
+
+# --- designs (bin/noct-design) ---------------------------------------------
+python3	python	-	core	noct-design.py renders a design and tests/lint.sh designs checks one
+gsettings	glib2	-	core	noct-design sets the GTK apps' fonts from a design's [fonts]
+kwriteconfig6	kconfig	-	optional	noct-design sets the Qt apps' fonts in kdeglobals; comes with KDE Frameworks, which a Qt app here pulls in
