@@ -242,7 +242,7 @@ resolves somewhere before a fresh machine has to find out.
 | Group | Why |
 |---|---|
 | hyprland, portals, kitty, qt6ct, hyprpicker, hyprlock | the session itself |
-| ttf-jetbrains-mono-nerd, adwaita-fonts, noto-fonts(-emoji) | kitty's font; Adwaita Sans for the shell UI; everything else |
+| ttf-jetbrains-mono-nerd, adwaita-fonts, noto-fonts(-emoji), ttf-fantasque-nerd | the one font, kitty's and the shell's; GTK's default until a design sets one; everything else; the Flat design's font |
 | signal-desktop, aerc | the two applications this setup assumes: messenger, and a keyboard-driven mail client |
 | uwsm | `options.lua` sets `LAUNCH_PREFIX = "uwsm app -- "`, so **every** app bind goes through it. Clear `LAUNCH_PREFIX` if you do not boot Hyprland via uwsm |
 | nautilus | `options.lua` `FILE_MANAGER` |

@@ -22,7 +22,7 @@ one with `●`.
 
 | Design | Palette | Shape | Material |
 |---|---|---|---|
-| **Glass** | noirblaze | 2px corners, gradient focus border, hairline elsewhere, round pill, Adwaita Sans with JetBrains Mono in every app | frosted terminal and pill, everything else opaque |
+| **Glass** | noirblaze | 2px corners, gradient focus border, hairline elsewhere, round pill, JetBrains Mono in every app | frosted terminal and pill, everything else opaque |
 | **Flat** | Gruvbox, `retrobox` in neovim | square everywhere, no gaps, solid accent border, visible frame on every window, a thin square bar with equal workspace boxes, Fantasque in every app | nothing translucent, no blur, no shadows |
 
 Glass is the tracked config as it stands; everything below this section
