@@ -34,10 +34,11 @@ its palette. A table a design leaves out writes no file.
 - **The Settings UI layer wins over every `.toml`.** `settings.toml` in the state
   directory already held `transparency_mode` and `font_family` from the GUI, so
   a generated file alone could not change them. For a key that layer holds,
-  `noct-design` calls `noctalia msg config-set` with the design's value, or the
-  tracked one when the design names none. Every key a design sets therefore
-  needs a tracked value, or switching back cannot restore it; `tests/lint.sh
-  designs` holds that.
+  `noct-design` saves the value and calls `noctalia msg config-set` with the
+  design's, and the next switch sets the saved value back. GTK and Qt fonts are
+  saved and restored the same way. Restoring the tracked value instead was the
+  first version; a review found it would overwrite choices made in the Settings
+  UI before any design was picked.
 - **The designs are not in `~/.config/noctalia`.** They are TOML, and a `.toml`
   there is Noctalia config.
 
@@ -46,4 +47,5 @@ its palette. A table a design leaves out writes no file.
 | What | Why not |
 |---|---|
 | A design as a set of edits to the tracked files | Switching would dirty the checkout, which is the live config ([001](001-links-not-copies.md)) |
+| Restoring the tracked value on switching back | It overwrites a Settings UI or font choice the user made before any design was picked |
 | Writing every key through `config-set` | It puts `[bar.*]` tables in `settings.toml`, which is exactly the override `noct-check bar-pill-config` reports |

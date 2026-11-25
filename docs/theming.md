@@ -64,44 +64,35 @@ size          = 11                    # GTK and Qt, in points
 terminal_size = 13                    # kitty
 ```
 
-A design without `[fonts]` resets them: the shell to `00-shell.toml`'s, kitty to
-`kitty.conf`'s, GTK to the gsettings defaults, and Qt's keys out of
-`kdeglobals`. Running GTK apps and kittys follow at once; Qt apps on restart.
-
 **Neovim** lives in its own repo, so the design reaches it as a file it can
 read: `~/.local/state/noctalia/design-nvim.lua`, which returns the `[nvim]` table
 and is absent when the design has none. After a switch, `noct-design` calls the
-global `NoctDesign()` in every running neovim that defines one. The hook in
-`init.lua`, in place of a fixed `colorscheme`:
+global `NoctDesign()` in every running neovim that defines one. The nvim config
+(`torbenkopplin/nvimrc`, `init.lua`) reads the file at startup, defines
+`NoctDesign()`, and falls back to noirblaze with a warning when the file does
+not load or names a colorscheme that is not installed.
 
-```lua
-local state = os.getenv("XDG_STATE_HOME") or (vim.env.HOME .. "/.local/state")
-function _G.NoctDesign()
-  local ok, d = pcall(dofile, state .. "/noctalia/design-nvim.lua")
-  vim.cmd.colorscheme(ok and type(d) == "table" and d.colorscheme or "noirblaze")
-  -- re-apply anything set over the colorscheme (transparent backgrounds) here
-  return ""
-end
-NoctDesign()
-```
+Edit the active design and run `noct-design apply`; that re-applies its palette
+too, over a later `/theme` pick. `noct-design show` prints which generated files
+it wrote. Decision [029](decisions/029-designs-bundle-shape-and-material.md)
+explains why it works this way. What a switch does:
 
-Edit the active one and run `noct-design apply`. `noct-design show` prints which
-generated files it wrote. Each table becomes one file that loads after the
-tracked config, so a key a design leaves out keeps its tracked value. Decision
-[029](decisions/029-designs-bundle-shape-and-material.md) explains why it works
-this way. Three rules, all held by `tests/lint.sh designs`:
-
-- **`[pill]` names only what changes.** Noctalia replaces a list from a later
-  file instead of merging it, so `noct-design` writes the whole capsule group
-  from `10-bar.toml` with the design's keys merged in.
-- **Every `[noctalia]` key needs a tracked value.** The Settings UI saves to a
-  layer that wins over every `.toml`. For a key saved there, `noct-design` sets
-  the design's value over IPC, or the tracked value when switching back, and it
-  needs one to switch back to. That is why `00-shell.toml` names
-  `transparency_mode`, `popup_shadows` and `settings_window_translucent`.
+- **A table the design leaves out writes no file**, so the tracked config
+  stands. `[pill]` names only what changes: Noctalia replaces a list from a
+  later file instead of merging it, so `noct-design` writes the whole capsule
+  group from `10-bar.toml` with the design's keys merged in.
+- **What a design overrides elsewhere, it gives back.** Noctalia's Settings UI
+  saves to a layer that wins over every `.toml`, and GTK and Qt keep their fonts
+  in gsettings and `kdeglobals`. A design that sets a key held there saves the
+  old value (`design-saved.json` and `design-fonts.saved` in
+  `~/.local/state/noctalia/`), and the next switch restores it first. So Glass
+  after Flat puts back your own Settings and font choices, not the tracked ones.
 - **A design's `[glass]` wins over `glass.local.conf`.** Picking a design is the
   newer choice. Glass names no levels, so under Glass the machine's own file
   governs as before.
+- **Nothing is written until the design checks out.** `tests/lint.sh designs`
+  runs the same check: unknown tables and keys, and values of the wrong type,
+  where a Noctalia key is typed like the tracked value it replaces.
 
 Switching rebuilds the bar once, because Noctalia rebuilds it on every config
 reload.

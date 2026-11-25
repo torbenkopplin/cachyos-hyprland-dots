@@ -4,34 +4,50 @@
   noct-design.py render <design.toml> <design dir> <config home> <state home>
   noct-design.py check  <design dir> <tracked noctalia dir>
 
-`render` writes the generated files and prints one IPC call per line for
-noct-design to run. `check` is tests/lint.sh designs.
+`render` checks everything, then writes the generated files and prints one IPC
+call per line for noct-design to run; on any error it writes nothing. `check`
+is tests/lint.sh designs.
 """
 
+import json
 import sys
 import tomllib
 from pathlib import Path
 
 KINDS = {"builtin", "custom", "wallpaper", "community"}
 
-# What each table may hold, by who reads it. None: any Noctalia key.
+NUM, INT, STR, BOOL = "number", "integer", "string", "boolean"
+
+# What each table may hold, and of what type. None: any Noctalia key, typed
+# like the tracked value it replaces.
 KNOWN = {
-    "design":   {"label", "description", "palette"},
+    "design":   {"label": STR, "description": STR, "palette": STR},
     "noctalia": None,
-    "pill":     {"fill", "opacity", "radius", "padding", "border", "border_width"},
-    "hyprland": {"rounding", "border_size", "gaps_in", "gaps_out", "border", "inactive_alpha"},
-    "glass":    {"window", "terminal", "adaptive", "blur_size", "blur_passes",
-                 "blur_brightness", "blur_contrast", "blur_vibrancy", "blur_xray"},
-    "nvim":     {"colorscheme"},
-    "fonts":    {"ui", "mono", "size", "terminal_size"},
+    "pill":     {"fill": STR, "opacity": NUM, "radius": NUM, "padding": NUM,
+                 "border": STR, "border_width": NUM},
+    "hyprland": {"rounding": INT, "border_size": INT, "gaps_in": INT, "gaps_out": INT,
+                 "border": STR, "inactive_alpha": NUM},
+    "glass":    {"window": NUM, "terminal": NUM, "adaptive": BOOL, "blur_size": INT,
+                 "blur_passes": INT, "blur_brightness": NUM, "blur_contrast": NUM,
+                 "blur_vibrancy": NUM, "blur_xray": BOOL},
+    "nvim":     {"colorscheme": STR},
+    "fonts":    {"ui": STR, "mono": STR, "size": NUM, "terminal_size": NUM},
 }
 
 GENERATED = "90-design.toml"
+SAVED = "design-saved.json"
+
+
+class DesignError(Exception):
+    pass
 
 
 def load(path):
-    with open(path, "rb") as f:
-        return tomllib.load(f)
+    try:
+        with open(path, "rb") as f:
+            return tomllib.load(f)
+    except (OSError, tomllib.TOMLDecodeError) as e:
+        raise DesignError(f"{path}: {e}") from None
 
 
 def merge(base, over):
@@ -59,6 +75,27 @@ def get(d, path):
     return d
 
 
+def kind(v):
+    if isinstance(v, bool):
+        return BOOL
+    if isinstance(v, int):
+        return INT
+    if isinstance(v, float):
+        return NUM
+    if isinstance(v, str):
+        return STR
+    return type(v).__name__
+
+
+def an(word):
+    return ("an " if word[0] in "aeiou" else "a ") + word
+
+
+def fits(v, want):
+    got = kind(v)
+    return got == want or {got, want} <= {NUM, INT}
+
+
 def tracked_noctalia(noct_dir):
     """The tracked Noctalia config, merged in Noctalia's order, without ours."""
     merged = {}
@@ -66,6 +103,41 @@ def tracked_noctalia(noct_dir):
         if f.name != GENERATED:
             merged = merge(merged, load(f))
     return merged
+
+
+def noctalia_table(design):
+    """The design's Noctalia keys, the shell font from [fonts] included."""
+    noct = dict(design.get("noctalia", {}))
+    ui = design.get("fonts", {}).get("ui")
+    return merge(noct, {"shell": {"font_family": ui}}) if ui else noct
+
+
+def problems(design, tracked):
+    """What is wrong with one design, as sentences."""
+    out = []
+    for table, keys in design.items():
+        if table not in KNOWN:
+            out.append(f"[{table}] is read by nothing")
+        elif not isinstance(keys, dict):
+            out.append(f"[{table}] is not a table")
+        elif KNOWN[table] is not None:
+            for k, v in keys.items():
+                want = KNOWN[table].get(k)
+                if want is None:
+                    out.append(f"[{table}] {k} is read by nothing")
+                elif not fits(v, want):
+                    out.append(f"[{table}] {k} is {an(kind(v))}, not {an(want)}")
+    palette = design.get("design", {}).get("palette", "")
+    if palette and palette.split(" ", 1)[0] not in KINDS:
+        out.append(f"palette '{palette}' is not '<{'|'.join(sorted(KINDS))}> <name>'")
+    if design.get("hyprland", {}).get("border", "gradient") not in ("flat", "gradient"):
+        out.append("[hyprland] border is flat or gradient")
+    noct = noctalia_table(design) if isinstance(design.get("noctalia", {}), dict) else {}
+    for path in paths(noct):
+        have, mine = get(tracked, path), get(noct, path)
+        if have is not None and not fits(mine, kind(have)):
+            out.append(f"{path} is {an(kind(mine))}, where the tracked config has {an(kind(have))}")
+    return out
 
 
 # --- writing ------------------------------------------------------------------
@@ -77,12 +149,18 @@ def literal(v):
     if isinstance(v, (int, float)):
         return repr(v)
     if isinstance(v, str):
-        if "'" not in v:
+        if "'" not in v and "\n" not in v:
             return f"'{v}'"
-        return '"' + v.replace("\\", "\\\\").replace('"', '\\"') + '"'
+        return json.dumps(v)  # a JSON string is a valid TOML basic string
     if isinstance(v, list):
         return "[" + ", ".join(literal(x) for x in v) + "]"
-    raise ValueError(f"cannot write {v!r} as TOML")
+    raise DesignError(f"cannot write {v!r} as TOML")
+
+
+def lua_literal(v):
+    if isinstance(v, str):
+        return json.dumps(v)  # and a valid Lua string
+    return literal(v)
 
 
 def is_table_list(v):
@@ -111,31 +189,8 @@ def lua_table(header, d):
     """A Lua file returning `d`, or None for an empty table (no file)."""
     if not d:
         return None
-    body = "\n".join(f"    {k} = {literal(v).replace(chr(39), chr(34))}," for k, v in d.items())
+    body = "\n".join(f"    {k} = {lua_literal(v)}," for k, v in d.items())
     return f"-- {header}\nreturn {{\n{body}\n}}\n"
-
-
-def write(path, text):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(text)
-    tmp.replace(path)
-
-
-def write_or_remove(path, text):
-    if text is None:
-        path.unlink(missing_ok=True)
-    else:
-        write(path, text)
-
-
-# --- render -------------------------------------------------------------------
-
-def noctalia_table(design):
-    """The design's Noctalia keys, the shell font from [fonts] included."""
-    noct = dict(design.get("noctalia", {}))
-    ui = design.get("fonts", {}).get("ui")
-    return merge(noct, {"shell": {"font_family": ui}}) if ui else noct
 
 
 def kitty_fonts(header, fonts):
@@ -148,6 +203,19 @@ def kitty_fonts(header, fonts):
     return "\n".join(lines) + "\n"
 
 
+def write(path, text):
+    """Replace or remove one file; the rename keeps a reader from seeing half of it."""
+    if text is None:
+        path.unlink(missing_ok=True)
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(text)
+    tmp.replace(path)
+
+
+# --- render -------------------------------------------------------------------
+
 def with_pill(noct, tracked, pill):
     """[pill] merged into the bar's centre capsule group, the whole list written.
 
@@ -157,70 +225,88 @@ def with_pill(noct, tracked, pill):
     bar = get(tracked, "bar.default") or {}
     centre = bar.get("center", [])
     if len(centre) != 1 or not str(centre[0]).startswith("group:"):
-        sys.exit(f"[pill]: the bar's centre lane is {centre}, not one capsule group")
+        raise DesignError(f"[pill]: the bar's centre lane is {centre}, not one capsule group")
     gid = centre[0][len("group:"):]
     groups = bar.get("capsule_group", [])
     if not any(g.get("id") == gid for g in groups):
-        sys.exit(f"[pill]: no capsule_group has id '{gid}'")
+        raise DesignError(f"[pill]: no capsule_group has id '{gid}'")
     groups = [dict(g, **pill) if g.get("id") == gid else g for g in groups]
     return merge(noct, {"bar": {"default": {"capsule_group": groups}}})
+
+
+def settings_ipc(base, state, saved):
+    """IPC for the Settings UI layer, which loads after every .toml and wins.
+
+    A key it holds that this design sets is overridden, and the value it held
+    is saved; a saved key this design does not set gets that value back. So a
+    switch only ever undoes what an earlier switch did.
+    """
+    ipc, keep = [], {}
+    for path in sorted(set(paths(base)) | set(saved)):
+        held = get(state, path)
+        want = get(base, path)
+        if want is not None:
+            if path in saved:
+                keep[path] = saved[path]
+            elif held is not None:
+                keep[path] = held
+            if held is None:
+                continue  # not in the Settings UI layer: 90-design.toml carries it
+        else:
+            want = saved[path]
+        if held != want:
+            ipc.append(f"config-set {path} {literal(want)}")
+    return ipc, keep
 
 
 def render(design_path, design_dir, config_home, state_home):
     design_path = Path(design_path)
     noct_dir = Path(config_home) / "noctalia"
     state_dir = Path(state_home) / "noctalia"
+    saved_file = state_dir / SAVED
 
+    # Read and check everything first, so an error writes nothing.
     design = load(design_path)
     tracked = tracked_noctalia(noct_dir)
-    header = (f"Generated by noct-design from ~/.config/noct-design/{design_path.stem}.toml."
-              " Edit that and run `noct-design apply`.")
-
-    noct = noctalia_table(design)
-    if design.get("pill"):
-        noct = with_pill(noct, tracked, design["pill"])
-    write_or_remove(noct_dir / GENERATED,
-                    "\n".join([f"# {header}"] + emit(noct)) + "\n" if noct else None)
-
-    write_or_remove(Path(config_home) / "hypr" / "generated" / "design.lua",
-                    lua_table(header, design.get("hyprland", {})))
-    write_or_remove(state_dir / "design-nvim.lua", lua_table(header, design.get("nvim", {})))
-
-    fonts = design.get("fonts", {})
-    write(Path(config_home) / "kitty" / "generated-design.conf", kitty_fonts(header, fonts))
-
-    glass = design.get("glass", {})
-    body = "\n".join(f"{k} = {literal(v)}" for k, v in glass.items())
-    write_or_remove(state_dir / "design-glass.conf",
-                    f"# {header}\n{body}\n" if glass else None)
-
-    # The Settings UI layer loads after every .toml. For a key it holds, set
-    # this design's value over IPC, or the tracked one: every key any design
-    # sets, so switching back undoes what the last design did.
+    found = problems(design, tracked)
+    if found:
+        raise DesignError(f"{design_path}: " + "; ".join(found))
     settings = state_dir / "settings.toml"
     state = load(settings) if settings.exists() else {}
-    keys = set()
-    for f in sorted(Path(design_dir).glob("*.toml")):
-        keys |= set(paths(noctalia_table(load(f))))
-    for path in sorted(keys):
-        held = get(state, path)
-        if held is None:
-            continue
-        want = get(noct, path)
-        if want is None:
-            want = get(tracked, path)
-        if want is None:
-            print(f"noct-design: the Settings UI holds {path} = {held!r} and nothing names a value to restore",
-                  file=sys.stderr)
-        elif want != held:
-            print(f"config-set {path} {literal(want)}")
+    try:
+        saved = json.loads(saved_file.read_text()) if saved_file.exists() else {}
+    except (OSError, ValueError) as e:
+        raise DesignError(f"{saved_file}: {e}") from None
 
-    # GTK and Qt: "fonts <ui>|<mono>|<size>", or "fonts" alone to reset them.
+    header = (f"Generated by noct-design from ~/.config/noct-design/{design_path.stem}.toml."
+              " Edit that and run `noct-design apply`.")
+    base = noctalia_table(design)
+    noct = with_pill(base, tracked, design["pill"]) if design.get("pill") else base
+    if design.get("pill") and get(state, "bar.default.capsule_group") is not None:
+        print(f"noct-design: {settings} holds bar.default.capsule_group, which beats [pill]",
+              file=sys.stderr)
+    ipc, keep = settings_ipc(base, state, saved)
+
+    fonts = design.get("fonts", {})
+    glass = design.get("glass", {})
+    files = {
+        noct_dir / GENERATED: "\n".join([f"# {header}"] + emit(noct)) + "\n" if noct else None,
+        Path(config_home) / "hypr" / "generated" / "design.lua":
+            lua_table(header, design.get("hyprland", {})),
+        state_dir / "design-nvim.lua": lua_table(header, design.get("nvim", {})),
+        Path(config_home) / "kitty" / "generated-design.conf": kitty_fonts(header, fonts),
+        state_dir / "design-glass.conf":
+            f"# {header}\n" + "".join(f"{k} = {literal(v)}\n" for k, v in glass.items())
+            if glass else None,
+        saved_file: json.dumps(keep, indent=2) + "\n" if keep else None,
+    }
+
+    for path, text in files.items():
+        write(path, text)
+    for line in ipc:
+        print(line)
     if fonts:
         print(f"fonts {fonts.get('ui', '')}|{fonts.get('mono', '')}|{fonts.get('size', 11)}")
-    else:
-        print("fonts")
-
     palette = design.get("design", {}).get("palette", "")
     if palette:
         print(f"palette {palette}")
@@ -235,28 +321,18 @@ def check(design_dir, noct_dir):
     if not any(f.stem == "glass" for f in files):
         print(f"{design_dir}/glass.toml is missing: it is the design in effect before any is picked")
     for f in files:
-        d = load(f)
-        for table, keys in d.items():
-            if table not in KNOWN:
-                print(f"{f}: [{table}] is read by nothing")
-            elif KNOWN[table] is not None:
-                for k in sorted(set(keys) - KNOWN[table]):
-                    print(f"{f}: [{table}] {k} is read by nothing")
-        palette = d.get("design", {}).get("palette", "")
-        if palette and palette.split(" ", 1)[0] not in KINDS:
-            print(f"{f}: palette '{palette}' is not '<{'|'.join(sorted(KINDS))}> <name>'")
-        if d.get("hyprland", {}).get("border", "gradient") not in ("flat", "gradient"):
-            print(f"{f}: [hyprland] border is flat or gradient")
-        for path in paths(noctalia_table(d)):
-            if get(tracked, path) is None:
-                print(f"{f}: {path} has no value in {noct_dir}/*.toml, so another design cannot restore it")
+        for p in problems(load(f), tracked):
+            print(f"{f}: {p}")
 
 
 if __name__ == "__main__":
     cmd, args = (sys.argv[1], sys.argv[2:]) if len(sys.argv) > 1 else ("", [])
-    if cmd == "render" and len(args) == 4:
-        render(*args)
-    elif cmd == "check" and len(args) == 2:
-        check(*args)
-    else:
-        sys.exit(__doc__)
+    try:
+        if cmd == "render" and len(args) == 4:
+            render(*args)
+        elif cmd == "check" and len(args) == 2:
+            check(*args)
+        else:
+            sys.exit(__doc__)
+    except DesignError as e:
+        sys.exit(f"noct-design: {e}")

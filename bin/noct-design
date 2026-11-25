@@ -19,14 +19,15 @@
 #   palette     `noctalia msg color-scheme-set`
 #
 # A table the design leaves out writes no file, so the tracked value stands.
-# docs/theming.md#designs is the long form.
+# What a design overrides in Noctalia's Settings UI layer and in GTK and Qt is
+# saved, and the next switch gives it back. docs/theming.md#designs is the long form.
 
 set -uo pipefail
 
 HERE=$(dirname "$(readlink -f "$0")")
 . "$HERE/noct-common.sh"
 
-usage() { sed -n '3,7s/^# \{0,1\}//p' "$0" >&2; exit 2; }
+usage() { sed -n '4,8s/^# \{0,1\}//p' "$0" >&2; exit 2; }
 
 CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
 STATE_HOME=${XDG_STATE_HOME:-$HOME/.local/state}
@@ -54,32 +55,40 @@ list() {
     done
 }
 
-# render <file> -- write the generated files and print the IPC calls to make
-# (bin/noct-design.py).
+# render <file> -- check the design, write the generated files and print the
+# IPC calls to make; writes nothing on an error (bin/noct-design.py).
 render() {
     python3 -I "$HERE/noct-design.py" render "$1" "$DESIGN_DIR" "$CONFIG_HOME" "$STATE_HOME"
 }
 
+fail() {
+    echo "${1#noct-design: }" | sed 's/^/noct-design: /' >&2
+    notify-send -a Design -u critical "Could not switch design" "$1" 2>/dev/null
+    return 1
+}
+
 # switch <name>
 switch() {
-    local name=$1 file="$DESIGN_DIR/$1.toml" out line
-    [[ -f $file ]] || { echo "noct-design: no design '$name' in $DESIGN_DIR" >&2; return 1; }
+    local name=$1 out line palette="" failed=0
+    [[ $name =~ ^[A-Za-z0-9_-]+$ ]] || { fail "'$name' is not a design name"; return; }
+    local file="$DESIGN_DIR/$name.toml"
+    [[ -f $file ]] || { fail "no design '$name' in $DESIGN_DIR"; return; }
 
-    out=$(render "$file") || {
-        notify-send -a Design -u critical "Could not switch design" "$name" 2>/dev/null
-        return 1
-    }
+    # Its errors and warnings start with "noct-design:"; every other line is a call.
+    out=$(render "$file" 2>&1) || { fail "$out"; return; }
     mkdir -p "$(dirname "$ACTIVE_FILE")"
     printf '%s' "$name" >"$ACTIVE_FILE"
 
-    local palette=""
+    restore_fonts
     while IFS= read -r line; do
         case $line in
+            "noct-design: "*) echo "$line" >&2 ;;
             "config-set "*)
                 line=${line#config-set }
-                noctalia msg config-set "${line%% *}" "${line#* }" >/dev/null 2>&1 ;;
+                noctalia msg config-set "${line%% *}" "${line#* }" >/dev/null 2>&1 \
+                    || { echo "noct-design: config-set ${line%% *} failed" >&2; failed=1; } ;;
+            "fonts "*)   app_fonts "${line#fonts }" ;;
             "palette "*) palette=${line#palette } ;;
-            fonts*)      app_fonts "${line#fonts}" ;;
         esac
     done <<<"$out"
 
@@ -94,41 +103,63 @@ switch() {
     fi
     noct-glass apply
     nvim_reload
+
+    (( failed )) && notify-send -a Design -u critical "Design '$name' only partly applied" \
+        "a Settings value could not be set; see noct-design set $name" 2>/dev/null
+    return "$failed"
 }
 
-# app_fonts " <ui>|<mono>|<size>" -- GTK and Qt apps' fonts; "" resets both to
-# their defaults. Running GTK apps follow at once, Qt apps on restart.
+# GTK and Qt fonts. A design's [fonts] saves each value it replaces, and the
+# next switch puts them back first, so a design only ever undoes its own change.
+FONTS_SAVED="$STATE_HOME/noctalia/design-fonts.saved"
+GTK=org.gnome.desktop.interface
+
+# qt_font <key> [value] -- write a kdeglobals [General] font; no value deletes it.
+qt_font() {
+    if [[ -n ${2:-} ]]; then
+        kwriteconfig6 --file kdeglobals --group General --key "$1" "$2"
+    else
+        kwriteconfig6 --file kdeglobals --group General --key "$1" --delete
+    fi
+}
+
+restore_fonts() {
+    [[ -f $FONTS_SAVED ]] || return 0
+    local where key value
+    while IFS=$'\t' read -r where key value; do
+        case $where in
+            gtk) command -v gsettings >/dev/null 2>&1 && gsettings set "$GTK" "$key" "$value" ;;
+            qt)  command -v kwriteconfig6 >/dev/null 2>&1 && qt_font "$key" "$value" ;;
+        esac
+    done <"$FONTS_SAVED"
+    rm -f "$FONTS_SAVED"
+}
+
+# app_fonts "<ui>|<mono>|<size>" -- running GTK apps follow at once, Qt apps on restart.
 app_fonts() {
-    local spec=${1# } ui mono size
-    IFS='|' read -r ui mono size <<<"$spec"
-    local -a keys=(font-name document-font-name monospace-font-name)
+    local ui mono size
+    IFS='|' read -r ui mono size <<<"$1"
+    # Qt 6's font string: family, point size, then normal weight, upright.
+    local qt_tail=",$size,-1,5,400,0,0,0,0,0,0,0,0,0,0,1"
+    local -a changes=()
+    [[ -n $ui ]]   && changes+=("gtk font-name $ui $size" "gtk document-font-name $ui $size"
+                            "qt font $ui$qt_tail" "qt menuFont $ui$qt_tail" "qt toolBarFont $ui$qt_tail")
+    [[ -n $mono ]] && changes+=("gtk monospace-font-name $mono $size" "qt fixed $mono$qt_tail")
 
-    if command -v gsettings >/dev/null 2>&1; then
-        if [[ -z $spec ]]; then
-            local k; for k in "${keys[@]}"; do gsettings reset org.gnome.desktop.interface "$k"; done
-        else
-            [[ -n $ui ]] && gsettings set org.gnome.desktop.interface font-name "$ui $size" \
-                         && gsettings set org.gnome.desktop.interface document-font-name "$ui $size"
-            [[ -n $mono ]] && gsettings set org.gnome.desktop.interface monospace-font-name "$mono $size"
-        fi
-    fi
-
-    if command -v kwriteconfig6 >/dev/null 2>&1; then
-        # qt <key> [family] -- Qt 6's font string (normal weight, upright); no family deletes the key.
-        qt() {
-            if [[ -n ${2:-} ]]; then
-                kwriteconfig6 --file kdeglobals --group General --key "$1" "$2,$size,-1,5,400,0,0,0,0,0,0,0,0,0,0,1"
-            else
-                kwriteconfig6 --file kdeglobals --group General --key "$1" --delete
-            fi
-        }
-        if [[ -z $spec ]]; then
-            qt font; qt menuFont; qt toolBarFont; qt fixed
-        else
-            [[ -n $ui ]]   && { qt font "$ui"; qt menuFont "$ui"; qt toolBarFont "$ui"; }
-            [[ -n $mono ]] && qt fixed "$mono"
-        fi
-    fi
+    mkdir -p "$(dirname "$FONTS_SAVED")"
+    local entry where key value
+    for entry in "${changes[@]}"; do
+        where=${entry%% *}; entry=${entry#* }; key=${entry%% *}; value=${entry#* }
+        case $where in
+            gtk) command -v gsettings >/dev/null 2>&1 || continue
+                 printf 'gtk\t%s\t%s\n' "$key" "$(gsettings get "$GTK" "$key")" >>"$FONTS_SAVED"
+                 gsettings set "$GTK" "$key" "$value" ;;
+            qt)  command -v kwriteconfig6 >/dev/null 2>&1 || continue
+                 printf 'qt\t%s\t%s\n' "$key" \
+                     "$(kreadconfig6 --file kdeglobals --group General --key "$key" 2>/dev/null)" >>"$FONTS_SAVED"
+                 qt_font "$key" "$value" ;;
+        esac
+    done
 }
 
 # nvim_reload -- every running neovim re-reads design-nvim.lua, if its config

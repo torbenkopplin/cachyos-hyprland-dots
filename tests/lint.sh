@@ -511,8 +511,8 @@ check_no_secrets() {
     verdict no-secrets "no tracked file carries an address, a password or a copy-me file" "${problems[@]}"
 }
 
-# The designs bin/noct-design switches between. A key it does not know is not an
-# error anywhere: lib/design.lua and noct-glass simply never read it.
+# The designs bin/noct-design switches between, through the same check noct-design
+# runs before a switch: a key nothing reads is not an error anywhere else.
 check_designs() {
     command -v python3 >/dev/null 2>&1 || { skip designs "no python3"; return; }
     local out
@@ -521,7 +521,7 @@ check_designs() {
     local -a problems=()
     local line
     while IFS= read -r line; do [[ -n $line ]] && problems+=("$line"); done <<<"$out"
-    verdict designs "every design names only keys something reads" "${problems[@]}"
+    verdict designs "every design checks out: known tables and keys, right types" "${problems[@]}"
 }
 
 CHECKS=(
@@ -538,7 +538,7 @@ CHECKS=(
     "doc-links|check_doc_links|every relative link in the docs resolves"
     "decisions-index|check_decisions_index|the decisions log and its index agree"
     "no-secrets|check_no_secrets|no credential, address or copy-me file is tracked"
-    "designs|check_designs|every design names only keys something reads"
+    "designs|check_designs|every design checks out: known tables and keys, right types"
 )
 
 if [[ ${1-} == --list ]]; then
