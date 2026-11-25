@@ -47,13 +47,14 @@ require("conf.binds")
 -- would kill the rest of this config.
 pcall(dofile, CONFIG_HOME .. "/hypr/generated/colors.lua")
 
--- The active design's rounding, gaps and border style, written by
--- bin/noct-design. After colors.lua, because a flat border is drawn from the
--- PALETTE that file defines. Absent means the tracked look.
-local has_design, design = pcall(dofile, CONFIG_HOME .. "/hypr/generated/design.lua")
-if has_design and type(design) == "table" then require("lib.design").apply(design) end
-
 -- Frosted glass level for the active scheme, written by bin/noct-glass from
 -- Noctalia's colors_changed hook. Same reasoning as above: absolute path so it
 -- is found at all, pcall because it is absent until the first render.
 pcall(dofile, CONFIG_HOME .. "/hypr/generated/glass.lua")
+
+-- The active design's rounding, gaps and border style, written by
+-- bin/noct-design. After colors.lua, because a flat border is drawn from the
+-- PALETTE that file defines. Last, so an error here cannot skip glass.lua.
+-- Absent means the tracked look.
+local has_design, design = pcall(dofile, CONFIG_HOME .. "/hypr/generated/design.lua")
+if has_design and type(design) == "table" then require("lib.design").apply(design) end

@@ -30,7 +30,6 @@ margin_edge     = 0
 opacity = 1.0
 radius  = 0
 fill    = "surface_container"
-border  = "outline"
 
 # Window borders and corners; read by config/hypr/lib/design.lua.
 [hyprland]
