@@ -105,6 +105,11 @@ def tracked_noctalia(noct_dir):
     return merged
 
 
+# Numbers are never negative; these are fractions too.
+FRACTIONS = {("hyprland", "inactive_alpha"), ("glass", "window"), ("glass", "terminal"),
+             ("pill", "opacity")}
+
+
 def noctalia_table(design):
     """The design's Noctalia keys, the shell font from [fonts] included."""
     noct = dict(design.get("noctalia", {}))
@@ -113,7 +118,7 @@ def noctalia_table(design):
 
 
 def problems(design, tracked):
-    """What is wrong with one design, as sentences."""
+    """What is wrong with one design, as sentences: the check render runs before writing."""
     out = []
     for table, keys in design.items():
         if table not in KNOWN:
@@ -127,18 +132,30 @@ def problems(design, tracked):
                     out.append(f"[{table}] {k} is read by nothing")
                 elif not fits(v, want):
                     out.append(f"[{table}] {k} is {an(kind(v))}, not {an(want)}")
+                elif want in (NUM, INT) and (v < 0 or ((table, k) in FRACTIONS and v > 1)):
+                    out.append(f"[{table}] {k} = {v} is out of range")
+    if out:
+        return out  # the checks below assume every table is a table of the right types
+
     palette = design.get("design", {}).get("palette", "")
     if palette and palette.split(" ", 1)[0] not in KINDS:
         out.append(f"palette '{palette}' is not '<{'|'.join(sorted(KINDS))}> <name>'")
     if design.get("hyprland", {}).get("border", "gradient") not in ("flat", "gradient"):
         out.append("[hyprland] border is flat or gradient")
-    noct = noctalia_table(design) if isinstance(design.get("noctalia", {}), dict) else {}
+    if any("|" in str(design.get("fonts", {}).get(k, "")) for k in ("ui", "mono")):
+        out.append("[fonts] a font name cannot contain '|'")
+    noct = noctalia_table(design)
     for path in paths(noct):
         have, mine = get(tracked, path), get(noct, path)
         if have is None:
             out.append(f"{path} has no value in the tracked config to check its type against")
         elif not fits(mine, kind(have)):
             out.append(f"{path} is {an(kind(mine))}, where the tracked config has {an(kind(have))}")
+    if design.get("pill"):
+        try:
+            with_pill({}, tracked, design["pill"])
+        except DesignError as e:
+            out.append(str(e))
     return out
 
 

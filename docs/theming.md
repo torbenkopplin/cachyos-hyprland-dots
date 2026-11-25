@@ -93,8 +93,9 @@ explains why it works this way. What a switch does:
   newer choice. Glass names no levels, so under Glass the machine's own file
   governs as before.
 - **Nothing is written until the design checks out.** `tests/lint.sh designs`
-  runs the same check: unknown tables and keys, and values of the wrong type,
-  where a Noctalia key must have a tracked value and is typed like it.
+  runs the same check: unknown tables and keys, values of the wrong type or out
+  of range (a Noctalia key must have a tracked value and is typed like it), and
+  a `[pill]` that no longer finds the bar's capsule group.
 
 Switching rebuilds the bar once, because Noctalia rebuilds it on every config
 reload.

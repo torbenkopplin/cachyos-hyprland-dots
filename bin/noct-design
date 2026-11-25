@@ -101,7 +101,8 @@ switch() {
     # A new palette re-renders the templates and fires colors_changed, which
     # runs noct-glass. The same palette does neither, so both are asked for.
     if [[ -n $palette && $palette != "$(noct_scheme 2>/dev/null)" ]]; then
-        noctalia msg color-scheme-set "${palette%% *}" "${palette#* }" >/dev/null 2>&1
+        noctalia msg color-scheme-set "${palette%% *}" "${palette#* }" >/dev/null 2>&1 \
+            || { echo "noct-design: palette '$palette' could not be set" >&2; failed=1; }
     else
         noctalia msg templates-apply >/dev/null 2>&1
     fi
@@ -109,7 +110,7 @@ switch() {
     nvim_reload
 
     (( failed )) && notify-send -a Design -u critical "Design '$name' only partly applied" \
-        "a Settings value could not be set; see noct-design set $name" 2>/dev/null
+        "a Settings value or the palette could not be set; see noct-design set $name" 2>/dev/null
     return "$failed"
 }
 
