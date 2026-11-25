@@ -10,9 +10,16 @@ label       = "Flat"
 description = "square, opaque, solid border, Gruvbox"
 palette     = "builtin Gruvbox"
 
+# ui: the shell, GTK and Qt apps. mono: kitty, and GTK and Qt's fixed-width font.
+# size is GTK and Qt's, in points; terminal_size is kitty's. Package: ttf-fantasque-nerd.
+[fonts]
+ui            = "FantasqueSansM Nerd Font"
+mono          = "FantasqueSansM Nerd Font"
+size          = 11
+terminal_size = 13          # Fantasque runs smaller than kitty.conf's JetBrains Mono at 12
+
 # Merged over the tracked Noctalia config, as ~/.config/noctalia/90-design.toml.
 [noctalia.shell]
-font_family                 = "Liberation Mono"
 corner_radius_scale         = 0.0
 popup_shadows               = false
 settings_window_translucent = false
@@ -24,12 +31,22 @@ transparency_mode = "solid"
 compositor_blur = false
 capsule_radius  = 0
 margin_edge     = 0
+thickness       = 24        # the workspace boxes stay ~16px; a thin bar is what they fill
+capsule_padding = 3
+
+# Workspaces as equal boxes (pill_scale tops out at 1).
+[noctalia.widget.workspaces]
+pill_scale       = 1.0
+active_pill_size = 1.0
+occupied_color   = "outline_variant"
+empty_color      = "surface_container"
 
 # The bar's centre capsule group, over 10-bar.toml's (members and all).
 [pill]
 opacity = 1.0
 radius  = 0
 fill    = "surface_container"
+padding = 0
 
 # Window borders and corners; read by config/hypr/lib/design.lua.
 [hyprland]

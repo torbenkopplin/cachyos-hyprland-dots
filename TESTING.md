@@ -233,7 +233,8 @@ See [decision 029](docs/decisions/029-designs-bundle-shape-and-material.md).
 - [ ] **Flat:** window corners are square, the focused border is one solid colour,
       every other window has a visible frame, and the bar is a square box with no
       blur behind it. Launcher, control centre and notifications have square
-      corners and are not translucent. Terminals are opaque. `noct-glass show`
+      corners and are not translucent. Terminals are opaque, and the shell,
+      kitty and GTK apps are in Fantasque. `noct-glass show`
       says `window 1.0  terminal 1.0  [design]`.
 - [ ] Under Flat, `/theme` → toggle dark/light: both read well, and the shape
       stays square.

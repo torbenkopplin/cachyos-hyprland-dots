@@ -62,10 +62,12 @@ repo	desktop	grim
 #                            Usually present as a GNOME dependency, which is
 #                            not a thing to rely on
 #   noto-*                   everything else, emoji included
+#   ttf-fantasque-nerd       the Flat design's [fonts] (config/noct-design/flat.toml)
 repo	desktop	noto-fonts
 repo	desktop	noto-fonts-emoji
 repo	desktop	ttf-jetbrains-mono-nerd
 repo	desktop	adwaita-fonts
+repo	desktop	ttf-fantasque-nerd
 
 # options.lua sets LAUNCH_PREFIX = "uwsm app -- ", so without uwsm every single
 # app bind fails. Clear LAUNCH_PREFIX instead if you do not want it.

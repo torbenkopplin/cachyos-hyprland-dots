@@ -23,7 +23,7 @@ one with `●`.
 | Design | Palette | Shape | Material |
 |---|---|---|---|
 | **Glass** | noirblaze | 2px corners, gradient focus border, hairline elsewhere, round pill | frosted terminal and pill, everything else opaque |
-| **Flat** | Gruvbox, `retrobox` in neovim | square everywhere, no gaps, solid accent border, visible frame on every window, square bar | nothing translucent, no blur, no shadows |
+| **Flat** | Gruvbox, `retrobox` in neovim | square everywhere, no gaps, solid accent border, visible frame on every window, a thin square bar with equal workspace boxes, Fantasque in every app | nothing translucent, no blur, no shadows |
 
 Glass is the tracked config as it stands; everything below this section
 describes it. After picking a design, `/theme` still swaps the palette and the
@@ -56,7 +56,17 @@ terminal = 1.0
 
 [nvim]                                # for an nvim config that reads it, below
 colorscheme = "retrobox"
+
+[fonts]                               # ui: shell, GTK, Qt. mono: kitty, GTK and Qt fixed
+ui            = "FantasqueSansM Nerd Font"
+mono          = "FantasqueSansM Nerd Font"
+size          = 11                    # GTK and Qt, in points
+terminal_size = 13                    # kitty
 ```
+
+A design without `[fonts]` resets them: the shell to `00-shell.toml`'s, kitty to
+`kitty.conf`'s, GTK to the gsettings defaults, and Qt's keys out of
+`kdeglobals`. Running GTK apps and kittys follow at once; Qt apps on restart.
 
 **Neovim** lives in its own repo, so the design reaches it as a file it can
 read: `~/.local/state/noctalia/design-nvim.lua`, which returns the `[nvim]` table

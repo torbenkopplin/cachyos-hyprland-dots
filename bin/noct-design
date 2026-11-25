@@ -79,6 +79,7 @@ switch() {
                 line=${line#config-set }
                 noctalia msg config-set "${line%% *}" "${line#* }" >/dev/null 2>&1 ;;
             "palette "*) palette=${line#palette } ;;
+            fonts*)      app_fonts "${line#fonts}" ;;
         esac
     done <<<"$out"
 
@@ -93,6 +94,41 @@ switch() {
     fi
     noct-glass apply
     nvim_reload
+}
+
+# app_fonts " <ui>|<mono>|<size>" -- GTK and Qt apps' fonts; "" resets both to
+# their defaults. Running GTK apps follow at once, Qt apps on restart.
+app_fonts() {
+    local spec=${1# } ui mono size
+    IFS='|' read -r ui mono size <<<"$spec"
+    local -a keys=(font-name document-font-name monospace-font-name)
+
+    if command -v gsettings >/dev/null 2>&1; then
+        if [[ -z $spec ]]; then
+            local k; for k in "${keys[@]}"; do gsettings reset org.gnome.desktop.interface "$k"; done
+        else
+            [[ -n $ui ]] && gsettings set org.gnome.desktop.interface font-name "$ui $size" \
+                         && gsettings set org.gnome.desktop.interface document-font-name "$ui $size"
+            [[ -n $mono ]] && gsettings set org.gnome.desktop.interface monospace-font-name "$mono $size"
+        fi
+    fi
+
+    if command -v kwriteconfig6 >/dev/null 2>&1; then
+        # qt <key> [family] -- Qt 6's font string (normal weight, upright); no family deletes the key.
+        qt() {
+            if [[ -n ${2:-} ]]; then
+                kwriteconfig6 --file kdeglobals --group General --key "$1" "$2,$size,-1,5,400,0,0,0,0,0,0,0,0,0,0,1"
+            else
+                kwriteconfig6 --file kdeglobals --group General --key "$1" --delete
+            fi
+        }
+        if [[ -z $spec ]]; then
+            qt font; qt menuFont; qt toolBarFont; qt fixed
+        else
+            [[ -n $ui ]]   && { qt font "$ui"; qt menuFont "$ui"; qt toolBarFont "$ui"; }
+            [[ -n $mono ]] && qt fixed "$mono"
+        fi
+    fi
 }
 
 # nvim_reload -- every running neovim re-reads design-nvim.lua, if its config
