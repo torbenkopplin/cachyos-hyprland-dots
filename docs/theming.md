@@ -85,14 +85,16 @@ explains why it works this way. What a switch does:
   saves to a layer that wins over every `.toml`, and GTK and Qt keep their fonts
   in gsettings and `kdeglobals`. A design that sets a key held there saves the
   old value (`design-saved.json` and `design-fonts.saved` in
-  `~/.local/state/noctalia/`), and the next switch restores it first. So Glass
-  after Flat puts back your own Settings and font choices, not the tracked ones.
+  `~/.local/state/noctalia/`), and the next switch restores it first, before
+  the new design sets its own. Both shipped designs set fonts, so your own font
+  comes back only under a design without `[fonts]`. A Settings value changed by
+  hand while a design is active is replaced by the saved one on the next switch.
 - **A design's `[glass]` wins over `glass.local.conf`.** Picking a design is the
   newer choice. Glass names no levels, so under Glass the machine's own file
   governs as before.
 - **Nothing is written until the design checks out.** `tests/lint.sh designs`
   runs the same check: unknown tables and keys, and values of the wrong type,
-  where a Noctalia key is typed like the tracked value it replaces.
+  where a Noctalia key must have a tracked value and is typed like it.
 
 Switching rebuilds the bar once, because Noctalia rebuilds it on every config
 reload.
@@ -363,7 +365,8 @@ cp config/noctalia/glass.local.conf.example ~/.config/noctalia/glass.local.conf
 ```
 
 Absent by default, which means "use the tracked levels". Present, it wins
-outright — **both** of its keys before **either** of `glass.conf`'s, so a bare
+over `glass.conf` outright (a design's `[glass]` still wins over it; see
+[Designs](#designs)) — **both** of its keys before **either** of `glass.conf`'s, so a bare
 `window` set locally beats a per-scheme `window` in the tracked file. Without
 that ordering, a machine that had said "no compositor transparency here" would
 get it back the moment you switched to the one scheme that overrides it.

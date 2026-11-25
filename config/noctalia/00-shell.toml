@@ -14,6 +14,11 @@ font_family           = "JetBrainsMono Nerd Font"
 corner_radius_scale   = 1.0
 settings_show_advanced = true
 
+## Named so a design that changes them is type-checked against them
+## (tests/lint.sh designs). Noctalia's defaults.
+popup_shadows               = true
+settings_window_translucent = true
+
 ## Noctalia registers as the polkit agent, so authentication prompts are
 ## keyboard-navigable shell dialogs rather than a stray GTK window.
 polkit_agent          = true

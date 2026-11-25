@@ -74,9 +74,13 @@ switch() {
     local file="$DESIGN_DIR/$name.toml"
     [[ -f $file ]] || { fail "no design '$name' in $DESIGN_DIR"; return; }
 
+    # One switch at a time: two would save each other's fonts as the originals.
+    mkdir -p "$STATE_HOME/noctalia"
+    exec 9>"$STATE_HOME/noctalia/design.lock"
+    flock -n 9 || { fail "another switch is running"; return; }
+
     # Its errors and warnings start with "noct-design:"; every other line is a call.
     out=$(render "$file" 2>&1) || { fail "$out"; return; }
-    mkdir -p "$(dirname "$ACTIVE_FILE")"
     printf '%s' "$name" >"$ACTIVE_FILE"
 
     restore_fonts
@@ -135,31 +139,42 @@ restore_fonts() {
     rm -f "$FONTS_SAVED"
 }
 
-# app_fonts "<ui>|<mono>|<size>" -- running GTK apps follow at once, Qt apps on restart.
+# app_fonts "<ui>|<mono>|<size>" -- running GTK apps follow at once, Qt apps on
+# restart. With no size, each font keeps the size it has.
 app_fonts() {
     local ui mono size
     IFS='|' read -r ui mono size <<<"$1"
-    # Qt 6's font string: family, point size, then normal weight, upright.
-    local qt_tail=",$size,-1,5,400,0,0,0,0,0,0,0,0,0,0,1"
     local -a changes=()
-    [[ -n $ui ]]   && changes+=("gtk font-name $ui $size" "gtk document-font-name $ui $size"
-                            "qt font $ui$qt_tail" "qt menuFont $ui$qt_tail" "qt toolBarFont $ui$qt_tail")
-    [[ -n $mono ]] && changes+=("gtk monospace-font-name $mono $size" "qt fixed $mono$qt_tail")
+    [[ -n $ui ]]   && changes+=("gtk font-name $ui" "gtk document-font-name $ui"
+                                "qt font $ui" "qt menuFont $ui" "qt toolBarFont $ui")
+    [[ -n $mono ]] && changes+=("gtk monospace-font-name $mono" "qt fixed $mono")
 
     mkdir -p "$(dirname "$FONTS_SAVED")"
-    local entry where key value
+    local entry where key family now pt
     for entry in "${changes[@]}"; do
-        where=${entry%% *}; entry=${entry#* }; key=${entry%% *}; value=${entry#* }
+        where=${entry%% *}; entry=${entry#* }; key=${entry%% *}; family=${entry#* }
         case $where in
             gtk) command -v gsettings >/dev/null 2>&1 || continue
-                 printf 'gtk\t%s\t%s\n' "$key" "$(gsettings get "$GTK" "$key")" >>"$FONTS_SAVED"
-                 gsettings set "$GTK" "$key" "$value" ;;
+                 now=$(gsettings get "$GTK" "$key")
+                 printf 'gtk\t%s\t%s\n' "$key" "$now" >>"$FONTS_SAVED"
+                 pt=${now%\'}; pt=${pt##* }
+                 [[ $pt =~ ^[0-9.]+$ ]] || pt=11
+                 gsettings set "$GTK" "$key" "$(gvariant_string "$family ${size:-$pt}")" ;;
             qt)  command -v kwriteconfig6 >/dev/null 2>&1 || continue
-                 printf 'qt\t%s\t%s\n' "$key" \
-                     "$(kreadconfig6 --file kdeglobals --group General --key "$key" 2>/dev/null)" >>"$FONTS_SAVED"
-                 qt_font "$key" "$value" ;;
+                 now=$(kreadconfig6 --file kdeglobals --group General --key "$key" 2>/dev/null)
+                 printf 'qt\t%s\t%s\n' "$key" "$now" >>"$FONTS_SAVED"
+                 pt=$(cut -d, -f2 <<<"$now")
+                 [[ $pt =~ ^[0-9.]+$ ]] || pt=11
+                 # Qt 6's font string: family, point size, then normal weight, upright.
+                 qt_font "$key" "$family,${size:-$pt},-1,5,400,0,0,0,0,0,0,0,0,0,0,1" ;;
         esac
     done
+}
+
+# gvariant_string <text> -- quoted for `gsettings set`, which parses its value.
+gvariant_string() {
+    local s=${1//\\/\\\\}
+    printf "'%s'" "${s//\'/\\\'}"
 }
 
 # nvim_reload -- every running neovim re-reads design-nvim.lua, if its config

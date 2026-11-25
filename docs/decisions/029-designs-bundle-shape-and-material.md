@@ -21,8 +21,9 @@ tracked config, plus a palette switch:
 | `[glass]` | `~/.local/state/noctalia/design-glass.conf` | `noct-glass`, before `glass.local.conf` |
 | `palette` | `noctalia msg color-scheme-set` | — |
 
-The tracked config stays the Glass design, unchanged: `glass.toml` names only
-its palette. A table a design leaves out writes no file.
+The tracked config stays the Glass design: `glass.toml` names its palette and
+its one font, which it also applies to GTK and Qt. A table a design leaves out
+writes no file.
 
 ## Three things that shaped it
 

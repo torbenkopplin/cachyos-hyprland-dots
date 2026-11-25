@@ -135,7 +135,9 @@ def problems(design, tracked):
     noct = noctalia_table(design) if isinstance(design.get("noctalia", {}), dict) else {}
     for path in paths(noct):
         have, mine = get(tracked, path), get(noct, path)
-        if have is not None and not fits(mine, kind(have)):
+        if have is None:
+            out.append(f"{path} has no value in the tracked config to check its type against")
+        elif not fits(mine, kind(have)):
             out.append(f"{path} is {an(kind(mine))}, where the tracked config has {an(kind(have))}")
     return out
 
@@ -306,7 +308,7 @@ def render(design_path, design_dir, config_home, state_home):
     for line in ipc:
         print(line)
     if fonts:
-        print(f"fonts {fonts.get('ui', '')}|{fonts.get('mono', '')}|{fonts.get('size', 11)}")
+        print(f"fonts {fonts.get('ui', '')}|{fonts.get('mono', '')}|{fonts.get('size', '')}")
     palette = design.get("design", {}).get("palette", "")
     if palette:
         print(f"palette {palette}")
