@@ -22,6 +22,7 @@ KNOWN = {
     "hyprland": {"rounding", "border_size", "gaps_in", "gaps_out", "border", "inactive_alpha"},
     "glass":    {"window", "terminal", "adaptive", "blur_size", "blur_passes",
                  "blur_brightness", "blur_contrast", "blur_vibrancy", "blur_xray"},
+    "nvim":     {"colorscheme"},
 }
 
 GENERATED = "90-design.toml"
@@ -105,6 +106,14 @@ def emit(d, path=()):
     return lines
 
 
+def lua_table(header, d):
+    """A Lua file returning `d`, or None for an empty table (no file)."""
+    if not d:
+        return None
+    body = "\n".join(f"    {k} = {literal(v).replace(chr(39), chr(34))}," for k, v in d.items())
+    return f"-- {header}\nreturn {{\n{body}\n}}\n"
+
+
 def write(path, text):
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
@@ -155,10 +164,9 @@ def render(design_path, design_dir, config_home, state_home):
     write_or_remove(noct_dir / GENERATED,
                     "\n".join([f"# {header}"] + emit(noct)) + "\n" if noct else None)
 
-    hypr = design.get("hyprland", {})
-    body = "\n".join(f"    {k} = {literal(v).replace(chr(39), chr(34))}," for k, v in hypr.items())
     write_or_remove(Path(config_home) / "hypr" / "generated" / "design.lua",
-                    f"-- {header}\nreturn {{\n{body}\n}}\n" if hypr else None)
+                    lua_table(header, design.get("hyprland", {})))
+    write_or_remove(state_dir / "design-nvim.lua", lua_table(header, design.get("nvim", {})))
 
     glass = design.get("glass", {})
     body = "\n".join(f"{k} = {literal(v)}" for k, v in glass.items())

@@ -23,7 +23,7 @@ one with `●`.
 | Design | Palette | Shape | Material |
 |---|---|---|---|
 | **Glass** | noirblaze | 2px corners, gradient focus border, hairline elsewhere, round pill | frosted terminal and pill, everything else opaque |
-| **Flat** | Gruvbox | square everywhere, solid accent border, visible frame on every window, square bar | nothing translucent, no blur, no shadows |
+| **Flat** | Gruvbox, `retrobox` in neovim | square everywhere, no gaps, solid accent border, visible frame on every window, square bar | nothing translucent, no blur, no shadows |
 
 Glass is the tracked config as it stands; everything below this section
 describes it. After picking a design, `/theme` still swaps the palette and the
@@ -53,6 +53,26 @@ border   = "flat"
 [glass]                               # any glass.conf key; window = terminal = 1.0
 window   = 1.0                        # also switches the blur off
 terminal = 1.0
+
+[nvim]                                # for an nvim config that reads it, below
+colorscheme = "retrobox"
+```
+
+**Neovim** lives in its own repo, so the design reaches it as a file it can
+read: `~/.local/state/noctalia/design-nvim.lua`, which returns the `[nvim]` table
+and is absent when the design has none. After a switch, `noct-design` calls the
+global `NoctDesign()` in every running neovim that defines one. The hook in
+`init.lua`, in place of a fixed `colorscheme`:
+
+```lua
+local state = os.getenv("XDG_STATE_HOME") or (vim.env.HOME .. "/.local/state")
+function _G.NoctDesign()
+  local ok, d = pcall(dofile, state .. "/noctalia/design-nvim.lua")
+  vim.cmd.colorscheme(ok and type(d) == "table" and d.colorscheme or "noirblaze")
+  -- re-apply anything set over the colorscheme (transparent backgrounds) here
+  return ""
+end
+NoctDesign()
 ```
 
 Edit the active one and run `noct-design apply`. `noct-design show` prints which

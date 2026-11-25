@@ -35,6 +35,8 @@ fill    = "surface_container"
 [hyprland]
 rounding       = 0
 border_size    = 2
+gaps_in        = 0          # columns meet; the borders are the divider
+gaps_out       = 0          # and reach the screen edge
 border         = "flat"     # "gradient" is the tracked default
 inactive_alpha = 1.0        # 0.15 is the tracked hairline
 
@@ -43,3 +45,8 @@ inactive_alpha = 1.0        # 0.15 is the tracked hairline
 window   = 1.0
 terminal = 1.0
 adaptive = false
+
+# Neovim's colorscheme, for an nvim config that reads it (docs/theming.md#designs).
+# retrobox ships with neovim and is Gruvbox-based.
+[nvim]
+colorscheme = "retrobox"

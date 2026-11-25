@@ -15,6 +15,7 @@
 #   [pill]      the same file: the bar's centre capsule group, over 10-bar.toml's
 #   [hyprland]  ~/.config/hypr/generated/design.lua, read by lib/design.lua
 #   [glass]     ~/.local/state/noctalia/design-glass.conf, read by noct-glass
+#   [nvim]      ~/.local/state/noctalia/design-nvim.lua, read by an nvim config
 #   palette     `noctalia msg color-scheme-set`
 #
 # A table the design leaves out writes no file, so the tracked value stands.
@@ -91,6 +92,19 @@ switch() {
         noctalia msg templates-apply >/dev/null 2>&1
     fi
     noct-glass apply
+    nvim_reload
+}
+
+# nvim_reload -- every running neovim re-reads design-nvim.lua, if its config
+# defines the global NoctDesign() (docs/theming.md#designs); others are untouched.
+nvim_reload() {
+    command -v nvim >/dev/null 2>&1 || return 0
+    local sock
+    for sock in "${XDG_RUNTIME_DIR:-/tmp}"/nvim.*.0; do
+        [[ -S $sock ]] || continue
+        timeout 2 nvim --server "$sock" \
+            --remote-expr "luaeval('NoctDesign and NoctDesign() or \"\"')" >/dev/null 2>&1
+    done
 }
 
 act() {
