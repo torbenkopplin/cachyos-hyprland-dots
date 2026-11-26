@@ -51,11 +51,12 @@ padding = 0
 # Window borders and corners; read by config/hypr/lib/design.lua.
 [hyprland]
 rounding       = 0
-border_size    = 2
-gaps_in        = 0          # columns meet; the borders are the divider
-gaps_out       = 0          # and reach the screen edge
+border_size    = 8          # only the focused window draws one, so it can be loud
+gaps_in        = 4          # the wallpaper between columns is the divider
+gaps_out       = 4
 border         = "flat"     # "gradient" is the tracked default
-inactive_alpha = 1.0        # 0.15 is the tracked hairline
+border_color   = "tertiary" # a palette role; primary sits too close to the window colours
+inactive_alpha = 0.0        # unfocused windows draw no border at all
 
 # Levels in glass.conf's terms. Both at 1.0 also switches the blur off.
 [glass]

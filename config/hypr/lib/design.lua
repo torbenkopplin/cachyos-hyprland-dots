@@ -29,7 +29,7 @@ function M.apply(d)
     -- current template; the gradient from that file then stays.
     local p = PALETTE
     if p then
-        if d.border == "flat" then col.active_border = "rgb(" .. p.primary .. ")" end
+        if d.border == "flat" then col.active_border = "rgb(" .. p[d.border_color or "primary"] .. ")" end
         if d.inactive_alpha then col.inactive_border = rgba(p.outline_variant, d.inactive_alpha) end
     end
     if next(col) then general.col = col end
