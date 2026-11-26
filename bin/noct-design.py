@@ -26,7 +26,7 @@ KNOWN = {
     "pill":     {"fill": STR, "opacity": NUM, "radius": NUM, "padding": NUM,
                  "border": STR, "border_width": NUM},
     "hyprland": {"rounding": INT, "border_size": INT, "gaps_in": INT, "gaps_out": INT,
-                 "border": STR, "inactive_alpha": NUM},
+                 "border": STR, "border_color": STR, "inactive_alpha": NUM},
     "glass":    {"window": NUM, "terminal": NUM, "adaptive": BOOL, "blur_size": INT,
                  "blur_passes": INT, "blur_brightness": NUM, "blur_contrast": NUM,
                  "blur_vibrancy": NUM, "blur_xray": BOOL},
@@ -109,6 +109,9 @@ def tracked_noctalia(noct_dir):
 FRACTIONS = {("hyprland", "inactive_alpha"), ("glass", "window"), ("glass", "terminal"),
              ("pill", "opacity")}
 
+# The palette roles config/noctalia/templates/hyprland-colors.lua renders.
+BORDER_ROLES = ("primary", "tertiary", "outline", "outline_variant")
+
 
 def noctalia_table(design):
     """The design's Noctalia keys, the shell font from [fonts] included."""
@@ -142,6 +145,8 @@ def problems(design, tracked):
         out.append(f"palette '{palette}' is not '<{'|'.join(sorted(KINDS))}> <name>'")
     if design.get("hyprland", {}).get("border", "gradient") not in ("flat", "gradient"):
         out.append("[hyprland] border is flat or gradient")
+    if design.get("hyprland", {}).get("border_color", "primary") not in BORDER_ROLES:
+        out.append(f"[hyprland] border_color is one of {', '.join(BORDER_ROLES)}")
     if any("|" in str(design.get("fonts", {}).get(k, "")) for k in ("ui", "mono")):
         out.append("[fonts] a font name cannot contain '|'")
     noct = noctalia_table(design)

@@ -46,8 +46,8 @@ corner_radius_scale = 0.0
 radius  = 0
 opacity = 1.0
 
-[hyprland]                            # rounding, border_size, gaps_in, gaps_out,
-rounding = 0                          # border = "flat" | "gradient", inactive_alpha
+[hyprland]                            # rounding, border_size, gaps_in, gaps_out, inactive_alpha,
+rounding = 0                          # border = "flat" | "gradient", border_color = a palette role
 border   = "flat"
 
 [glass]                               # any glass.conf key; window = terminal = 1.0
